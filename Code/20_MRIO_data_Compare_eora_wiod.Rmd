@@ -1,0 +1,399 @@
+---
+title: "Untitled"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+# Set up
+
+```{r Paths and packages}
+# To clear your environment 
+# remove(list = ls())
+
+# set work dir
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+setwd(dir)
+setwd('../Data/')
+getwd()
+
+dir.eora    <- './data_02_intermediate/dt02_flows/eora/'
+dir.fig     <- './Figure/'
+
+### packages
+library(readxl)
+library(XLConnect)
+library(xlsx)
+library(tidyverse)
+library(reshape2) # expand long table to wide one
+
+### plot #####
+library(cowplot)
+library(ggplot2)
+library(ggpubr)
+library(RColorBrewer)
+## Color Brewer palette
+library(viridis)
+library(hrbrthemes)
+library(devtools)
+library(circlize)  ## for circlize plot
+library(Cairo)
+
+```
+
+
+
+```{r Theme and font}
+### plot settings
+unit_ns    <- 'cm'
+width_1col <- 8.8   ## 1-column
+width_2col <- 18    ## 2-column
+font       <- 'sans'     ## "TT Arial"
+font_size  <- 7        ##  Nature Sustainability: max = 7; min = 5
+theme_ns <- 
+  theme_bw()+
+  theme(
+    # axis.title =element_blank(),
+    # axis.text  =element_blank(),
+    # axis.ticks =element_blank(),
+    # panel.background = element_rect(fill = NA),
+    panel.grid.major.x = element_blank(),
+    # panel.grid.major = element_blank(),
+    # panel.grid.minor = element_line(colour = "red", size = 1),
+    legend.background = element_rect(fill="transparent"),
+    legend.key.size = unit(0.15,"cm"),
+    text = element_text(size=font_size)
+        )
+```
+
+
+#  Data
+## Data source
+```{r}
+
+### indicator file names ----------------------------
+### co2
+# indicator.name<- 'co2'
+# xls.name.eora <- 'YJ_CO2_2005.xlsx'; unit_name <- 'tonne' ## tonne
+# xls.name.wiod <- '9_co2.xlsx';       unit_conv <- 1000    ## 1000 tonnes in raw data; convert to the same unit
+
+### water use
+indicator.name<- 'water'
+xls.name.eora <- 'YJ_Water_2005.xlsx'; unit_name <- 'm3'  ## m3
+xls.name.wiod <- '6_wat.xlsx';         unit_conv <- 1000  ## 1000 cubic meters in raw data
+
+# ### energy
+# indicator.name<- 'energy_total'
+# xls.name.eora <- 'YJ_Energytotal_2005.xlsx'; unit_name <- 'PJ'         ## PJ = 1000 TJ
+# xls.name.wiod <- '7_ene.xlsx';               unit_conv <- 1/10^3  ## in TJ in the raw data
+
+
+# ### forest
+# indicator.name<- 'Landuse_forest'
+# xls.name.eora <- 'YJ_Landuse_forest_2005.xlsx'; unit_name <- 'ha'         ## 
+# xls.name.wiod <- '15_for.xlsx';                 unit_conv <- 10^3       ## 1000 ha in the raw data
+
+
+### create file names with path ---------------------
+path_dt_eora <- dir.eora
+path_dt_wiod <- 'G:/My Drive/_paper/SDGs/SDGs_Global_Trade/data/update_0503_SUM_dist/'
+xls_eora <- paste0(path_dt_eora, xls.name.eora); xls_eora
+xls_wiod <- paste0(path_dt_wiod, xls.name.wiod); xls_wiod
+
+
+
+### ctr info ----------------------------------------
+### ctr names
+# xls_iso  <- "./_eora_190country_iso3.xlsx"
+# iso <- readxl::read_excel(path = xls_iso)
+# iso_match <- df.eora[, 1:2] %>%
+#   left_join(., iso, by = c('Row' = 'country_eora')) %>%
+#   arrange(!is.na(iso3_eora))
+# writexl::write_xlsx(x = iso_match, path = './_eora_190country_iso3_match.xlsx')
+xls_iso_eora <- "./_eora_190country_iso3_match_update.xlsx"
+xls_iso_wiod <- "./_wiod_41country_iso3.xlsx"
+iso_eora <- readxl::read_excel(path = xls_iso_eora)
+iso_wiod <- readxl::read_excel(path = xls_iso_wiod)
+```
+
+
+
+## Eora
+```{r}
+### the data
+df.eora  <- readxl::read_excel(path = xls_eora) 
+df.eora1 <- df.eora %>%
+  left_join(., iso_eora, by = c('Row' = 'Row')) %>% ## add ctr code
+  arrange(!is.na(iso3_eora))
+
+names(df.eora1)
+# unique(df.eora1$Row)
+ctr_ls_eora <- unique(df.eora1$iso3_eora); ctr_ls_eora
+
+### rename the cols
+names(df.eora1) <- c('ctr', ctr_ls_eora, 'iso3')
+
+### reorder the col names
+col_name_ctr <- names(df.eora1)[-c(1, ncol(df.eora1))]; col_name_ctr ## remove "ctr" in the 1st col and "iso3" in the last
+df.eora.final <- df.eora1 %>%
+  dplyr::select(ctr, iso3, all_of(col_name_ctr))
+```
+
+
+
+## WIOD
+```{r}
+df.wiod <- readxl::read_excel(path = xls_wiod, sheet = 1, range = "B1:AP616")
+s2 <- df.wiod
+# add country name as a new col
+countries <- colnames(s2[1:41]); countries
+colnames(s2) <- countries; length(countries)
+
+# add year seq to data frame 
+year_seq = rep(seq(1995, 2009, by=1), each = 41)
+ctr_seq <- rep(countries, times = 2009-1995+1);# ctr_seq
+s2$year <- year_seq
+s2$ctr  <- ctr_seq
+
+df.wiod1 <- s2 %>%
+  left_join(., iso_wiod, by = 'ctr') %>%
+  arrange(!is.na(iso3))
+
+df.wiod2005 <- df.wiod1 %>% as.data.frame() %>%
+  dplyr::select(year, ctr, iso3, countries) %>%
+  dplyr::filter(year == 2005)
+
+names(df.wiod2005)
+unique(df.wiod2005$ctr)
+ctr_ls_wiod <- unique(df.wiod1$iso3); ctr_ls_wiod
+### rename the cols
+names(df.wiod2005) <- c('year', 'ctr', 'iso3', ctr_ls_wiod)
+
+# # total nearby imports
+# s4 <- s3 %>% group_by(year) %>% summarise_all(funs(sum))
+# 
+# # tanspose data frame and keep the first col as new header
+# s5 = as.data.frame(t(s4[,-1]))
+# colnames(s5) <- seq(1995, 2009, by=1)
+# s5 <- s5[ order(row.names(s5)), ]
+#   
+  
+  
+```
+
+
+## Compare
+```{r}
+ctr_ls_wiod <- unique(df.wiod1$iso3)
+ctr_ls_eora <- unique(df.eora1$iso3)
+### remove ROW from the list, and get a common ctr list
+ctr_ls_common <- Reduce(intersect, list(ctr_ls_wiod, ctr_ls_eora))
+
+### wide OR matrix format
+df_common_ctr_wiod <- df.wiod2005 %>%
+  dplyr::filter(iso3 %in% ctr_ls_common) %>%
+  dplyr::select(iso3, ctr_ls_common) %>%
+  arrange(iso3)
+df_common_ctr_eora <- df.eora1 %>%
+  dplyr::filter(iso3 %in% ctr_ls_common) %>%
+  dplyr::select(iso3, ctr_ls_common) %>%
+  arrange(iso3)
+
+### long format
+df_common_ctr_wiod_l <- df_common_ctr_wiod %>%
+  gather(key = 'receive', value = 'value', 2:length(names(df_common_ctr_wiod))) %>%
+  arrange(iso3, receive) %>%
+  ### convert to the same unit
+  dplyr::mutate(value = value * unit_conv)
+df_common_ctr_eora_l <- df_common_ctr_eora %>%
+  gather(key = 'receive', value = 'value', 2:length(names(df_common_ctr_eora))) %>%
+  arrange(iso3, receive)
+
+str(df_common_ctr_wiod_l)
+```
+
+
+### heatmap
+```{r}
+### plot to see
+myPalette <- colorRampPalette((brewer.pal(9, "Blues")));# myPalette; rev
+n1 <- 9
+colors <- myPalette(n1)[0:(n1)]; colors
+### generate a vector of n contiguous colors using the functions 
+### rainbow(n), heat.colors(n), terrain.colors(n), topo.colors(n), and cm.colors(n).
+space_size = 0.3
+
+(ht.wiod <- df_common_ctr_wiod_l %>%
+    ### transform the data to be comparable
+    dplyr::mutate(value = log10(value)) %>%
+    ### remove the self-to-self trade (too big values)
+    # dplyr::filter(iso3 != receive) %>%
+    ggplot(data = ., aes(x = receive, y = iso3)) + 
+    geom_tile(aes(fill = value), colour = "white", 
+              size = space_size, ## the space between boxes
+              show.legend = T) + 
+    scale_fill_gradientn(colours = topo.colors(100)) +
+    # theme_bw() +
+    theme_ns +
+    xlab('destination nation') + ylab('origin nation') +
+    labs(fill = paste0(indicator.name, ': log10(', unit_name, ')')) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.3))
+)
+
+ht.eora <- df_common_ctr_eora_l %>%
+  ### transform the data to be comparable
+  dplyr::mutate(value = log10(value)) %>%
+  ### remove the self-to-self trade (too big values)
+  # dplyr::filter(iso3 != receive) %>%
+  ggplot(data = ., aes(x = receive, y = iso3)) + 
+  geom_tile(aes(fill = value), colour = "white", 
+            size = space_size, ## the space between boxes
+            show.legend = T) + 
+  scale_fill_gradientn(colours = topo.colors(100)) +
+  # theme_bw() +
+  theme_ns +
+  xlab('destination nation') + ylab('origin nation') +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.3))
+
+ggarrange(ht.wiod, ht.eora, ncol = 2, labels = c('wiod', 'eora'), common.legend = T, vjust = 0, legend = 'top')
+### save plot
+fname <-paste0(dir.fig, 'eora_figures/', 'compare_heatmap_', indicator.name, '08-13.png'); fname
+ggsave(filename = fname, plot = last_plot(), width = width_2col, height = width_2col/2, units = unit_ns, dpi = 300)
+
+```
+
+
+### circular viz
+```{r}
+
+library(circlize)
+df_common_ctr_wiod_w <- df_common_ctr_wiod_l %>%
+  ### remove the self-to-self trade (too big values)
+  dplyr::filter(iso3 != receive) %>%
+  pivot_wider(names_from = receive, values_from = value) %>%
+  arrange(iso3)
+df_common_ctr_eora_w <- df_common_ctr_eora_l %>%
+  ### remove the self-to-self trade (too big values)
+  dplyr::filter(iso3 != receive) %>%
+  pivot_wider(names_from = receive, values_from = value) %>%
+  arrange(iso3)
+### 
+tradematrix1 = as.matrix(df_common_ctr_wiod_w[,2:41])
+tradematrix2 = as.matrix(df_common_ctr_eora_w[,2:41])
+
+### drop small flows
+# quantile(tradematrix1, 0.1)
+# quantile(tradematrix2, 0.1)
+# tradematrix1[tradematrix1 <= quantile(tradematrix1, 0.1)] <- 0 # values that less than the lower 10% will be dropped
+# tradematrix2[tradematrix2 <= quantile(tradematrix2, 0.1)] <- 0 # values that less than the lower 10% will be dropped
+
+### change country names
+countries <- as.vector(df_common_ctr_wiod_w$iso3) 
+rownames(tradematrix1) = countries
+rownames(tradematrix2) = countries
+# colnames(tradematrix1) = countries
+# colnames(tradematrix2) = countries
+
+grid.col2 = c(
+# color scheme
+  "#FF0000FF", "#FF2600FF", "#FF4D00FF", "#FF7300FF", "#FF9900FF",
+  "#FFBF00FF", "#FFE500FF", "#F2FF00FF", "#CCFF00FF", "#A6FF00FF",
+  "#80FF00FF", "#59FF00FF", "#33FF00FF", "#0DFF00FF", "#00FF19FF",
+  "#00FF40FF", "#00FF66FF", "#00FF8CFF", "#00FFB2FF", "#00FFD9FF",
+  "#00FFFFFF", "#00D9FFFF", "#00B3FFFF", "#008CFFFF", "#0066FFFF",
+  "#0040FFFF", "#001AFFFF", "#0D00FFFF", "#3300FFFF", "#5900FFFF",
+  "#7F00FFFF", "#A600FFFF", "#CC00FFFF", "#F200FFFF", "#FF00E6FF",
+  "#FF00BFFF", "#FF0099FF", "#FF0073FF", "#FF004DFF", "#FF0026FF")
+
+
+# define the font size
+fontsize1 = 0.5
+fontsize2 = fontsize1
+
+# define the circle size (default value: 0.2)
+# water 08/95 = 1.5/1
+# A4 page size: 8.5*11 inches = 21.6 * 27.9 cm
+sum1  <- sum(tradematrix1, na.rm = T); sum1 ## wiod
+sum2  <- sum(tradematrix2, na.rm = T); sum2 ## eora
+ratio0 <- sum2/sum1; ratio0
+
+### tune the number
+# ratio <- ratio0/1000 #**(1/10)
+# ratio
+ratio <- ifelse(ratio0 > 5, 5, ratio0); ratio
+
+
+### save plot
+fname <-paste0(dir.fig, 'eora_figures/', 'compare_circular_', indicator.name, '0915.png'); fname
+library(Cairo)
+Cairo(file= fname, type="png", units=unit_ns, width = width_2col, height = width_2col/2, dpi=300)
+
+# place two plots in one row
+par(mfrow=c(1,2), mar=c(0,0,1,0), oma=c(0,0,1,0))
+
+## circle size
+size2 = 0.08 # 0.11
+size1 = size2 * ratio; size1
+
+### plot 1 --------------------------------------------------------
+circos.clear()
+circos.par(gap.degree = 2.3) # 2.3
+chordDiagram(tradematrix1, 
+             grid.col = grid.col2,
+             annotationTrack = "grid", 
+             preAllocateTracks = list(track.height = size1), 
+             transparency = 0.3)
+
+### remove the text labels if the plot is too small
+### to do so, please comment the code bellow
+# ***
+circos.trackPlotRegion(track.index = 1, panel.fun = function(x, y) {
+  xlim = get.cell.meta.data("xlim")
+  xplot = get.cell.meta.data("xplot")
+  ylim = get.cell.meta.data("ylim")
+  sector.index = get.cell.meta.data("sector.index") # sector.name
+  if(abs(xplot[2] - xplot[1]) < 15) {
+    circos.text(mean(xlim), ylim[1], sector.index, facing = "clockwise", col = 'white',# name
+                niceFacing = T, adj = c(0, 0.5), cex = fontsize1)}
+  else {circos.text(mean(xlim), ylim[1], sector.index, facing = "inside", col = 'white',# name
+                niceFacing = TRUE, adj = c(0.5, 0), cex = fontsize1)}
+  },
+  bg.border = NA)
+# ***
+
+title.name <- paste0("a. wiod data", ' * ', round(ratio0, digits = 1), ' (', unit_name, ')'); title.name
+title(title.name)
+
+
+### plot 2 --------------------------------------------------------
+circos.clear()
+circos.par(gap.degree = 2.3) # Gap between two neighbour sectors. 
+
+chordDiagram(tradematrix2, grid.col = grid.col2,
+             annotationTrack = "grid", 
+             preAllocateTracks = list(track.height = size2), 
+             transparency = 0.4)
+
+circos.trackPlotRegion(track.index = 1, panel.fun = function(x, y) {
+  xlim = get.cell.meta.data("xlim")
+  xplot = get.cell.meta.data("xplot")
+  ylim = get.cell.meta.data("ylim")
+  sector.index = get.cell.meta.data("sector.index")
+  if(abs(xplot[2] - xplot[1]) < 15) {
+    circos.text(mean(xlim), ylim[1], sector.index, facing = "clockwise", col = 'white',
+                niceFacing = TRUE, adj = c(0, 0.5), cex = fontsize2)} 
+  else {circos.text(mean(xlim), ylim[1], sector.index, facing = "inside", col = 'white',
+                    niceFacing = TRUE, adj = c(0.5, 0), cex = fontsize2)}
+  }, 
+  bg.border = NA)
+title.name <- paste0("b. eora data", ' (', unit_name, ')'); title.name
+title(title.name)
+
+circos.clear() 
+# after making each plot, you need to call circos.clear() to manually reset all the parameters.
+# export plot file (set this last)
+dev.off()
+
+```

@@ -1,0 +1,129 @@
+---
+title: "Untitled"
+author: "Yingjie"
+date: "7/28/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+# Set up
+```{r Dirs and packages}
+
+### To clear your environment 
+# remove(list = ls())
+
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+setwd(dir)
+setwd('..') # set directory by one folder up
+getwd()
+dir.input1 <- './Data/data_02_intermediate/dt01_ctr_profile/xlsx/cleaned/'
+dir.input2 <- './Data/data_02_intermediate/dt02_flows/eora_cleaned/'
+dir.output <- './Data/data_03_results/'
+dir.fig    <- './Data/Figure/'
+
+
+### packages
+source('./Code/_package list.R')
+
+
+### Disable Scientific Notation in R
+options(scipen = 999) # Modify global options in R
+```
+
+
+
+```{r}
+# options(repos = c(
+#   yihui = 'https://yihui.r-universe.dev',
+#   CRAN = 'https://cloud.r-project.org'
+# ))
+# install.packages('xfun')
+# library(xfun)
+
+# if (!require(devtools)) install.packages("devtools")
+# library(devtools)
+# install_github("friendly/matlib", build_vignettes = TRUE)
+
+
+# install.packages("matlib")
+
+library(matlib)
+
+# library(tidyverse)
+```
+
+
+```{r}
+
+library(dplyr)
+xls <- "./Data/data_02_intermediate/dt02_flows/eora_cleaned/WaterUse.xlsx"
+df <- readxl::read_excel(path = xls) %>%
+  filter(year == 2015) %>%
+  select(-1, -2) %>%
+  as.data.frame()
+
+rownames(df) <- df$iso3
+df <- df[, -1]
+  
+
+## transpose the data
+##  columns: from (j); rows: to (i)
+fij <- t(x = df)
+
+## calculate G = fij/Tj
+Tj <- colSums(fij)
+Ti <- rowSums(fij)
+names(Tj) <- colnames(fij)
+names(Ti) <- rownames(fij)
+
+G  <- fij/Tj
+G1 <- fij/Ti
+
+
+I   <- diag(nrow(df))
+I_G  <- I - G
+I_G1 <- I - G1
+  
+## remove infinite data and NA from the matrix, otherwise, `inverse` returns all NA
+I_G <- I_G[is.finite(rowSums(I_G)),]
+I_G <- I_G[, rownames(I_G)]  ## remove these countries from columns as well
+
+I_G1 <- I_G1[is.finite(rowSums(I_G1)),]
+I_G1 <- I_G1[, rownames(I_G1)]  ## remove these countries from columns as well
+
+I_G1 <- I_G1[rownames(I_G), ]
+I_G1 <- I_G1[, rownames(I_G)]  ## remove these countries from columns as well
+
+## remove the total for counties that have been removed
+Tj <- Tj[rownames(I_G)]
+Ti <- Ti[rownames(I_G)]
+
+
+## calculate the inverse
+N  <- solve(I_G)
+N1 <- solve(I_G1)
+
+# library(matlib)
+# is_symmetric_matrix(I)
+# is_symmetric_matrix(G)
+# N2 <- matlib::inv(I_G) ## too slow
+## https://cran.r-project.org/web/packages/matlib/vignettes/inv-ex1.html
+
+
+## test code
+# a <- c(4, 7, 2, 6)
+# a <- matrix(unlist(a), ncol = 2, byrow = TRUE)
+# a
+# solve(a)
+# inv(a)
+
+
+etaij <- N/Ti
+etaji <- N1/Tj
+```
+

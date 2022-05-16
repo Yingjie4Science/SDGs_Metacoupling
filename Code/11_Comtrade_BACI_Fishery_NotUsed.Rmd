@@ -1,0 +1,164 @@
+---
+title: "Untitled"
+author: "Yingjie"
+date: "10/24/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+
+
+
+# Set up
+
+## packages
+```{r}
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+setwd(dir)
+setwd('../')
+getwd()
+
+library(tidyverse)
+library(scales)
+```
+
+
+## help data
+```{r}
+load(file = paste0('./Data/data_02_intermediate/dt02_flows/', 'template_eora.RData')) # `temp_eora`
+```
+
+
+
+# Data
+
+- HS92 (1995-2019, 2.18 Go)
+- HS96 (1996-2019, 1.98 Go)
+- HS02 (2002-2019, 1.62 Go)
+- HS07 (2007-2019, 1.21 Go)
+- HS12 (2012-2019, 799 Mo)
+- HS17 (2017-2019, 300 Mo)
+
+
+## Country Code
+```{r}
+## BACI ############################################################################################
+## - BACI provides disaggregated data on bilateral trade flows for more than 5000 products and 200 countries. 
+
+# t	Year
+# k	Product category (HS 6-digit code)
+# i	Exporter (ISO 3-digit country code)
+# j	Importer (ISO 3-digit country code)
+# v	Value of the trade flow (in thousands current USD)
+# q	Quantity (in metric tons)
+
+
+dir.baci <- "D:/data/BACI/"
+
+###
+csv      <- paste0(dir.baci, 'country_codes_V202102.csv')
+baci_ctr <- read_csv(csv) %>% as.data.frame()
+```
+
+## HS92
+```{r}
+
+csv <- paste0(dir.baci, "BACI_HS92_V202102/", "BACI_HS92_Y2015_V202102.csv"); csv
+# baci <- readr::read_csv(csv)
+# head(baci)
+
+csvs <- paste0(dir.baci, "BACI_HS92_V202102/", "BACI_HS92_Y", seq(2000, 2015, 5), "_V202102.csv"); csvs
+
+# bacis <- data.frame()
+# for (csv in csvs) {
+#   print(csv)
+#   baci  <- readr::read_csv(csv)
+#   bacis <- rbind(bacis, baci)
+# }
+# save(bacis, file = paste0(dir.baci, 'BACI_HS92.RData'))
+```
+
+
+## HS07
+```{r }
+csvs <- paste0(dir.baci, "BACI_HS07_V202102/", "BACI_HS07_Y", c(2007, 2010, 2015), "_V202102.csv"); csvs
+
+# bacis <- data.frame()
+# for (csv in csvs) {
+#   print(csv)
+#   baci  <- readr::read_csv(csv)
+#   bacis <- rbind(bacis, baci)
+# }
+# save(bacis, file = paste0(dir.baci, 'BACI_HS07_07_10_15.RData'))
+```
+
+
+
+## Fishery
+```{r}
+
+load(file = paste0(dir.baci, 'BACI_HS92.RData')) # `bacis`
+
+
+## Load fishery related HS code from FishStatJ
+load('./Data/_fish_hs17_hs92.RData') ## fish_hs17_hs92  
+
+ind <- 'TradeMatrix_Fishery'
+
+### 1. total flows by year, by commodity, regardless of i and j
+# baci_k <- bacis %>% 
+#   group_by(t, k) %>%
+#   dplyr::summarise_at(vars(v:q), sum, na.rm = TRUE)
+# 
+# baci_k_hs17 <- baci_k %>%
+#   ### - merge and add hs17 code
+#   merge(x = hs_t, y = ., by.x = 'hs92', by.y = 'k', all.y = T) %>%
+#   ### - merge and only keep fishery-related hs17 code
+#   merge(x = ., y = fish_hs17, by.x = 'hs17', by.y = 'hs17', all.x = T) %>%
+#   dplyr::filter(!is.na(id)) %>%
+#   as.data.frame()
+# 
+# ### count the NAs over multiple columns
+# sapply(baci_k_hs17, function(x) sum(is.na(x)))
+
+
+### 2. total flows by year, by i, by j, regardless of k (commodity) 
+
+head(bacis)
+# year <- 2000
+baci_ij <- bacis %>% 
+  # dplyr::filter(t == year) %>%
+  ### - filter based on fishery code
+  dplyr::filter(k %in% unique(fish_hs17_hs92$hs92)) %>%
+  ### - total flows among countries
+  group_by(t, i, j) %>%
+  dplyr::summarise_at(vars(v:q), sum, na.rm = TRUE) %>%
+  ### - add country code 
+  merge(., baci_ctr %>% dplyr::select(country_code, iso_3digit_alpha), by.x = 'i', by.y = 'country_code', all.x = T) %>%
+  dplyr::rename(o = iso_3digit_alpha) %>%
+  merge(., baci_ctr %>% dplyr::select(country_code, iso_3digit_alpha), by.x = 'j', by.y = 'country_code', all.x = T) %>%
+  dplyr::rename(d = iso_3digit_alpha) %>%
+  dplyr::select(-i, -j, -v) %>%
+  ### - To generate the same format as Eora in Matrix
+  merge(x = temp_eora, y = ., by.x = c('year', 'iso3', 'to'), by.y = c('t', 'o', 'd'), all.x = T) %>%
+  arrange(year, iso3, to) %>%
+  dplyr::select(year, ctr, everything()) %>%
+  spread(key = to, value = q) %>%
+  arrange(year, iso3) %>%
+  as.data.frame()
+
+
+### save to the `eora_cleaned` folder 
+df_formatted <- baci_ij 
+df_formatted %>%
+  group_by(year) %>% tally()
+fname <- paste0('./Data/data_02_intermediate/', ind, '.xlsx'); fname
+# writexl::write_xlsx(x = df_formatted, path = fname)
+```
+
+

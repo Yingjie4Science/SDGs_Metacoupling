@@ -1,0 +1,203 @@
+---
+title: "Untitled"
+author: "Yingjie"
+date: "10/24/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+# Set up
+
+## packages
+```{r}
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+setwd(dir)
+setwd('../')
+getwd()
+
+library(tidyverse)
+library(scales)
+```
+
+
+## help data
+```{r}
+## this data will be used to format flow data
+load(file = paste0('./Data/data_02_intermediate/dt02_flows/', 'template_eora.RData')) # `temp_eora`
+```
+
+
+
+# Data
+
+- HS92 (1995-2019, 2.18 Go)
+- HS96 (1996-2019, 1.98 Go)
+- HS02 (2002-2019, 1.62 Go)
+- HS07 (2007-2019, 1.21 Go)
+- HS12 (2012-2019, 799 Mo)
+- HS17 (2017-2019, 300 Mo)
+
+
+##  Metadata - BACI
+### Country Code
+```{r}
+## BACI ############################################################################################
+## - BACI provides disaggregated data on bilateral trade flows for more than 5000 products and 200 countries. 
+
+# t	Year
+# k	Product category (HS 6-digit code)
+# i	Exporter (ISO 3-digit country code)
+# j	Importer (ISO 3-digit country code)
+# v	Value of the trade flow (in thousands current USD)
+# q	Quantity (in metric tons)
+
+
+dir.baci <- "D:/data/BACI/"
+
+###
+csv      <- paste0(dir.baci, 'country_codes_V202102.csv')
+baci_ctr <- read_csv(csv) %>% as.data.frame()
+```
+
+
+### HS92
+```{r}
+
+### Trade data -------------------------------------------------------------------------------------
+csv <- paste0(dir.baci, "BACI_HS92_V202102/", "BACI_HS92_Y2015_V202102.csv"); csv
+# baci <- readr::read_csv(csv)
+# head(baci)
+
+csvs <- paste0(dir.baci, "BACI_HS92_V202102/", "BACI_HS92_Y", seq(2000, 2015, 5), "_V202102.csv"); csvs
+
+# bacis <- data.frame()
+# for (csv in csvs) {
+#   print(csv)
+#   baci  <- readr::read_csv(csv)
+#   bacis <- rbind(bacis, baci)
+# }
+# save(bacis, file = paste0(dir.baci, 'BACI_HS92.RData'))
+
+
+```
+
+
+### HS07
+```{r }
+csvs <- paste0(dir.baci, "BACI_HS07_V202102/", "BACI_HS07_Y", c(2007, 2010, 2015), "_V202102.csv"); csvs
+
+# bacis <- data.frame()
+# for (csv in csvs) {
+#   print(csv)
+#   baci  <- readr::read_csv(csv)
+#   bacis <- rbind(bacis, baci)
+# }
+# save(bacis, file = paste0(dir.baci, 'BACI_HS07_07_10_15.RData'))
+
+```
+
+
+
+
+
+## Pesticides
+
+  To find the HS code for `Hazardous pesticides`
+  Based on `RT_EN_README_Domain_Information_FAOSTAT item codes, HS codes and PIC.xlsx`, the HS codes are
+    - 380850 (HS 07 – 12) Hazardous pesticides
+    - 380859 (HS 17)      Hazardous pesticides
+        
+        
+  **to do**
+  - No 2000 and 2005? --> Yes, so far there is only data in HS07 (2007-2019)
+  - Compare this data to the FAO data
+```{r}
+
+ind <- 'TradeMatrix_Pesticides_Hzd'
+
+# f <- paste0(dir.baci, 'BACI_HS92.RData')          ## there is no data for 380850 and 380859
+f <- paste0(dir.baci, 'BACI_HS07_07_10_15.RData')
+
+load(file = f)
+
+head(bacis)
+ks <- bacis %>% distinct(k, .keep_all = F) %>%
+  dplyr::filter(str_starts(k, '3808'))
+
+pst_ij <- bacis %>% 
+  # dplyr::filter(t == year) %>%
+  ### - filter based on fishery code
+  dplyr::filter(k %in% c('380850', '380859')) %>%
+  ### - total flows among countries
+  group_by(t, i, j) %>%
+  dplyr::summarise_at(vars(v:q), sum, na.rm = TRUE) %>%
+  ### - add country code 
+  merge(., baci_ctr %>% dplyr::select(country_code, iso_3digit_alpha), by.x = 'i', by.y = 'country_code', all.x = T) %>%
+  dplyr::rename(o = iso_3digit_alpha) %>%
+  merge(., baci_ctr %>% dplyr::select(country_code, iso_3digit_alpha), by.x = 'j', by.y = 'country_code', all.x = T) %>%
+  dplyr::rename(d = iso_3digit_alpha) %>%
+  dplyr::select(-i, -j, -v) #%>%
+
+
+### - To generate the same format as Eora in Matrix
+df_formatted <- pst_ij %>%
+  merge(x = temp_eora, y = ., by.x = c('year', 'iso3', 'to'), by.y = c('t', 'o', 'd'), all.x = T) %>%
+  arrange(year, iso3, to) %>%
+  dplyr::select(year, ctr, everything()) %>%
+  spread(key = to, value = q) %>%
+  arrange(year, iso3) %>%
+  as.data.frame()
+
+### - available date in each year --> 119 in 2015
+pst_ij %>%
+  spread(key = d, value = q) %>%
+  group_by(t) %>% tally()
+
+df_formatted %>%
+  group_by(year) %>% tally()
+
+### save to the `eora_cleaned` folder 
+fname <- paste0('./Data/data_02_intermediate/dt02_flows/eora_cleaned/', ind, '.xlsx'); fname
+writexl::write_xlsx(x = df_formatted, path = fname)
+```
+
+
+
+
+
+### Compare BACI to FAO trade data
+
+  Based on the comparison, the two data sets align well with each other. 
+  
+```{r warning=FALSE}
+pst_ij_export <- df_formatted %>%
+  gather(key = 'to', value = 'value', 4:ncol(.)) %>%
+  group_by(year, ctr, iso3) %>%
+  dplyr::summarise(exp_baci = sum(value, na.rm = T))
+
+dir.cleaned      <- './Data/data_02_intermediate/dt01_ctr_profile/xlsx/cleaned/'
+xls <- paste0(dir.cleaned, 'Pesticides Trade_Export Quantity_4yrs.xlsx')
+pst_fao_exp <- readxl::read_excel(xls) %>%
+  gather(key = 'year', value = 'exp_fao', 3:ncol(.)) 
+
+
+
+pst_compare <- merge(x = pst_fao_exp, y = pst_ij_export, by = c('year', 'ctr', 'iso3'), all.x = T) %>%
+  dplyr::filter(year >= 2007)
+
+
+pst_compare %>% ggplot(aes(x = exp_fao, y = exp_baci)) +
+  geom_point(aes(color = year)) +
+  # scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+  #               labels = trans_format("log10", math_format(10^.x))) +
+  # scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+  #               labels = trans_format("log10", math_format(10^.x))) +
+  geom_abline(linetype = "dashed") +
+  theme_bw()
+
+```
+

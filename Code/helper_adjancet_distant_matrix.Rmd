@@ -1,0 +1,278 @@
+---
+title: "helper"
+author: "Yingjie"
+date: "9/15/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Set up
+```{r Dirs and packages}
+
+### To clear your environment 
+# remove(list = ls())
+
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+setwd(dir)
+setwd('..') # set directory by one folder up
+getwd()
+dir.fig    <- './Data/Figure/'
+
+
+### packages
+source('./Code/_package list.R')
+
+### Disable Scientific Notation in R
+options(scipen = 999) # Modify global options in R
+
+theme_set(theme_bw())
+```
+
+
+
+```{r Ancillary data}
+load('./Data/Ancillary_Data_ISO3code_shp.RData') ## iso_eora, pop, gdp (USD), shp, grp
+
+### extended country-iso3 pair list for matching
+load('./Data/Ancillary_Data_iso_eora_ex.RData')  ## iso_eora_ex
+
+```
+
+
+# Data
+
+## Countries included
+
+```{r}
+## country list used in this study 
+
+ctr <- gdp %>% dplyr::distinct(iso3) %>%
+  dplyr::mutate(value = 1) %>%
+  as.data.frame()
+
+ctr_matrix <- ctr %>%
+  dplyr::rename(o = iso3) %>%
+  dplyr::mutate(d = o, value = NA) %>%
+  spread(key = d, value = value) %>%
+  as.data.frame()
+
+
+ctr_si <- data.frame(
+  name = c("People's Republic of China", "Taiwan", "Republic of the Congo", "Cape Verde", "The Gambia",
+           "Macau", "São Tomé and Príncipe"), 
+  iso_a3 = c("CHN", "TWN", "COG", "CPV", "GMB", 
+             "MAC", "STP")
+)
+
+ctr_to_match <- grp %>%
+  dplyr::select(name, iso_a3) %>%
+  dplyr::filter(!is.na(iso_a3)) %>%
+  rbind(., iso_eora %>% dplyr::rename(name = Row, iso_a3 = iso3_eora)) %>%
+  rbind(., ctr_si) %>%
+  distinct(name, iso_a3)
+# writexl::write_xlsx(x = ctr_to_match, path = './Data/_match_ISO3_names_wiki.xlsx')
+```
+
+
+
+
+## Countries by land and maritime borders
+  1. Refer to the *List of countries and territories by land and maritime borders* from  https://en.wikipedia.org/wiki/List_of_countries_and_territories_by_land_and_maritime_borders; 
+  
+  2. *Convert Wiki Tables to CSV* using https://wikitable2csv.ggor.de/ (default setting) and download as *table-1.csv*. 
+  
+  3. Read into R and clean the table
+```{r}
+csv <- paste0('./Data/_distant_matrix/', 'table-1.csv')
+# csv <- paste0('./Data/_distant_matrix/', 'table-1 (1).csv')
+
+b <- read_csv(csv, skip = 1) %>% as.data.frame()
+
+names(b)
+
+names(b) <- c('Country', 'n_land', 'n_maritime', 'n_total', 'n_name')
+
+## b_si: add missing country name list 
+b_si <-  data.frame(
+  Country    = c('Taiwan'), 
+  n_land     = c(''), 
+  n_maritime = c(''),
+  n_total    = c(''),
+  n_name     = c('')
+)
+
+
+## bc -> borders cleaned
+bc <- b %>%
+  dplyr::filter(!is.na(n_total)) %>%
+  dplyr::mutate(Country = gsub("\\s*\\[[^\\)]+\\]", "", Country), ## remove `[numbers]`
+                Country = gsub("\\s*\\([^\\)]+\\)", "", Country), ## remove `(strings)`
+                Country = gsub("\\)$", "", Country),              ## fix one more cleaning work
+                n_name  = gsub("\\s*\\[[^\\)]+\\]", "", n_name),
+                n_name  = gsub("\\s*\\([^\\)]+\\)", "", n_name),  
+                ) %>%
+  ### add missing countries
+  dplyr::mutate(Country = ifelse(Country == 'Republic of China', 'Taiwan', Country)) %>%
+  # rbind(., b_si) %>%
+  ### remove noise data, such as some countries have `insular areas` or `dependent territories`
+  dplyr::filter(stringr::str_detect(Country, pattern = 'includ', negate = T)) %>%
+  ### match with iso3 code
+  merge(., ctr_to_match, by.x = 'Country', by.y = 'name', all.x = T) %>%
+  arrange(!is.na(iso_a3))
+  
+# writexl::write_xlsx(x = bc %>% dplyr::select(Country, iso_a3), path = './Data/_match_ISO3_names_wiki.xlsx')
+
+
+## remove everything after "Excluding"
+bc$Country <- gsub("Excluding.*", "", bc$Country, ignore.case = T)
+bc$Country <- stringr::str_squish(string = bc$Country)
+
+bc_eora <- merge(ctr, bc, by.x = 'iso3', by.y = 'iso_a3', all = T)%>%  ## all.x = T
+  dplyr::select(iso3, Country, n_total, n_name) %>%
+  arrange(!is.na(Country), !is.na(iso3))
+
+writexl::write_xlsx(x = bc_eora, path = './Data/_match_ISO3_names_wiki.xlsx')
+
+
+bc_eora <- read_excel('./Data/_match_ISO3_names_wiki_fixed.xlsx')
+```
+
+
+
+
+
+### Match
+```{r }
+
+## clean text --------------------------------------------------------------------------------------
+bc_eora_code <- bc_eora
+str(bc_eora_code)
+
+bc_eora_code$n_name <- stringr::str_replace_all(string = bc_eora_code$n_name, pattern = fixed("\n"), replacement = ";")  # erase new lines
+bc_eora_code$n_name <- stringr::str_replace_all(string = bc_eora_code$n_name, pattern = fixed("\r"), replacement = ";")  # erase carriage return
+bc_eora_code$n_name <- stringr::str_replace_all(string = bc_eora_code$n_name, pattern = fixed("\t"), replacement = ";")  # erase tabs
+bc_eora_code$n_name <- stringr::str_squish(string = bc_eora_code$n_name) # remove leading & trailing whitespace, and repeated whitespace inside a string
+
+bc_eora_code$n_name_code <- bc_eora_code$n_name
+
+## remove everything after "which"
+bc_eora_code$n_name_code <- gsub("which.*", "", bc_eora_code$n_name_code)
+bc_eora_code$n_name_code <- gsub("United Nations Buffer Zone.*|who is.*|Djibouti borders.*|Morocco claims.*|Mauritania borders.*", "", bc_eora_code$n_name_code)
+bc_eora_code$n_name_code <- gsub("China", "People's Republic of China", bc_eora_code$n_name_code)
+
+
+
+
+  
+## need to loop each row in `n_name`, and replace country name to iso3 code ------------------------
+ls_name_iso <- bc_eora %>%
+  distinct(iso3, Country) %>%
+  filter(!is.na(Country)) %>%
+  dplyr::mutate(n = nchar(Country)) %>%  ### loop long names first to avoid mistake; e.g., if short name first, say 'Korea' may match 'North Korea' too
+  arrange(desc(n))
+
+
+## loop 
+
+for (i in 1:nrow(ls_name_iso)) {
+  name <- ls_name_iso$Country[i]; # print(name)
+  iso3 <- ls_name_iso$iso3[i];    # print(iso3)
+  
+  patt <- paste0('\\b', name); print(patt)
+  repl <- paste0(iso3, ';')
+  # patt <- 'Turkey\\b'
+  # repl <- 'TUR, '
+  
+  # bc_eora_code <- bc_eora %>%
+  #   dplyr::mutate(n_name_code = gsub(patt, repl, n_name)) %>%
+  #   # dplyr::mutate(n_name_code = str_replace(string = n_name, pattern = patt, replacement = repl)) %>%
+  #   as.data.frame()
+  
+  bc_eora_code$n_name_code <- gsub(patt, repl, bc_eora_code$n_name_code)
+  
+    
+}
+
+
+
+### further refine the replacements
+bc_eora_code$n_name_code <- gsub('Navassa Island', 'ROW;', bc_eora_code$n_name_code)
+bc_eora_code$n_name_code <- gsub('Western Sahara', 'ROW;', bc_eora_code$n_name_code)
+bc_eora_code$n_name_code <- gsub('Somaliland,', '', bc_eora_code$n_name_code)
+
+bc_eora_code$n_name_code <- stringr::str_squish(string = bc_eora_code$n_name_code)
+bc_eora_code$n_name_code <- gsub(' |,|;$', '', bc_eora_code$n_name_code) # remove `;` at the end
+
+bc_eora_code <- bc_eora_code %>%
+  dplyr::mutate(n_name_code = ifelse(iso3 == "ANT", "DOM;NLD;VEN;ABW", n_name_code), ## use neighbors of 'CUW' to fill the missing value
+                # n_name_code = ifelse(iso3 == "ROW", "NA", n_name_code),
+                n_name_code = ifelse(iso3 == "SUN", "AZE;BLR;CHN;EST;FIN;GEO;JPN;PRK;LVA;LTU;MNG;NOR;POL;ROU;SWE;TUR;UKR;USA;ROW", n_name_code), ## use neighbors of 'RUS'
+                Country = ifelse(iso3 == "ANT", 'Netherlands Antilles', Country),
+                Country = ifelse(iso3 == "ROW", 'Rest of the world', Country),
+                Country = ifelse(iso3 == "SUN", 'Former USSR', Country),
+                )
+
+```
+
+
+
+### Selected list for paper
+```{r}
+bc_eora_code_selected <- merge(ctr, bc_eora_code, by.x = 'iso3', by.y = 'iso3', all.x = T) %>%
+  dplyr::select(iso3, Country, n_name_code) %>%
+  dplyr::filter(iso3 != 'ROW') %>%
+  arrange(!is.na(Country), !is.na(iso3), iso3)
+
+
+### remove countries that are NOT in our selected country list 
+ctr_all <- unique(bc_eora_code$iso3)          ## 223
+ctr_in  <- unique(bc_eora_code_selected$iso3) ## 190
+ctr_not <- setdiff(ctr_all, ctr_in)           ##  33
+
+bc_eora_code_selected$Neighbors <- bc_eora_code_selected$n_name_code
+for (i in ctr_not) {
+  bc_eora_code_selected$Neighbors <- gsub(i, '', bc_eora_code_selected$Neighbors)
+}
+
+
+### remove leading and ending ";", as well repeated ";" (appear more than 2 times)
+bc_eora_code_selected$Neighbors <- gsub('^;+|;+$|;{2,}', '', bc_eora_code_selected$Neighbors) 
+
+bc_eora_code_selected <- bc_eora_code_selected %>% 
+  dplyr::select(-n_name_code) %>%
+  dplyr::mutate(Neighbors = ifelse(Neighbors == '', 'None', Neighbors))
+
+bc_eora_code_selected_forSI <- bc_eora_code_selected %>% 
+  dplyr::rename(Name = Country, ISO3 = iso3) %>%
+  dplyr::select(Name, ISO3, everything())
+
+writexl::write_xlsx(x = bc_eora_code_selected_forSI, path = './Data/Figure/SI_table_Country_Neighbors.xlsx')
+
+
+### to only include Neighbors that are in our selected country list 
+ctr_matrix_long <- ctr_matrix %>%
+  ## --> to be a long format so that countries can be pairs
+  gather(key = 'd', value = 'value', 2:ncol(.)) %>%
+  ## --> link with Neighbors data
+  merge(., bc_eora_code_selected, by.x = 'o', by.y = 'iso3', all.x = T) %>%
+  ## --> based on Neighbors data to decide the relationship between each pair: 1-Neighbors; 0-NOT
+  dplyr::mutate(value = ifelse(str_detect(string = Neighbors, pattern = paste0(d, '\\b')), 1, 0)) %>%
+  ## --> remove "ANT" "ROW", as there is no data from Mengyu
+  dplyr::filter(!o %in% c("ANT", "ROW"),
+                !d %in% c("ANT", "ROW")) %>%
+  arrange(o, d) %>%
+  as.data.frame()
+  
+ctr_matrix_neighbor <- ctr_matrix_long %>%
+  spread(key = 'd', value = 'value')
+
+writexl::write_xlsx(x = ctr_matrix_neighbor, path = './Data/_neighbor_matrix/_input_ctr_matrix_neighbor.xlsx')
+```
+
+
+
+
+

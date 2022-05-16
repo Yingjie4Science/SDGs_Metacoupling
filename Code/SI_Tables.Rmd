@@ -1,0 +1,72 @@
+---
+title: "SI_Tables"
+author: "Yingjie"
+date: "9/27/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r}
+library(tidyverse)
+```
+
+
+## R Markdown
+
+
+```{r}
+link <- 'https://docs.google.com/spreadsheets/d/13Di8K8ObDFfdALxrf-YjlGyYf_tNrm1TZ7yMDaozfzc'
+
+library(googlesheets4)
+
+
+### 1. Footprint indicators
+ft  <- read_sheet(link, sheet = 1) %>%
+  as.data.frame() %>%
+  dplyr::filter(Used == '1') %>%
+  dplyr::select(ID, FT_Indicators, Source, Source_link, References)
+
+names(ft)
+ft_save <- ft 
+names(ft_save) <- c('ID', 'Footprint indicators',	'Source',	'Source link',	'References')
+### Save to local
+writexl::write_xlsx(x = ft_save, path = './Data/Figure/SI/SI_Table 2_Footprint indicators.xlsx') 
+
+
+
+### 2. SDG indicators
+sdg <- read_sheet(link, sheet = 2) %>%
+  dplyr::select(ID, FT_Indicators, SDG, Targets, ImpactOnSDG, SDG_Indi_desc, SDG_Indi_ref)%>%
+  dplyr::filter(!is.na(ImpactOnSDG),
+                grepl('^0|^1', ImpactOnSDG)) %>%
+  dplyr::mutate_all(as.character) %>%
+  as.data.frame()
+
+unique(sdg$Targets)
+length(unique(sdg$Targets))
+
+### 3. Match the two tables
+match <- merge(x = sdg %>% dplyr::select(-Targets), 
+               y = ft %>% dplyr::select(ID, FT_Indicators), by = 'ID', all.x = T) %>%
+  dplyr::select(ID, FT_Indicators.x, FT_Indicators.y, everything()) %>%
+  arrange(ImpactOnSDG)
+
+
+match_save <- match %>%
+  dplyr::mutate(SDG = as.character(SDG), 
+                SDG_Indi_ref = ifelse(is.na(SDG_Indi_ref), 'by Authors', SDG_Indi_ref)) %>%
+  dplyr::select(SDG, SDG_Indi_desc, FT_Indicators.y, SDG_Indi_ref) %>%
+  dplyr::rename(`Footprint indicators` = FT_Indicators.y, 
+                `SDG Indicator` = SDG_Indi_desc,
+                References = SDG_Indi_ref) %>%
+  as.data.frame()
+
+writexl::write_xlsx(x = match_save, path = './Data/Figure/SI/SI_Table 1_SDG indicators.xlsx')  
+```
+
+
+
+
+

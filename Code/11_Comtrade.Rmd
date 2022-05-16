@@ -1,0 +1,287 @@
+---
+title: "Untitled"
+author: "Yingjie"
+date: "10/25/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+# Set up
+```{r}
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+setwd(dir)
+setwd('..') # set directory by one folder up
+getwd()
+
+
+dir.raw     <- './Data/data_01_raw/'
+getwd()
+source('./Code/_package list.R')
+# install.packages("devtools")
+# library(devtools)
+# devtools::install_github("ropensci/comtradr")
+library(comtradr)
+### https://docs.ropensci.org/comtradr/
+### https://github.com/ropensci/comtradr/
+### https://comtrade.un.org/data/Doc/api/ex/r
+### https://cran.r-project.org/web/packages/comtradr/vignettes/comtradr-vignette.html
+```
+
+
+
+# Data
+
+## Country code
+```{r}
+
+### Countries that included in UN Comtrade ----------------------------------------------------------
+## -> see https://comtrade.un.org/Data/cache/reporterAreas.json
+xls <- paste0(dir.raw, 'UN_Comtrade/reporterAreas.xlsx')
+ctr_reporter <- readxl::read_excel(path = xls) %>%
+  dplyr::mutate(head = str_squish(head),
+                head = gsub(':|\"|id|;', '', head),
+                head = str_squish(head)) %>%
+  separate(col = 'head', into = c('id', 'text'), sep = 'text', remove = F) %>%
+  dplyr::mutate(id = str_squish(id), text = str_squish(text)) %>%
+  dplyr::select(-head) %>%
+  dplyr::filter(id != 'all') %>%
+  as.data.frame()
+
+
+## remove "All" from the list
+ctr_list <- ctr_reporter$text; ctr_list
+
+length(ctr_list)
+
+
+
+### add country code
+xls <- paste0(dir.raw, 'UN_Comtrade/Comtrade Country Code and ISO list.xlsx')
+ctr_comtrade <- readxl::read_excel(path = xls) %>%
+  dplyr::rename(id = `Country Code`, 
+                iso3 = `ISO3-digit Alpha`,
+                name      = `Country Name, Abbreviation`,
+                name_full = `Country Name, Full`) %>%
+  dplyr::select(id, iso3, name, name_full) %>%
+  as.data.frame()
+
+### Merge the 2 list 
+ctr_comtrade_iso <- merge(ctr_reporter, ctr_comtrade, by = 'id', all = T) %>%
+  dplyr::filter(iso3 != 'N/A') %>%
+  ### check names
+  dplyr::mutate(check = text == name) %>%
+  dplyr::mutate(name = ifelse(id == 652, 'Saint Barthelemy', name)) %>%
+  dplyr::mutate(check = text == name) %>%
+  dplyr::filter(!is.na(text)) %>%
+  ###
+  # dplyr::select(id, iso3, name) %>%
+  arrange(text) %>%
+  as.data.frame()
+
+
+ctr_test2 <- readr::read_csv(file = paste0(dir.raw, 'UN_Comtrade/', 'UNComtrade_country_code2.csv')) %>%
+  dplyr::filter(!country_name %in% 
+                  c('Antarctica', 'American Samoa', "Bouvet Island", "Br. Indian Ocean Terr.", 
+                    "Christmas Isds", "Cocos Isds", "South Georgia and the South Sandwich Islands",
+                    "Fr. South Antarctic Terr.", "Guam"))
+
+ctr_test3 <- merge(ctr_test2, ctr_comtrade_iso, by.x = 'country_name', by.y = 'text', all.y = T)
+```
+
+
+## Test package
+```{r}
+### Get to know the functions -----------------------------------------------------------------------
+
+# ct_country_lookup("korea", ignore.case = T)
+# ct_country_lookup("korea", "reporter")
+# ct_country_lookup("bolivia", "partner")
+
+# ct_commodity_lookup(c("tomato", "Pesticide"), verbose = TRUE, ignore.case = T)
+# ct_commodity_lookup(c("cide"), verbose = TRUE, ignore.case = T)
+# ct_commodity_lookup(c("Insecticide"), verbose = TRUE, ignore.case = T)
+
+
+
+# product_code <- ct_commodity_lookup("shrimp", return_code = TRUE, return_char = TRUE); product_code
+product_code <- ct_commodity_lookup(c("Insecticide"), return_code = TRUE, return_char = TRUE); product_code
+
+example1 <- ct_search(reporters = 'China', #"China",   
+                      partners = 'All', # c("Rep. of Korea", "USA", "Mexico"), 
+                      commod_codes = product_code,  
+                      # trade_direction = "exports",
+                      start_date = 2015, end_date = 2016,
+                      freq = 'annual')
+
+# Inspect the return data
+str(example1)
+
+ct_update_databases()
+# ct_update_databases(commodity_type = "SITC") # this will download the commodity table that follows the Standard International Trade Classification scheme).
+ct_commodity_db_type()
+
+colnames(example1)
+### Apply polished col headers
+example2 <- ct_use_pretty_cols(example1)
+colnames(example2)
+
+ct_register_token()
+ct_get_remaining_hourly_queries()
+ct_get_reset_time()
+```
+
+
+
+## Bulk download
+```{r}
+# product <- 'Insecticide'
+# product_code <- ct_commodity_lookup(c("Insecticide"), return_code = TRUE, return_char = TRUE); product_code
+
+product <- 'Pesticides'
+product_code <- c('380850', '380859')
+
+
+### Loop download data ------------------------------------------------------------------------------
+
+dataset <- data.frame()
+
+for (i in 1:length(ctr_test2$country_name)) {
+  
+  ctr_name <- ctr_test2[i,2] %>% unlist() %>% unname()
+  ctr_iso3 <- ctr_test2[i,3] %>% unlist() %>% unname()
+  print(c(i, ctr_name, ctr_iso3))
+
+  dt <- ct_search(reporters = ctr_name,
+                  partners = 'All',
+                  trade_direction = "all", ## 'all', 'imports', 'exports', 're_imports', 're_exports'
+                  type = "goods",
+                  commod_codes = product_code,
+                  # start_date = 2015, end_date = 2019,
+                  freq = 'annual')
+
+  # dataset <- rbind(dataset, dt)
+
+  writexl::write_xlsx(dt, path = paste0(dir.raw, 'UN_Comtrade/', product, '/', ctr_iso3, '.xlsx'))
+}
+```
+
+
+
+
+```{r - if over limit}
+### the most recent country this code worked on 
+i
+ctr_name 
+
+### get the index number
+# id_upto <- which(ctr_test2$country_name == ctr_name); id_upto 
+
+id_upto <- i
+
+
+### continue ...
+for (i in id_upto:length(ctr_test2$country_name)) {
+  
+  ctr_name <- ctr_test2[i,2] %>% unlist() %>% unname()
+  ctr_iso3 <- ctr_test2[i,3] %>% unlist() %>% unname()
+  print(c(i, ctr_name, ctr_iso3))
+
+  dt <- ct_search(reporters = ctr_name,
+                  partners = 'All',
+                  trade_direction = "all", ## 'all', 'imports', 'exports', 're_imports', 're_exports'
+                  type = "goods",
+                  commod_codes = product_code,
+                  # start_date = 2015, end_date = 2019,
+                  freq = 'annual')
+
+  writexl::write_xlsx(dt, path = paste0(dir.raw, 'UN_Comtrade/', product, '/', ctr_iso3, '.xlsx'))
+}
+
+
+
+# ct_register_token()
+ct_get_remaining_hourly_queries() ## return the number of remaining queries for the current hour.
+ct_get_reset_time() ##will return the date/time in which the current hourly time limit will reset.
+```
+
+
+```{r}
+## Put data from each country together
+ls_xlsx <- list.files(path = paste0(dir.raw, 'UN_Comtrade/Insecticides/'), pattern = 'xlsx$', full.names = T); 
+ls_xlsx
+length(ls_xlsx)
+
+ls_xlsx_df <- data.frame(name = basename(ls_xlsx)) %>%
+  dplyr::mutate(name = gsub('.xlsx', '', name)) %>%
+  merge(., ctr_comtrade_iso %>% dplyr::select(name, iso3), 
+        by = 'name', all.x = T)
+# file.rename(from = ls_xlsx, to = ?)
+
+
+
+dfs <- data.frame()
+for (xlsx in ls_xlsx) {
+  print(basename(xlsx))
+  d   <- readxl::read_excel(path = xlsx)
+  dfs <- rbind(dfs, d)
+}
+
+
+## Clean up the full data set
+names(dfs)
+unique(dfs$is_leaf_code)
+unique(dfs$second_partner)
+unique(dfs$customs)
+unique(dfs$customs_proc_code)
+unique(dfs$mode_of_transport)
+unique(dfs$alt_qty)
+unique(dfs$alt_qty_unit)
+unique(dfs$gross_weight_kg)
+unique(dfs$cif_trade_value_usd)
+unique(dfs$fob_trade_value_usd)
+dfs %>% ggplot() + geom_point(aes(x = qty, y = netweight_kg)) ## this 2 looks the same?
+
+unique(dfs$qty_unit)
+
+dfs %>%
+  distinct(classification, year) %>%
+  arrange(year) %>%
+  as.data.frame()
+
+dfs_c <- dfs %>%
+  dplyr::select(-c(period, period_desc,second_partner_code, reporter_code, partner_code, second_partner, second_partner_iso, 
+                   customs, customs_proc_code, mode_of_transport, mode_of_transport_code, alt_qty, alt_qty_unit, alt_qty_unit_code,
+                   gross_weight_kg, cif_trade_value_usd, fob_trade_value_usd,
+                   flag))
+```
+
+
+```{r}
+### Manual downloads ################################################################################
+## - This dataset is not complete 
+csv <- paste0(dir.raw, 'UN_Comtrade/comtrade_Insecticides.csv')
+# dt0 <- read_csv(file = csv) 
+# 
+# names(dt0)
+# names(dt0) <- names(example1)
+# dt1 <- dt0 %>%
+#   dplyr::select(-c("period", "period_desc", "aggregate_level", "is_leaf_code", 
+#                    "reporter_code", "partner_code",
+#                    "second_partner_code", "second_partner", "second_partner_iso", 
+#                    "customs_proc_code", "customs", "mode_of_transport_code",
+#                    "qty_unit_code","qty_unit","alt_qty_unit_code","alt_qty_unit","qty","alt_qty", "gross_weight_kg",
+#                    "trade_value_usd", "cif_trade_value_usd", "fob_trade_value_usd", "flag"))
+#   
+# 
+# names(dt1)
+# names(example2)
+# unique(dt1$trade_flow)
+# unique(dt1$mode_of_transport)
+
+```
+

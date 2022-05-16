@@ -1,0 +1,4961 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+# Set up
+
+```{r Dirs and Packages}
+### To clear your environment 
+# remove(list = ls())
+
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+setwd(dir)
+setwd('..') # set directory by one folder up
+getwd()
+
+
+dir.raw          <- './Data/data_01_raw/'
+dir.process      <- './Data/data_02_intermediate/dt01_ctr_profile/xlsx/'
+dir.cleaned      <- './Data/data_02_intermediate/dt01_ctr_profile/xlsx/cleaned/'
+dir.eora_cleaned <- './Data/data_02_intermediate/dt02_flows/eora_cleaned/'
+
+# Packages ----------------------------------------------------------------
+source('./Code/_package list.R')
+
+# if("dplyr" %in% (.packages())){
+#           detach("package:dplyr", unload=TRUE) 
+#           detach("package:plyr", unload=TRUE) 
+# } 
+# # library(plyr)
+# library(dplyr)
+
+### search data range
+yr_start <- 1990
+yr_end   <- 2020
+
+```
+
+
+```{python Python, eval=FALSE, include=FALSE}
+import numpy as np
+import pandas as pd
+import xlrd
+import os
+```
+
+
+```{r Ancillary data}
+### extended country-iso3 pair list for matching
+load('./Data/Ancillary_Data_iso_eora_ex.RData')  ## ## iso_eora_ex
+
+load('./Data/Ancillary_Data_ISO3code_shp.RData') ## iso_eora, pop, gdp, shp, grp
+
+```
+
+
+
+
+```{r Functions}
+## Remove columns from dataframe where ALL values are NA
+not_all_na <- function(x) any(!is.na(x)) ## temp %>% select(where(not_all_na)) --> allow a few NA in the column 
+not_any_na <- function(x) all(!is.na(x)) ## temp %>% select(where(not_any_na)) --> not allow any NA in the column
+
+
+source('./Code/function_fill_na_wb.R')           ## for data from World Bank
+source("./Code/function_fill_na_owid.R")         ## for data from Our World In Data
+source('./Code/function_fill_na_cleaned_raw.R')  ##
+source('./Code/function_fill_na_ILOSTAT.R')      ## for data from ILOSTAT
+
+
+
+function_format_4yrData_save <- function(iname){
+  fname <- paste0(dir.process, iname, '_FILLNA.xlsx'); #print(fname)
+  dfwb_fillna_4yrs <- readxl::read_excel(fname) %>%
+    dplyr::select(iso3_eora, country_eora, `2000`, `2005`, `2010`, `2015`)  %>%
+    arrange(iso3_eora)
+  names(dfwb_fillna_4yrs) <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+  fname <- paste0(dir.cleaned, iname, '_4yrs.xlsx'); print(fname) 
+  writexl::write_xlsx(x = dfwb_fillna_4yrs, path = fname)
+  
+  print(paste0('There are ', round(sum(is.na(dfwb_fillna_4yrs))/(190*4)*100, digits = 1), '% NA'))
+}
+```
+
+
+
+##  County list
+  In EORA, WB
+  
+```{r}
+## County list in the EORA database --------------------------------------
+# choose.dir()
+ctr_eora <- readxl::read_xlsx('./Data/_eora_190country_iso3.xlsx') 
+str(ctr_eora)
+
+
+### extended country-iso3 list for matching
+getwd()
+fname <- './Data/Ancillary_Data_iso_eora_ex.RData' ## iso_eora_ex
+load(fname)
+
+
+## County list in World Bank ---------------------------------------------
+### provides a snapshot of available countries, indicators, and other relevant information.
+str(wb_cachelist, max.level = 1)
+## The countries data frame
+wb_geo <- wb_cachelist$countries 
+head(wb_geo, 3)
+
+# ctr_wb <- wb_geo %>%
+#   filter(!is.na(iso3c))
+
+### The indicators data frame
+wb_ind <- wb_cachelist$indicators
+# blmbrg_vars <- wbsearch(pattern = "Bloomberg", fields = "sourceOrg")
+# head(blmbrg_vars)
+
+
+### country list in World Bank data
+ctr_wb <- wb(indicator = 'SP.POP.TOTL', country = "countries_only") %>%
+  distinct(iso3c, iso2c, country)  ## 216 countries in the WB list
+ctr_wb <- merge(ctr_wb, wb_geo, 
+                by = c('iso3c','country','iso2c'), all.x = T)%>%
+  select(country, iso3c, region, income)
+
+
+
+### Merge ctr lists from EORA and WB ------------------------------------
+ctr0 <- merge(ctr_eora, ctr_wb, by.x='iso3_eora', by.y='iso3c', all.x = T)
+ctr0 %>% group_by(income) %>% tally()
+
+
+### Fill the data gap in country list 
+#### manually calculate GDPPC and get the classification
+# iso3	income
+# SWZ	Lower-middle income
+# ANT	High income
+# MKD	Upper-middle income
+# ROW	Low income
+# TWN	High income
+# USR	Upper-middle income ## --> Soviet Union --> SUN
+# PRK North Korea, Low income
+
+ctr <- ctr0 %>%
+  mutate(income = ifelse(iso3_eora=='SWZ' & is.na(income), 'Lower middle income', income), ## replace(income, iso3_eora=='SWZ', 'Lower middle income'),
+         income = ifelse(iso3_eora=='ANT' & is.na(income), 'High income',         income), ## replace(income, iso3_eora=='ANT', 'High income'),
+         income = ifelse(iso3_eora=='MKD' & is.na(income), 'Upper middle income', income), ## replace(income, iso3_eora=='MKD', 'Upper middle income'),
+         income = ifelse(iso3_eora=='ROW' & is.na(income), 'Low income',          income), ## replace(income, iso3_eora=='ROW', 'Low income'),
+         income = ifelse(iso3_eora=='TWN' & is.na(income), 'High income',         income), ## replace(income, iso3_eora=='TWN', 'High income'),
+         income = ifelse(iso3_eora=='SUN' & is.na(income), 'Upper middle income', income), ## replace(income, iso3_eora=='SUN', 'Upper middle income'),
+         income = ifelse(iso3_eora=='PRK' & is.na(income), 'Low income',          income)) %>%
+  as.data.frame()
+
+
+names(ctr) <- c("iso3_eora", "country_eora", "country", "region", "income")
+ctr %>% ungroup() %>%
+  group_by(income) %>% tally()
+
+```
+
+
+
+
+#  Downloading data
+## 1. Vars search
+
+```{r WB}
+# Vars ---------------------------------------------------------------------
+keywords <- c(
+  # 'government'
+  # 'tax'
+  # 'debt'
+  # 'degrade'
+  # 'eutrophication'
+  # 'fish'
+  # 'marine|coast'
+  # 'forest|climate'
+  # 'expenditure'
+  # '*Research.*Development.*'
+  # 'R&D'
+  # 'emission'
+  # 'recycl*'
+  # 'consumption'
+  # 'handwashing'
+  # 'PM2.5|PM10'
+  # 'slum' 
+  # 'public'
+  # 'land area'
+  # 'urban|rural'
+  # 'urban|city|cities'
+  # 'male|female'
+  # 'Poverty'
+  # 'equity'
+  # 'internet'
+  # "technology"
+  # 'high-tech'
+  # 'budget'
+  # 'invest|support'
+  # 'industry'
+  # 'infrastructure'
+  # 'CO2'
+  # 'Passenger'
+  # 'transport'
+  # 'GDP',
+  # 'trade'
+  # 'export'
+  # 'bank|ATM|account|financial'
+  # 'tourism'
+  # 'employ'
+  # 'energy * use'
+  # 'energy'
+  # 'fisheries'
+  # 'clean|renewable'
+  # 'sanitation'
+  # 'telephone'
+  # 'women|gender'  
+
+  # 'electricity'
+  # 'spending on education'
+  # 'Expected years of schooling'
+  # 'mathematics', 
+  # 'Mobile cellular telephone'
+  # 'material'
+  # 'manufactur'
+  # 'Mortality'
+  # 'reading|schooling'
+  # 'emergency', 
+  # 'facilit*'
+  # 'medical', 
+  # 'alcohol|wine|beer'
+  # 'Mortality|unsafe', 
+  # 'air pollution'
+  # 'tobacco|Smoking', 
+  # 'vaccine',  
+  # 'fertilizer|nitrogen'
+  # 'pesticide'
+  # 'yield'
+  # 'crop'
+  # 'agricultur'
+  # 'production'
+  # 'stunting', 
+  # "population.*total*",
+  # 'Population ages*'
+  # "poverty|unemployment|employment", 
+  # "gdp.*capita.*US\\$"
+  # "access.*elect*", 
+  # 'sanitation', 
+  # 'School enrollment'
+  # 'Health expenditure', 
+  # '*basic.*water*',
+  # 'water'
+  # '*disaster*', 'undernourishment', 'vulnerable*', 'investment in *'
+  # '* poverty .*', 'Literacy'
+  )
+keywords <- 'Mortality'
+keywords <- 'death'
+keywords <- 'aid|investment|assistance'
+keywords_not <- 'paid|Paid'
+keywords <- 'fisheries'
+vars     <- wbsearch(pattern = keywords, extra = T) %>%
+  dplyr::filter(stringr::str_detect(indicator, pattern = keywords)) %>%
+  # dplyr::filter(!stringr::str_detect(indicator, pattern = keywords_not)) %>%
+  as.data.frame()
+
+# vars
+getwd()
+
+words <- gsub("[[:punct:]]", "_", keywords); words
+today <- format(Sys.time(), "%Y%m%d_%H%M%S"); print(today)
+# fname <- paste0('vars_WB_', today, '_', words, '.csv'); fname
+fname <- paste0(dir.raw, 'wb_vars/vars_WB_', words, '.xlsx'); fname # '_', today, 
+writexl::write_xlsx(x = vars, path = fname)
+
+
+
+### Downloading data with wb() ---------------------------------------------------------------------
+
+# data <- wb(country = c("US", "NO"), indicator = c("SP.POP.TOTL", "NY.GDP.MKTP.CD"),
+#                    # return_wide = F, POSIXct = TRUE, 
+#                    # mrv = 100, gapfill = TRUE, ## gapfill allows you to “fill-in” the values between actual observations.
+#                    startdate = 1990, enddate = 2020)
+#
+# ind  <- '5.51.01.09.water'
+# data <- wb(indicator = ind, 
+#            country = "countries_only",
+#                 # mrv = 1,
+#            startdate = 1990, enddate = 2020)
+```
+
+
+
+```{r WDI, eval=FALSE, include=FALSE}
+library(WDI)
+new_wdi_cache <- WDIcache() 
+
+
+keywords <- ''
+vars <- WDIsearch("computer", cache = new_wdi_cache)
+vars
+ind <- 'IT.CMP.PCMP.ED'
+
+wdi_dat <- WDI(indicator = ind,
+               start = yr_start, end = yr_end, extra = TRUE) 
+names(wdi_dat)
+wdi_dat <- subset(wdi_dat, region != "Aggregates") # this also removes NAs
+```
+
+
+
+
+```{r WHO vars, eval=FALSE, include=FALSE}
+## https://github.com/expersso/WHO
+# library(devtools)
+# install_github("expersso/WHO")
+
+library(WHO)
+codes <- get_codes(extra = F)
+head(codes)
+vars <- codes[grepl("NCD", codes$display), ]
+vars
+getwd()
+fname <- paste0(dir.raw, 'wb_vars/vars_WHO.csv'); fname
+write.csv(x = vars, file = fname, row.names = F)
+# Opens a browser with the meta data for the specified series
+# browseURL(codes$url[1])
+```
+
+
+
+### FAOSTAT
+
+```{r FAO country code}
+dir.fao <- './Data/data_01_raw/FAOSTAT/'
+# ctr.fao <- read.xlsx(file = './FAOSTAT/AllTerritoriesValidCurrentYear.xlsx',
+#                      sheetIndex = 1) %>% select(1, 3:11, 38)
+# write.csv(x = ctr.fao, file = './FAOSTAT/AllTerritoriesValidCurrentYear_code.csv', row.names = F)
+# ctr.fao <- read.csv(file = './FAOSTAT/AllTerritoriesValidCurrentYear_code.csv')
+
+
+### Country list -----------------------------------------------------------
+# ctr.fao <- readxl::read_excel('./Data/data_01_raw/FAOSTAT/Country codes_names.xlsx', sheet = 1) %>%
+#   dplyr::filter(!is.na(iso_fao)) %>%
+#   dplyr::filter(iso_fao != "FALSE") %>%
+#   dplyr::mutate_if(is.factor, as.character) %>%
+#   # dplyr::select(1:2) %>%
+#   as.data.frame()
+# str(ctr.fao)
+
+
+ctr.fao <- readxl::read_excel('./Data/data_01_raw/FAOSTAT/Country codes_names_FAO_Revised_by_Li.xlsx') %>%
+  dplyr::select('Short name', 'ISO3', 'FAOSTAT') %>%
+  # dplyr::filter(!is.na(iso_fao)) %>%
+  # dplyr::filter(iso_fao != "FALSE") %>%
+  # dplyr::mutate_if(is.factor, as.character) %>%
+  # dplyr::select(1:2) %>%
+  as.data.frame()
+str(ctr.fao)
+
+
+### This info was dlownloaded from https://www.fao.org/faostat/en/#definitions --> "Country/Region"
+ctr.faostat <- readr::read_csv("./Data/data_01_raw/FAOSTAT/FAOSTAT_Country_Region.csv") %>%
+  dplyr::filter(!is.na(`ISO3 Code`)) %>%
+  dplyr::select(Country, `Country Code`, `ISO3 Code`) %>%
+  # dplyr::mutate(`Country Code` = as.numeric(`Country Code`)) %>%
+  as.data.frame()
+
+names(ctr.faostat)
+
+### To see if `ctr.faostat` includes all the countries listed in `ctr_eora`. --> YES
+ctr_test <- merge(x = ctr.faostat, y = ctr_eora, by.x = "ISO3 Code", by.y = "iso3_eora", all.y = T)
+```
+
+
+
+  Deal with FAO csv data. 
+```{r}
+# csv <- 'Emissions_Agriculture_Agriculture_total_E_All_Data_(Normalized).csv'
+# csv <- 'Investment_Machinery_E_All_Data_(Normalized).csv'
+# 
+# csv.f <- paste0(dir.fao, csv); print(csv.f)
+# df <- read.csv(csv.f, stringsAsFactors = F) #%>%
+# 
+# unique(df$Item)
+# unique(df$Element)
+# 
+# item <- "Agricultural tractors, total"
+# element <- "In Use" 
+# 
+# df1 <- df %>%  
+#   dplyr::filter(Item == item, Element == element) %>%
+#   # filter(Year >= 2010, Area == 'China') %>%
+#   dplyr::filter(Year >= yr_start, Year <= yr_end) %>%
+#   select(Area, Item, Element, Year, Unit, Value) %>%
+#   spread(key = Year, value = Value) %>%
+#   left_join(x  = .,  y = ctr.fao, by = c("Area" = "Short name")) %>%
+#   # filter(is.na(iso_fao)) %>%   ## check if any NA 
+#   left_join(x  = ctr_eora, y = ., by = c("iso3_eora" = "ISO3"))
+# names(df1)
+
+### fill na
+# source('function_fill_na_faostat.R')
+# df <- df1
+# function_fill_na_faostat(df)
+```
+
+
+  **FAO data in R package**
+
+  **Food Balance Sheet** (FBS) presents a comprehensive picture of the pattern of a country's food supply during a specified reference period.
+  
+```{r FBS}
+# ### FAOSTAT package ------------------------------------------------------------------
+# install.packages("FAOSTAT")
+# remotes::install_gitlab(repo = "paulrougieux/faostatpackage/FAOSTAT")
+library(FAOSTAT)
+# FAOsearch
+# download_faostat_bulk
+# read_faostat_bulk
+
+# Create an object named '.LastSearch' using the FAOSearch function, which can then be called as an argument to the getFAO() or getFAOtoSYB() function.
+fao_ls <- FAOsearch()
+FAOsearch(dataset="crop", full = FALSE)
+FAOsearch(dataset="Food Balances", full = FALSE)
+
+
+### Load crop production data
+dir.fao <- paste0(dir.raw, 'FAOSTAT/'); dir.fao
+
+# dt_fao_FBSH <- get_faostat_bulk(code = "FBSH", data_folder = dir.fao); ## for data before 2014
+# dt_fao_FBS  <- get_faostat_bulk(code = "FBS",  data_folder = dir.fao); ## for data after  2014
+# names(dt_fao_FBSH)
+# names(dt_fao_FBS)
+# FAO_FBS <- rbind(dt_fao_FBSH, dt_fao_FBS)
+
+datasetname <- 'FBS_FBSH'
+### Cache the file i.e. save the data frame in the serialized RDS format for fast reuse later.
+fname <- paste0(dir.fao, datasetname, ".rds"); fname
+# saveRDS(FAO_FBS, fname)
+### Now you can load your local version of the data from the RDS file
+FAO_FBS <- readRDS(fname)
+
+str(FAO_FBS)
+unique(FAO_FBS$item)
+```
+
+
+### ILO 
+```{r}
+require(Rilostat)
+options(ilostat_cache_dir = 'C:/temp')
+### https://ilostat.github.io/Rilostat/articles/Rilostat.html
+
+options(scipen=999) ## prevent scientific notation in R
+
+
+library(tidyverse)
+as.data.frame(ls("package:Rilostat"))
+
+### all available indicators from ILOSTAT ----------------------------------------------------------
+# toc <- get_ilostat_toc()
+toc2 <- get_ilostat_toc(search = c('Annual', 'fatal'), fixed = F, lang = 'en')
+
+```
+
+
+
+
+# ================================
+
+##  2. Download and Calculation
+
+### Goal 1 - No Poverty
+
+```{r - Population, total}
+# SP.POP.TOTL	       ++ Population, total
+# SP.RUR.TOTL	       ++ Rural population
+# SP.URB.TOTL	       ++ Urban population
+# SP.URB.TOTL.IN.ZS	 ++ Urban population (% of total)
+# SP.RUR.TOTL.ZS	   ++ Rural population (% of total population)
+
+### Population, total -----------------------------------------------------------
+ind <- 'SP.POP.TOTL'      
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+unique(dfwb$indicator)
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(dfwb)
+### 3. get a cleaned data and save to dir
+fname <- paste0(dir.process, iname, '_FILLNA.xlsx'); fname
+dfwb_fillna_4yrs <- readxl::read_excel(fname) %>%
+  dplyr::select(iso3_eora, country_eora, `2000`, `2005`, `2010`, `2015`)  %>%
+  arrange(iso3_eora)
+names(dfwb_fillna_4yrs) <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+writexl::write_xlsx(x = dfwb_fillna_4yrs, path = paste0(dir.cleaned, iname, '_4yrs.xlsx'))
+print(paste0('There are ', round(sum(is.na(dfwb_fillna_4yrs))/(190*4)*100, digits = 1), '% NA'))
+
+
+
+
+### ***SAME AS STEP 3 - create a function for future use***
+
+
+
+
+
+
+### Rural population -----------------------------------------------------------
+ind <- 'SP.RUR.TOTL' 
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+unique(dfwb$indicator)
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(dfwb)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname)
+
+
+
+
+### Urban population -----------------------------------------------------------
+ind <- 'SP.URB.TOTL' 
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+unique(dfwb$indicator)
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+
+### 2. fill NA
+function_fill_na_wb(dfwb)
+
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname)
+
+```
+
+
+
+
+  We choose to use `GDP (constant 2010 US$)`, and use `GDP (current US$)` to fill the data gap. 
+```{r - GDP}
+# NY.GDP.MKTP.KD	   ++ GDP (constant 2010 US$)  # prefer this one
+# NY.GDP.MKTP.CD     ++ GDP (current US$)
+# NY.GDP.MKTP.KN	      GDP (constant LCU)
+# NY.GDP.MKTP.PP.KD  ++ GDP, PPP (constant 2011 international $)
+# NY.GDP.MKTP.PP.CD     GDP, PPP (current international $)
+# NY.GDP.PCAP.PP.KD	 ++ GDP per capita, PPP (constant 2011 international $)
+# NY.GDP.PCAP.KD.ZG	    GDP per capita growth (annual %)
+# NY.GDP.MKTP.KD.ZG	    GDP growth (annual %)
+
+
+ind <- 'NY.GDP.MKTP.KD';    
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(dfwb)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname)
+
+
+
+
+ind <- 'NY.GDP.MKTP.CD';    
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(dfwb)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname)
+```
+
+
+
+
+```{r - Poverty headcount}
+# SI.POV.DDAY     + Poverty headcount ratio at $1.90 a day (2011 PPP) (% of population)
+# SI.POV.LMIC     + Poverty headcount ratio at $3.20 a day (2011 PPP) (% of population)
+# SH.UHC.NOP1.ZS  - Proportion of population pushed below the $1.90 ($ 2011 PPP) poverty line by out-of-pocket health care expenditure (%)
+# SH.UHC.NOP1.ZG  Increase in poverty gap at $1.90 ($ 2011 PPP) poverty line due to out-of-pocket health care expenditure (% of poverty line)
+
+
+ind <- 'SI.POV.DDAY'
+
+
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(dfwb)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## "There are 22% NA"
+
+```
+
+
+
+
+
+
+```{r - Others}
+# EG.ELC.ACCS.ZS   ++ Access to electricity (% of population)
+ind <- 'EG.ELC.ACCS.ZS'; iname <- 'Access to electricity_pct'
+C010401.01 <- wb(indicator = ind, country = "countries_only",
+                 startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+names(C010401.01)
+na <- C010401.01 %>% filter(is.na(country))
+fname <- paste0(dir.process, iname, '.csv'); fname
+# write.csv(x = C010401.01, file = fname, row.names = F)
+
+
+
+# SH.H2O.BASW.ZS	++ People using basic drinking water services (% of population) ## 2000-2015
+ind <- 'SH.H2O.BASW.ZS'; iname <- 'People using basic drinking water services'
+C010401.02 <- wb(indicator = ind, country = "countries_only",
+                 startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+na <- C010401.02 %>% filter(is.na(country))
+fname <- paste0(dir.process, iname, '.xlsx'); fname
+# write_xlsx(x = C010401.02, path = fname)
+
+
+# SH.STA.BASS.ZS	  + People using basic sanitation services (% of population) #2000-2015
+ind <- 'SH.STA.BASS.ZS'; 
+# ind <- 'SH.STA.SMSS.ZS' ## less data avaibale
+C010401.03 <- wb(indicator = ind, country = "countries_only",
+                 startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+fname <- paste0(dir.process, iname, '.xlsx'); fname
+# write_xlsx(x = C010401.03, path = fname)
+
+
+
+
+# IN.POV.LIT.RAT.TOTL 
+# SE.LITR.15UP.ZS
+# SE.ADT.LITR.ZS
+# ind <- 'UIS.LR.AG65'
+ind <- 'UIS.GTVP.2.GPV'   ## Share of all students in lower secondary education enrolled in general programmes (%)
+ind <- 'UIS.E.2.GPV.G1.T' ## -- Enrolment in Grade 1 of lower secondary general education, both sexes (number)
+ind <- 'UIS.GTVP.23.GPV'  ## Share of all students in secondary education enrolled in general programmes
+
+
+C010401.04 <- wb(indicator = ind, country = "countries_only",
+                 startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+head(C010401.04$indicator)
+
+
+
+
+ind <- 'EN.CLC.DRSK.XQ'
+C200304 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+
+ind <- 'IE.PPI.WATR.CD'
+ind <- 'IE.PPN.ENGY.CD'
+ind <- 'IE.PPI.ENGY.CD'
+C010a02 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+ind <- 'SL.EMP.VULN.ZS'
+ind <- 'SL.EMP.VULN.FE.ZS'
+C010b01 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+```
+
+
+
+
+### Goal 2 - Zero Hunger
+
+```{r - Land area - Total}
+### total land-------------------------------------------------------
+###
+# AG.LND.TOTL.HA	     + Land area (hectares)
+# EN.LAND.TOTL	      -- Land area (sq km)
+# AG.LND.TOTL.K2	   +++ Land area (sq. km)
+
+### 1. download data from WB
+ind <- 'AG.LND.TOTL.K2'; iname <- 'land area_km2'
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+unique(dfwb$indicator)
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+
+### 2. fill NA
+function_fill_na_wb(dfwb)
+
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname)
+```
+
+
+```{r - Agricultural land}
+### agricultural -----------------------------------------------------
+###
+# AG.LND.AGRI.K2	    ++ Agricultural land (sq. km)
+# AG.LND.AGRI.ZS    	++ Agricultural land (% of land area)
+# AG.LND.AGRI.HA	     + Agricultural land (hectares)
+# AG.LND.ARBL.HA	    ++ Arable land (hectares)
+# AG.LND.ARBL.ZS	    ++ Arable land (% of land area)
+# AG.LND.IRIG.HA.AG    - Agricultural area irrigated (ha) # 2000 - Now
+# EN.LAND.CRP.ZS	    -- Land use, cropland (% of land area)
+# EN.LAND.CRP	        -- Land use, cropland (sq km)
+
+
+ind <- 'AG.LND.AGRI.K2'; 
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+unique(dfwb$indicator)
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(dfwb)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname)
+```
+
+
+```{r - Arable land}
+ind <- 'AG.LND.ARBL.HA'; 
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+unique(dfwb$indicator)
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(dfwb)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname)
+```
+
+
+```{r - Forest area}
+### forest  ----------------------------------------------------------
+###
+# AG.LND.FRST.K2	    ++ Forest area (sq. km)
+# AG.LND.FRST.ZS    	++ Forest area (% of land area)
+# AG.LND.FRST.HA	     + Forest area (hectares)
+# ER.FST.DFST.ZG	     - Annual deforestation (% of change)
+# DAK.FRST.CR	        -- Total Specific Allocation Grant for Forestry (in IDR Billion)
+
+ind <- 'AG.LND.FRST.K2'
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+unique(dfwb$indicator)
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+
+### 2. fill NA
+function_fill_na_wb(dfwb)
+
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname)
+```
+
+
+```{r - Urban land area}
+### urban land -------------------------------------------------------
+###
+### too few years available
+# AG.LND.TOTL.UR.K2	               - Urban land area (sq. km)
+# AG.LND.EL5M.UR.ZS	               - Urban land area where elevation is below 5 meters (% of total land area)
+# AG.LND.EL5M.UR.K2                - Urban land area where elevation is below 5 meters (sq. km)
+# IN.TRANSPORT.URBNRD.DENSIT	     - Urban Road Density (KMs Per 1000 Population)
+# IN.TRANSPORT.RD.URBN.SURFACED	   - Urban Roads Surfaced (KMs)
+# SF.CMN.PHON.LCTY.ZS	            -- Telephone mainlines in largest city (% of total)
+# IT.MLT.LCTY.P3	                -- Telephone mainlines in largest city (per 1,000 people)
+
+ind <- 'AG.LND.TOTL.UR.K2'
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+unique(dfwb$indicator)
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+
+### 2. fill NA
+function_fill_na_wb(dfwb)
+
+### 3. get a cleaned data and save to dir
+# function_format_4yrData_save(iname = iname) ## no data for 2005 and 2015, I manually tidy the data: 2000 for 2005, 2010 for 2015
+```
+
+
+
+
+```{r - Cropland - FAO}
+
+FAOsearch(dataset="Land Use", full = FALSE)
+
+### Load crop production data
+dir.fao <- paste0(dir.raw, 'FAOSTAT/'); dir.fao
+
+fao_dataset <- get_faostat_bulk(code = "RL",   data_folder = dir.fao); ## Fertilizers indicators
+
+names(fao_dataset)
+
+unique(fao_dataset$item)
+unique(fao_dataset$element)
+
+
+item_name    <- "Cropland"
+element_name <- "Area"
+
+dt1 <- fao_dataset %>%
+  dplyr::filter(item    == item_name) %>%
+  dplyr::filter(element == element_name) %>%
+  as.data.frame()
+
+dt2 <- dt1 %>%
+  dplyr::filter(year>=1990) %>%
+  ### link with country code
+  merge(x = ., y = ctr.fao, by.x = 'area_code', by.y = 'FAOSTAT', all.x = T) %>%
+  dplyr::select(-area_code, -item_code, -element_code, -year_code, -flag) %>% 
+  dplyr::select('area', 'Short name', 'ISO3', everything()) 
+
+unit <- unique(dt2$unit); unit
+
+dt <- dt2 %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "ISO3")) %>%
+  dplyr::select(-`Short name`, -unit, -area, -item) #%>%
+  
+
+
+### 1. format data
+df <- dt %>%
+  spread(key = 'year', value = 'value') %>%
+  # dplyr::select(-ncol(.)) %>%
+  
+  dplyr::mutate(indicatorID = item_name, indicator = indicatorID, iso2c = '', country = '') %>%
+  dplyr::select("country_eora", "iso3_eora","indicatorID","indicator","iso2c","country", everything()) %>%
+  as.data.frame() %>%
+  dplyr::select(where(not_all_na)) %>%
+  as.data.frame() 
+names(df)  
+
+iname <- paste(item_name, unique(dt2$element), gsub('/', '_', unit), sep = '_'); iname
+### 2. fill NA
+function_fill_na_wb(df)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## "There are 7.9% NA"
+```
+
+
+
+```{r - ??ag production--yield--machine}
+
+# AG.PRD.CREL.MT	++ Cereal production (metric tons)
+# AG.YLD.CREL.KG	++ Cereal yield (kg per hectare)
+# ER.H2O.FWAG.ZS	 - Annual freshwater withdrawals, agriculture (% of total freshwater withdrawal)
+
+
+ind <- 'AG.PRD.CREL.MT'; iname <- 'Cereal production_tons'
+ind <- 'ER.H2O.FWAG.ZS'
+
+S1203 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+df <- S1203
+iname <- unique(df$indicator)[1]; iname
+fname <- paste0(dir.process, iname, '.xlsx'); fname
+
+
+
+
+ind <- 'AG.YLD.CREL.KG' ## ++ Cereal yield (kg per hectare)
+
+S0201 <- wb(indicator = ind, country = "countries_only",
+           startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+ind <- 'AG.LND.TRAC.ZS' ##	+ Agricultural machinery, tractors per 100 sq. km of arable land
+ind <- 'AG.AGR.TRAC.NO' ##	  Agricultural machinery, tractors
+
+S0209 <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+```
+
+
+
+
+```{r - other}
+# 'SN.ITK.DEFC.POP'     ## - Prevalence of undernourishment (population)
+# 'SH.STA.STNT.ZS'      ## - Prevalence of stunting, height for age (% of children under 5)
+
+
+ind <- 'SN.ITK.DEFC.POP' ## Prevalence of undernourishment (population)
+C020101 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+ind <- 'SH.STA.STNT.ZS' ## Prevalence of stunting, height for age (% of children under 5)
+C020201 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+```
+
+
+
+  This is from *FAO FBS* data
+```{r - Cereal production - FAO}
+cereals_ls <- 
+  c("Cereals - Excluding Beer", ## this is the total of the following list
+    "Wheat and products", 
+    "Rice and products", 
+    "Barley and products", 
+    "Maize and products", 
+    "Rye and products",
+    "Oats", 
+    "Millet and products", 
+    "Sorghum and products", 
+    "Cereals, Other")
+FAO_FBS_cereals <- FAO_FBS %>%
+  dplyr::filter(item %in% cereals_ls) %>%
+  as.data.frame()
+  
+
+unique(FAO_FBS_cereals$element)
+unique(FAO_FBS_cereals$item)
+
+
+FAO_FBS_Wheat <- FAO_FBS_cereals %>%
+  dplyr::filter(element %in% c('Import Quantity', 'Export Quantity')) %>%
+  # dplyr::filter(year == 2015) %>%
+  dplyr::filter(year>=1990, 
+                area == 'China, mainland') %>%
+  dplyr::filter(item == "Wheat and products")
+  
+  
+FAO_FBS_cereals2 <- FAO_FBS_cereals %>%
+  dplyr::filter(element %in% c("Production", 'Import Quantity', 'Export Quantity')) %>%
+  # dplyr::filter(year == 2015) %>%
+  dplyr::filter(year>=1990) %>%
+  dplyr::filter(item =="Cereals - Excluding Beer") %>%
+  
+  ### link with country code
+  merge(x = ., y = ctr.fao, by.x = 'area_code', by.y = 'FAOSTAT', all.x = T) %>%
+  dplyr::select(-area_code, -item_code, -element_code, -year_code, -flag) %>% 
+  dplyr::select('area', 'Short name', 'ISO3', everything()) 
+
+unique(FAO_FBS_cereals2$unit)
+
+dt <- FAO_FBS_cereals2 %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "ISO3")) %>%
+  dplyr::mutate(value_ton = value*1000) %>%
+  dplyr::select(-`Short name`, -value, -unit, -area, -item) #%>%
+  
+
+
+### 1. production part -------------------------------------------
+df <- dt %>%
+  dplyr::filter(element %in% c("Production")) %>%
+  spread(key = 'year', value = 'value_ton') %>%
+  # dplyr::select(-ncol(.)) %>%
+  dplyr::mutate(indicatorID = 'Cereals_Production_ton', indicator = indicatorID, iso2c = '', country = '') %>%
+  dplyr::select("country_eora", "iso3_eora","indicatorID","indicator","iso2c","country", everything()) %>%
+  as.data.frame() 
+names(df)  
+iname <- unique(df$indicator)[!is.na(unique(dfwb$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(df)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## "There are 15.8% NA"
+```
+
+
+
+
+```{r - Cereal trade}
+### 2. trade balance part -----------------------------------------
+df <- dt %>%
+  dplyr::filter(element %in% c('Import Quantity')) %>%
+  spread(key = 'year', value = 'value_ton') %>%
+  dplyr::mutate(indicatorID = 'Cereals_Import', indicator = indicatorID, iso2c = '', country = '') %>%
+  dplyr::select("country_eora", "iso3_eora","indicatorID","indicator","iso2c","country", everything()) %>%
+  as.data.frame()
+names(df)    
+iname <- unique(df$indicator)[!is.na(unique(dfwb$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(df)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## "There are 15.8% NA"  
+
+
+
+### 3. trade balance part -----------------------------------------
+df <- dt %>%
+  dplyr::filter(element %in% c('Export Quantity')) %>%
+  spread(key = 'year', value = 'value_ton') %>%
+  dplyr::mutate(indicatorID = 'Cereals_Export', indicator = indicatorID, iso2c = '', country = '') %>%
+  dplyr::select("country_eora", "iso3_eora","indicatorID","indicator","iso2c","country", everything()) %>%
+  as.data.frame()
+names(df)    
+iname <- unique(df$indicator)[!is.na(unique(dfwb$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(df)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## "There are 15.8% NA"  
+```
+
+
+
+  To know what are included in the `Cereals` list in the `Detailed trade matrix` dataset, we need to first look at the `Food Balances` dataset used in the above. 
+  
+  - FAO's `FBS and SUA list.xlsx` downloaded from 'https://www.fao.org/faostat/en/#data/FBS' is helpful but the "item code" is not consistent. 
+  
+  - This doc might be useful too -- FAO definition and classification of commodities https://www.fao.org/es/faodef/fdef01e.htm
+  
+  - This is also very helpful --> https://github.com/jagephart/cereals-network-shocks/blob/master/data/crop_list.tsv
+  
+  - "Definitions and standards - Food Balances (2014-)" --> `Item`, from 'https://www.fao.org/faostat/en/#data/FBS', provides more detailed info. See `FBS-Definitions and standards-Item.csv` and bellow. 
+  
+
+  **Barley and products**	Default composition: 44 Barley, 45 Barley, pot, 46 Barley, pearled, 47 Bran, barley, 48 Flour, barley and grits, 49 Malt, 50 Malt extract
+  
+  **Cereals - Excluding Beer**	
+  
+  **Cereals, Other**	Default composition: 68 Popcorn, 89 Buckwheat, 90 Flour, buckwheat, 91 Bran, buckwheat, 92 Quinoa, 94 Fonio, 95 Flour, fonio, 96 Bran, fonio, 97 Triticale, 98 Flour, triticale, 99 Bran, triticale, 101 Canary seed, 103 Grain, mixed, 104 Flour, mixed grain, 105 Bran, mixed grains, 108 Cereals, nes, 111 Flour, cereals, 112 Bran, cereals nes, 113 Cereal preparations, nes
+
+  **Maize and products**	Default composition: 56 Maize, 57 Germ, maize, 58 Flour, maize, 59 Bran, maize, 63 Gluten, maize, 64 Starch, maize, 846 Feed and meal, gluten
+  
+  **Millet and products**	Default composition: 79 Millet, 80 Flour, millet, 81 Bran, millet
+  
+  **Oats**	Default composition: 75 Oats, 76 Oats rolled, 77 Bran, oats
+  
+  **Rice and products**	Default composition: 27 Rice, paddy, 28 Rice, husked, 29 Rice, milled/husked, 31 Rice, milled, 32 Rice, broken, 33 Gluten, rice, 34 Starch, rice, 35 Bran, rice, 38 Flour, rice
+  
+  **Rye and products**	Default composition: 71 Rye, 72 Flour, rye, 73 Bran, rye
+  
+  **Sorghum and products**	Default composition: 83 Sorghum, 84 Flour, sorghum, 85 Bran, sorghum
+
+  **Wheat and products**	Default composition: 15 Wheat, 16 Flour, wheat, 17 Bran, wheat, 18 Macaroni, 19 Germ, wheat, 20 Bread, 21 Bulgur, 22 Pastry, 23 Starch, wheat, 24 Gluten, wheat, 41 Cereals, breakfast, 110 Wafers, 114 Mixes and doughs, 115 Food preparations, flour, malt extract
+
+
+
+
+```{r - Cereal trade - maxtrix}
+
+# csv <- paste0(dir.fao, 'Trade_DetailedTradeMatrix_E_All_Data_(Normalized)/Trade_DetailedTradeMatrix_E_All_Data_(Normalized).csv'); csv
+# tm <- readr::read_csv(file = csv)
+# save(tm, file = paste0(dir.fao, 'Trade_DetailedTradeMatrix_E_All_Data_(Normalized).RData'))
+
+load(file = paste0(dir.fao, 'Trade_DetailedTradeMatrix_E_All_Data_(Normalized).RData')) ## `tm`
+
+tm_q <- tm %>% 
+  dplyr::filter(str_detect(Element, 'Quantity')) %>%
+  # dplyr::filter(str_detect(Element, 'Quantity')) %>%
+  dplyr::filter(Year >= 1990)
+
+unique(tm_q$Item) %>% length()
+unique(tm_q$Unit)
+
+
+### only to include `cereals` list; 
+cereals_ls <- "cereal|Wheat|bulgur|breakfast|bread|pastry|wafers|doughs|Macaroni|Rice|Barley|malt|Maize|gluten|Rye|Oats|Millet|Sorghum|triticale|fonio|quinoa|canary|grain|Popcorn"
+tm_q_cereals <- tm_q %>%
+  dplyr::filter(str_detect(Item, regex(cereals_ls, ignore_case=TRUE)))
+unique(tm_q_cereals$Item) %>% sort()
+
+
+### removed not related matches
+tm_q_c2 <- tm_q_cereals %>%
+  dplyr::filter(str_detect(Item, regex('Goats|Beer|Oil|Beverage', ignore_case=TRUE), negate = T))
+
+unique(tm_q_c2$Item) ## 45 items
+unique(tm_q_c2$Unit)
+
+# skimr::skim(tm_q_c2) ## there is no missing values in the data, so no imputations are needed. 
+tm_q_c2 %>% dplyr::distinct(Flag)
+###  Flag (https://www.fao.org/faostat/en/#data/TM/metadata)
+# A	  Aggregate, may include official, semi-official, estimated or calculated data
+# M	  Data not available
+# R	  Estimated data using trading partners database
+# Im	FAO data based on imputation methodology
+# F	  FAO estimate
+# NA  Official data
+# *	  Unofficial figure
+
+
+### compare the sum of selected `Item` with FBS data, in order to verify we included all the cereals list. 
+tm_q_c_agg <- tm_q_c2 %>%
+  group_by(`Reporter Countries`, Element, Year) %>%
+  dplyr::summarise(sum = sum(Value, na.rm = T)) %>%
+  dplyr::filter(`Reporter Countries` == 'China, mainland')
+
+
+### to varify the cereal list 
+# tm_q_c_Wheat <- tm_q_c2 %>%
+#   dplyr::filter(str_detect(Item, regex('Wheat', ignore_case=TRUE))) %>%
+#   dplyr::filter(str_detect(Item, regex('buckwheat', ignore_case=TRUE), negate = T)) %>%
+#   # dplyr::filter(Year == 2015) %>%
+#   # group_by(`Reporter Countries`, Element, Year) %>%
+#   # dplyr::summarise(sum = sum(Value, na.rm = T)) %>%
+#   dplyr::filter(`Reporter Countries` == 'China, mainland') %>%
+#   dplyr::filter(str_detect(Element, 'Export')) %>%
+#   arrange(`Reporter Countries`, `Partner Countries`) %>%
+#   group_by(`Reporter Countries`, Year, Item, `Item Code`) %>%
+#   dplyr::summarise(sum = sum(Value, na.rm = T)/1000) %>%
+#   as.data.frame()
+
+tm_head <- tm_q %>% head()
+names(tm)
+
+tm_ctr <- tm_q %>%
+  as.data.frame() %>%
+  distinct(`Reporter Country Code`, `Reporter Countries`) %>% ## , `Partner Country Code`, `Partner Countries`
+  merge(x = ., y = ctr.faostat, by.x = "Reporter Country Code", by.y = "Country Code", all.x = T) %>%
+  dplyr::mutate(`ISO3 Code` = ifelse(`Reporter Country Code` == 41, 'CHN', `ISO3 Code`),
+                `ISO3 Code` = ifelse(`Reporter Country Code` ==206, 'SDN', `ISO3 Code`)) %>%
+  ### - To double check the country code
+  # merge(x = ., y = ctr.fao,     by.x = "Reporter Country Code", by.y = "FAOSTAT", all.x = T) %>%
+  # dplyr::mutate(check = `ISO3 Code` == ISO3) %>%
+  ### - To filter countries listed in Eora
+  merge(x = ., y = ctr_eora,    by.x = "ISO3 Code", by.y = "iso3_eora", all.y = T) %>%
+  as.data.frame()
+  
+str(tm_ctr)
+
+
+### To get the trade flow data for SDGs ------------------------------------------------------------
+
+tm_q_c_mat <- tm_q_c2 %>%
+  ungroup() %>%
+  dplyr::filter(Year %in% c(2000, 2005, 2010, 2015)) %>%
+  # dplyr::filter(str_detect(Element, 'Export')) %>%
+  group_by(`Reporter Country Code`, 
+           `Reporter Countries`, 
+           `Partner Country Code`, 
+           `Partner Countries`, 
+           Element, Unit, Year) %>%
+  dplyr::summarise(sum = sum(Value, na.rm = T)) %>%
+  
+  ### - To add code to `from` system
+  merge(x = ., y = ctr.faostat, by.x = "Reporter Country Code", by.y = "Country Code", all.x = T) %>%
+  dplyr::mutate(`ISO3 Code` = ifelse(`Reporter Country Code` == 41, 'CHN', `ISO3 Code`),
+                `ISO3 Code` = ifelse(`Reporter Country Code` ==206, 'SDN', `ISO3 Code`)) %>%
+  dplyr::rename(Reporter = `ISO3 Code`) %>%
+  dplyr::select(-Country) %>%
+
+  ### - To add code to `to` system
+  merge(x = ., y = ctr.faostat, by.x = "Partner Country Code", by.y = "Country Code", all.x = T) %>%
+  dplyr::mutate(`ISO3 Code` = ifelse(`Partner Country Code` == 41, 'CHN', `ISO3 Code`),
+                `ISO3 Code` = ifelse(`Partner Country Code` ==206, 'SDN', `ISO3 Code`)) %>%
+  dplyr::rename(Partner = `ISO3 Code`) %>%
+  dplyr::select(-Country) %>%
+  dplyr::filter(!`Partner Countries` %in% c('Unspecified Area', 'Belgium-Luxembourg')) %>%
+  dplyr::select(Element:Partner) %>%
+  
+  ### - To transfer the long table to matrix
+  # spread(key = Partner, value = sum) %>%
+  as.data.frame()
+
+
+### Since there are two "from-to" data, i.e., one is reported by importers and the other is reported by exporters, we need to choose one for use. 
+
+### - In Chung, Min Gon et al (2021, BMJ Global Health), it says "we used the meat import matrix data to get the quantities of meat exported and imported because importing countries are subjected to tariffs and have an incentive to measure the imported items accurately." 
+
+### - So, here, we first use data reported by `importers`, and then use the `Export` data to fill the data gap. 
+tm_q_c_mat2 <- tm_q_c_mat %>%
+  spread(key = Element, value = sum)
+
+
+tm_byImporter <- tm_q_c_mat2 %>% 
+  dplyr::select(- `Export Quantity`) %>%
+  dplyr::rename(to = Reporter, from = Partner, value_byImporter = `Import Quantity`)
+
+tm_byExporter <- tm_q_c_mat2 %>% 
+  dplyr::select(- `Import Quantity`) %>%
+  dplyr::rename(from = Reporter, to = Partner, value_byExporter = `Export Quantity`)
+
+tm_flows <- merge(tm_byImporter, tm_byExporter, by = c("Unit", "Year", "from","to"), all = T)
+
+### plot to see the discrepancy ---------
+(tm_flows_p <- tm_flows %>%
+  ggplot(aes(x = value_byImporter, y = value_byExporter)) +
+  geom_point(alpha = 0.5) +
+  geom_abline(intercept = 0, slope = 1, color = 'red') +
+  theme_bw()
+)
+
+tm_flows_p +
+  scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+  scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x)))
+
+
+
+### fill the data gap --------------------------------------------------------------------
+tm_flows_fillna <- tm_flows %>%
+  dplyr::mutate(value_byImporter = ifelse(is.na(value_byImporter), value_byExporter, value_byImporter))
+
+### To filter countries only listed in Eora
+### - use the Eora data as the template 
+temp <- readxl::read_excel(paste0('./Data/data_02_intermediate/dt02_flows/eora_cleaned/', 'CO2.xlsx')) 
+temp_eora <- temp %>%
+  gather(key = to, value = value, 4:ncol(.)) %>%
+  dplyr::select(-value) %>% # -ctr, 
+  as.data.frame()
+nrow(temp_eora) ## 142884 = 189 * 189 * 4 years
+
+tm_flows_fillna_eora <- tm_flows_fillna %>%
+  # dplyr::filter(from %in% ctr_eora_list$iso3, 
+  #               to   %in% ctr_eora_list$iso3) %>%
+  dplyr::select(- Unit, - value_byExporter) %>%
+  dplyr::rename(iso3 = from, year = Year, value = value_byImporter) %>%
+  merge(x = temp_eora, y = ., by.x = c('year', 'iso3', 'to'), by.y = c('year', 'iso3', 'to'), all.x = T)
+
+unique(tm_flows_fillna_eora$year) %>% length()
+unique(tm_flows_fillna_eora$iso3) %>% length()
+unique(tm_flows_fillna_eora$to)   %>% length()
+
+
+### To generate the same format as Eora in Matrix
+tm_flows_fillna_mat <- tm_flows_fillna_eora %>%
+  ungroup() %>%
+  arrange(year, iso3, to) %>%
+  dplyr::select(year, ctr, everything()) %>%
+  spread(key = to, value = value) %>%
+  arrange(year, iso3)
+
+
+### Save to the Eora folder
+fname <- paste0(dir.eora_cleaned, 'TradeMatrix_Cereals.xlsx'); fname
+writexl::write_xlsx(x = tm_flows_fillna_mat, path = fname)
+```
+
+
+
+####- Pesticide trade - FAO
+
+  https://www.fao.org/faostat/en/#data
+  
+  /Trade
+    /Detailed trade matrix # The trade database includes *all food and agricultural products* imported/exported annually by all the countries in the world.
+
+  
+  /Land, Inputs and Sustainability 
+    /Inputs
+      /Pesticides Trade    # *The pesticides traded for retail sale or as preparations or articles are those classified under code 38.08 in the Harmonized System Nomenclature (HS) and include: hazardous pesticides, insecticides, fungicides, herbicides, disinfectants and other. For these pesticides, this domain contains trade data (imports and exports) in values only (current 1000 US dollars), and the time series extends from 1961 onwards.*
+      
+  
+  
+  Pesticides include herbicides for destroying weeds and other unwanted vegetation, insecticides for controlling a wide variety of insects, fungicides used to prevent the growth of molds and mildew, disinfectants for preventing the spread of bacteria, and compounds used to control mice and rats.  --- https://www.niehs.nih.gov/health/topics/agents/pesticides/
+  
+  The word *pesticide* encompasses **all** chemical pest-control products, whereas the term *insecticide* refers solely to products that target insects.
+  
+  So, `Pesticides = herbicides + insecticides + fungicides + disinfectants + compounds`
+
+  **Pesticides** are chemicals that may be used to kill fungus, bacteria, insects, plant diseases, snails, slugs, or weeds among others. These chemicals can work by ingestion or by touch and death may occur immediately or over a long period of time.
+  
+  **Insecticides** are a type of pesticide that is used to specifically target and kill insects. Some insecticides include snail bait, ant killer, and wasp killer.
+
+  **Herbicides** are used to kill undesirable plants or “weeds”. Some herbicides will kill all the plants they
+touch, while others are designed to target one species. 
+
+  
+```{r}
+### 1. download data --------------------------------------------------------
+###   1.1 download data via Package
+FAOsearch(dataset="Pesticide", full = FALSE)
+
+
+### Load crop production data
+dir.fao <- paste0(dir.raw, 'FAOSTAT/'); dir.fao
+datasetname <- 'Pesticides Trade'
+dt_fao  <- FAOSTAT::get_faostat_bulk(code = "RT",  data_folder = dir.fao);
+
+### Save the data in RDS format for fast reuse later.
+fname <- paste0(dir.fao, datasetname, ".rds"); fname
+# saveRDS(FAO_FBS, fname)
+### Now you can load your local version of the data from the RDS file
+# dt_fao <- readRDS(fname)
+
+
+###   1.2. alternatively, download data via webpage
+csv <- "Inputs_Pesticides_Trade_E_All_Data_(Normalized).csv"
+csv <- paste0(dir.fao, 'Inputs_Pesticides_Trade/', csv); csv
+dt_fao <- readr::read_csv(csv) %>% as.data.frame()
+names(dt_fao) <- tolower(names(dt_fao))
+names(dt_fao) <- gsub(' ', '_', names(dt_fao))
+str(dt_fao)
+unique(dt_fao$item) %>% sort()
+unique(dt_fao$element)
+
+dt_fao %>% distinct(item, item_code)
+
+### - need to know the relation among all these kinds of items
+dt_fao_test <- dt_fao %>% 
+  as.data.frame() %>%
+  dplyr::filter(year == 2015, element == 'Import Quantity')
+write.csv(dt_fao_test, 'dt_fao_test.csv')
+
+
+dt <- dt_fao %>%
+  dplyr::filter(year>=1990) %>%
+  dplyr::filter(item =="Hazardous pesticides") %>%
+  dplyr::filter(element %in% c('Import Quantity', 'Export Quantity')) %>%
+  
+  ### link with country code
+  merge(x = ., y = ctr.fao, by.x = 'area_code', by.y = 'FAOSTAT', all.x = T) %>%
+  dplyr::select(-item_code, -element_code, -year_code, -flag) %>%  # -area_code, 
+  dplyr::select('area', 'Short name', 'ISO3', everything())  %>%
+  dplyr::select(-area, -`Short name`, -item, -unit) %>%
+  group_by(ISO3, element, year) %>%
+  dplyr::summarise(value = sum(value, na.rm = T)) %>%
+  as.data.frame() 
+
+
+
+
+### 2. trade data ------------------------------------------------
+ele <- 'Import Quantity'
+df <- dt %>%
+  ungroup() %>%
+  dplyr::filter(element %in% c(ele)) %>%
+  dplyr::select(-element) %>%
+  spread(key = 'year', value = 'value') %>%
+    
+  ### link with EORA
+  merge(x = ctr_eora, y = ., by.x = "iso3_eora", by.y = "ISO3", all.x = T) %>%
+  dplyr::mutate(indicatorID = paste(datasetname, ele, sep = '_'), 
+                indicator = indicatorID, iso2c = '', country = '') %>%
+  
+  ### NO DATA for 2000, so fill the column with NA
+  dplyr::mutate(`2000` = NA, `2005` = `2007`) %>%
+  dplyr::select("country_eora", "iso3_eora","indicatorID","indicator","iso2c","country", everything()) %>%
+  as.data.frame()
+names(df)    
+iname <- unique(df$indicator)[!is.na(unique(df$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(df)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## "There are 16.3% NA"  
+
+
+
+### 3. trade balance part -------------------------------------------------------------------------
+ele <- 'Export Quantity'
+df <- dt %>%
+  dplyr::filter(element %in% c(ele)) %>%
+    dplyr::select(-element) %>%
+  spread(key = 'year', value = 'value') %>%
+    
+  ### link with EORA
+  merge(x = ctr_eora, y = ., by.x = "iso3_eora", by.y = "ISO3", all.x = T) %>%
+  dplyr::mutate(indicatorID = paste(datasetname, ele, sep = '_'), 
+                indicator = indicatorID, iso2c = '', country = '') %>%
+  
+  ### NO DATA for 2000, so fill the column with NA
+  dplyr::mutate(`2000` = NA, `2005` = `2007`) %>%
+  dplyr::select("country_eora", "iso3_eora","indicatorID","indicator","iso2c","country", everything()) %>%
+  as.data.frame()
+names(df)    
+iname <- unique(df$indicator)[!is.na(unique(df$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(df)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## "There are 41.2% NA"  
+```
+
+
+
+### Goal 3 - Good Health and Well-being
+```{r - PM2.5}
+# Goal 3 ------------------------------------------------------------------
+
+
+# EN.ATM.PM25.MC.M3	 ++ PM2.5 air pollution, mean annual exposure (micrograms per cubic meter)
+# EN.ATM.PM25.MC.ZS	 ++ PM2.5 air pollution, population exposed to levels exceeding WHO guideline value (% of total)
+# EN.ATM.PM10.MC.M3	 -- PM10, country level (micrograms per cubic meter)
+
+ind <- 'EN.ATM.PM25.MC.M3' ## PM2.5 air pollution, mean annual exposure
+# ind <- 'EN.ATM.PM25.MC.ZS' ## PM2.5 air pollution, population exposed to levels exceeding WHO guideline value (% of total)
+
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+unique(dfwb$indicator)
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(dfwb)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname)
+```
+
+
+
+
+```{r - PM25 <EDGAR>}
+###	EDGAR: https://edgar.jrc.ec.europa.eu/overview.php?v=50_AP (same source for EORA)
+
+getwd()
+
+### 1, we use this data, as it is also used in EORA --------------------------
+xls <- './Data/data_01_raw/EDGAR_Air Pollutant Emissions/v50_PM2.5_1970_2015/v50_PM2.5_1970_2015.xls'
+### Emission country totals are expressed in kt substance / year. 1 Gg = 1 kt
+iname <- 'PM25_kt'
+sheet <- 'TOTALS BY COUNTRY'
+skip <- 8
+df0 <- readxl::read_excel(path = xls, sheet = sheet, skip = skip) %>% as.data.frame()
+df1 <- df0 %>% 
+  dplyr::select(ISO_A3, Name, `2000`, `2005`, `2010`, `2015`) %>%
+  merge(., ctr, by.x = 'ISO_A3', by.y = 'iso3_eora', all.y = T) %>%
+  dplyr::select(ISO_A3, Name, `2000`, `2005`, `2010`, `2015`) %>%
+  ### to format the numbers
+  gather(key = 'year', value = 'value', `2000`:`2015`) %>%
+  # dplyr::mutate(value = round(value, digits = 3)) %>%
+  spread(key = year, value = value) %>%
+  arrange(ISO_A3) %>%
+  arrange(!is.na(Name))
+names(df1)
+colnames_formal <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+names(df1) <- colnames_formal
+
+
+
+### the ROW data gap -------------------------------------------------------------
+### - use sum 
+wld <- df0 %>% 
+  dplyr::select(ISO_A3, Name, `2000`, `2005`, `2010`, `2015`) %>%
+  mutate_at(vars(`2000`:`2015`), .funs = as.numeric) %>%
+  # dplyr::summarize_if(is.numeric, sum, na.rm=TRUE) #%>%
+  dplyr::summarise_at(.vars = vars(`2000`:`2015`), sum, na.rm=TRUE)
+dat <- df1 %>%
+  ungroup() %>%
+  as.data.frame() %>%
+  mutate_at(vars(`2000`:`2015`), .funs = as.numeric) %>%
+  dplyr::summarize_if(is.numeric, sum, na.rm=TRUE) %>%
+  as.data.frame() 
+row <- (wld - dat) %>%
+  cbind(iso3 = 'ROW', ctr = 'Rest of the World, calculated') %>%
+  dplyr::select(all_of(colnames_formal))
+  
+df4 <- df1 %>% 
+  dplyr::filter(iso3 != 'ROW') %>%  ### remove the ROW row that have no data
+  rbind(row) %>%                    ### append the calculated ROW data       
+  arrange(iso3)
+
+
+### 5, save to results
+fname <- paste0(dir.process, 'cleaned/', iname, '_4yrs.xlsx'); fname
+writexl::write_xlsx(x = df4, path = fname)
+```
+
+
+
+```{r - PM10 <EDGAR>}
+###	EDGAR: https://edgar.jrc.ec.europa.eu/overview.php?v=50_AP (same source for EORA)
+
+### 1, we use this data, as it is also used in EORA --------------------------
+xls <- './Data/data_01_raw/EDGAR_Air Pollutant Emissions/v50_PM10_1970_2015/v50_PM10_1970_2015.xls'
+### Emission country totals are expressed in kt substance / year. 1 Gg = 1 kt
+iname <- 'PM10_kt'
+sheet <- 'TOTALS BY COUNTRY'
+skip <- 8
+df0 <- readxl::read_excel(path = xls, sheet = sheet, skip = skip) %>% as.data.frame()
+df1 <- df0 %>% 
+  dplyr::select(ISO_A3, Name, `2000`, `2005`, `2010`, `2015`) %>%
+  merge(., ctr, by.x = 'ISO_A3', by.y = 'iso3_eora', all.y = T) %>%
+  dplyr::select(ISO_A3, Name, `2000`, `2005`, `2010`, `2015`) %>%
+  ### to format the numbers
+  gather(key = 'year', value = 'value', `2000`:`2015`) %>%
+  # dplyr::mutate(value = round(value, digits = 3)) %>%
+  spread(key = year, value = value) %>%
+  arrange(ISO_A3) %>%
+  arrange(!is.na(Name))
+names(df1)
+colnames_formal <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+names(df1) <- colnames_formal
+
+
+
+### the ROW data gap -------------------------------------------------------------
+### - use sum 
+wld <- df0 %>% 
+  dplyr::select(ISO_A3, Name, `2000`, `2005`, `2010`, `2015`) %>%
+  mutate_at(vars(`2000`:`2015`), .funs = as.numeric) %>%
+  # dplyr::summarize_if(is.numeric, sum, na.rm=TRUE) #%>%
+  dplyr::summarise_at(.vars = vars(`2000`:`2015`), sum, na.rm=TRUE)
+dat <- df1 %>%
+  ungroup() %>%
+  as.data.frame() %>%
+  mutate_at(vars(`2000`:`2015`), .funs = as.numeric) %>%
+  dplyr::summarize_if(is.numeric, sum, na.rm=TRUE) %>%
+  as.data.frame() 
+row <- (wld - dat) %>%
+  cbind(iso3 = 'ROW', ctr = 'Rest of the World, calculated') %>%
+  dplyr::select(all_of(colnames_formal))
+  
+df4 <- df1 %>% 
+  dplyr::filter(iso3 != 'ROW') %>%  ### remove the ROW row that have no data
+  rbind(row) %>%                    ### append the calculated ROW data       
+  arrange(iso3)
+
+
+### 5, save to results
+fname <- paste0(dir.process, 'cleaned/', iname, '_4yrs.xlsx'); fname
+writexl::write_xlsx(x = df4, path = fname)
+```
+
+
+
+```{r - SO2 <EDGAR>}
+###	EDGAR: https://edgar.jrc.ec.europa.eu/overview.php?v=50_AP (same source for EORA)
+
+### 1, we use this data, as it is also used in EORA --------------------------
+xls <- './Data/data_01_raw/EDGAR_Air Pollutant Emissions/v50_SO2_1970_2015/v50_SO2_1970_2015.xls'
+### Emission country totals are expressed in kt substance / year. 1 Gg = 1 kt
+iname <- 'SO2_kt'
+sheet <- 'TOTALS BY COUNTRY'
+skip <- 8
+df0 <- readxl::read_excel(path = xls, sheet = sheet, skip = skip) %>% as.data.frame()
+df1 <- df0 %>% 
+  dplyr::select(ISO_A3, Name, `2000`, `2005`, `2010`, `2015`) %>%
+  merge(., ctr, by.x = 'ISO_A3', by.y = 'iso3_eora', all.y = T) %>%
+  dplyr::select(ISO_A3, Name, `2000`, `2005`, `2010`, `2015`) %>%
+  ### to format the numbers
+  gather(key = 'year', value = 'value', `2000`:`2015`) %>%
+  # dplyr::mutate(value = round(value, digits = 3)) %>%
+  spread(key = year, value = value) %>%
+  arrange(ISO_A3) %>%
+  arrange(!is.na(Name))
+names(df1)
+colnames_formal <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+names(df1) <- colnames_formal
+
+
+
+### the ROW data gap -------------------------------------------------------------
+### - use sum 
+wld <- df0 %>% 
+  dplyr::select(ISO_A3, Name, `2000`, `2005`, `2010`, `2015`) %>%
+  mutate_at(vars(`2000`:`2015`), .funs = as.numeric) %>%
+  # dplyr::summarize_if(is.numeric, sum, na.rm=TRUE) #%>%
+  dplyr::summarise_at(.vars = vars(`2000`:`2015`), sum, na.rm=TRUE)
+dat <- df1 %>%
+  ungroup() %>%
+  as.data.frame() %>%
+  mutate_at(vars(`2000`:`2015`), .funs = as.numeric) %>%
+  dplyr::summarize_if(is.numeric, sum, na.rm=TRUE) %>%
+  as.data.frame() 
+row <- (wld - dat) %>%
+  cbind(iso3 = 'ROW', ctr = 'Rest of the World, calculated') %>%
+  dplyr::select(all_of(colnames_formal))
+  
+df4 <- df1 %>% 
+  dplyr::filter(iso3 != 'ROW') %>%  ### remove the ROW row that have no data
+  rbind(row) %>%                    ### append the calculated ROW data       
+  arrange(iso3)
+
+
+### 5, save to results
+fname <- paste0(dir.process, 'cleaned/', iname, '_4yrs.xlsx'); fname
+writexl::write_xlsx(x = df4, path = fname)
+```
+
+
+
+#### - Mortality NCD
+  
+  SDG 3.4.1 - Mortality rate attributed to cardiovascular disease, cancer, diabetes, or chronic respiratory disease
+  
+  We decide to use NCD data from WHO. 
+  
+```{r - 1. WHO}
+not_all_na <- function(x) any(!is.na(x))
+not_any_na <- function(x) all(!is.na(x))
+
+
+# df <- WHO::get_data(code = "NCD_DTH_TOT")
+df0 <- readxl::read_excel(paste0(dir.raw, 'WHO/WHO_GHO_Total NCD Deaths (in thousands).xlsx'), skip = 2)
+names(df0)
+
+df1 <- df0 %>%
+  as.data.frame() %>%
+  dplyr::select(-ValueType, -ParentLocationCode, -ParentLocation, -`Location type`,
+                -`Period type`, -`IsLatestYear`, -`Dim1 type`, -Dim1ValueCode, -Value, 
+                -FactValueNumericLow, -FactValueNumericHigh, -Language, -DateModified) %>%
+  dplyr::select(where(not_any_na)) %>%
+  dplyr::filter(Dim1 == 'Both sexes') %>%
+  spread(key = 'Period', value = 'FactValueNumeric') %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "SpatialDimValueCode")) %>%
+  as.data.frame()
+names(df1)
+iname <- unique(df0$Indicator); iname
+
+
+dfwb_fillna_4yrs <- df1 %>%
+  dplyr::select(iso3_eora, country_eora, `2000`, `2005`, `2010`, `2015`)  %>%
+  arrange(iso3_eora)
+names(dfwb_fillna_4yrs) <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+writexl::write_xlsx(x = dfwb_fillna_4yrs, path = paste0(dir.cleaned, iname, '_4yrs.xlsx'))
+
+print(paste0('There are ', round(sum(is.na(dfwb_fillna_4yrs))/(190*4)*100, digits = 1), '% NA'))
+
+## "There are 10% NA"
+
+```
+
+
+```{r - 2. WB}
+# SH.DYN.NCOM.ZS	++ Mortality from CVD, cancer, diabetes or CRD between exact ages 30 and 70 (%)
+# SP.DYN.AMRT.MA	Mortality rate, adult, male (per 1,000 male adults)
+# SP.DYN.AMRT.FE	Mortality rate, adult, female (per 1,000 female adults)
+
+# SH.DTH.NCOM.ZS	Cause of death, by non-communicable diseases (% of total)
+# SP.DYN.CDRT.IN	Death rate, crude (per 1,000 people)
+
+ind <- 'SH.DYN.NCOM.ZS'
+C030401 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+  
+
+```
+
+
+
+```{r - 3. BMJ paper data by Chung et al 2021}
+source("./Data/data_01_raw/Health/NCDs_MinGonChung/NCDs.R")
+```
+
+
+
+#### - Other indicator
+```{r }
+ind <- 'SH.PRV.SMOK.FE'       ## + Smoking prevalence, females (% of adults)
+ind <- 'SH.PRV.SMOK.MA'       ## + Smoking prevalence, males (% of adults)
+ind <- 'SH.PRV.SMOK.FE.Q1.ZS' #    Smoking (% of women): Q1 (lowest)
+ind <- 'SH.PRV.SMOK.FE.Q2.ZS' 
+ind <- 'SH.PRV.SMOK.FE.Q3.ZS' 
+ind <- 'SH.PRV.SMOK.FE.Q4.ZS' 
+ind <- 'SH.PRV.SMOK.FE.Q5.ZS' #    Smoking (% of women): Q5 (highest)
+
+C030a01 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+df <- C030a01
+iname <- unique(df$indicator)[!is.na(unique(df$indicator))]; iname
+fname <- paste0(dir.process, iname, '.xlsx'); fname
+# write_xlsx(x = df, path = fname)
+
+
+
+
+
+### 3.b.1 ------------------------------------------
+ind <- 'SH.IMM.ALLV.Q1.ZS' ## Vaccinations (all vaccinations) (% of children ages 12-23 months): Q1 (lowest)
+ind <- 'SH.IMM.ALLV.Q2.ZS'
+ind <- 'SH.IMM.ALLV.Q3.ZS'
+ind <- 'SH.IMM.ALLV.Q4.ZS'
+ind <- 'SH.IMM.ALLV.Q5.ZS' ## Vaccinations (all vaccinations) (% of children ages 12-23 months): Q5 (highest)
+C030b01 <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+
+getwd()
+dir.gbd <- './Data/data_01_raw/GBD 2016 Health-related SDGs Indicators 1990-2030 Scaled and Unscaled Values/'
+csv <- 'IHME_GBD_2016_HEALTH_RELATED_SDG_1990_2030_UNSCALED_VALUES_Y2017M09D25.CSV'
+df <- read.csv(paste0(dir.gbd, csv), 
+               # skip = 1, 
+               stringsAsFactors = F) %>%
+  dplyr::filter(indicator_outline == '3.b.1') %>%
+  select(location_name, year_id, 
+         indicator_outline, ihme_indicator_description, unscaled_value) %>%
+  spread(key = year_id, value = unscaled_value)
+str(df)
+names(df)  
+
+
+ctr_gbd <- df %>% select(location_name) %>% as.data.frame()
+fname <- paste0(dir.gbd, '_ctr_GBD.xlsx'); fname
+# write_xlsx(x = ctr_gbd, path = fname)
+ctr_gbd <- readxl::read_excel(fname, range = 'A1:B189')
+
+df3 <- df %>% 
+  left_join(., ctr_gbd) %>%
+  left_join(ctr_eora, ., by = c("iso3_eora" = "iso3"))
+
+df <- df3
+iname <- substr(unique(df$ihme_indicator_description)[1], 1,15); iname
+fname <- paste0(dir.process, iname, '.xlsx'); fname
+# writexl::write_xlsx(x = df3, path = fname)
+
+
+
+
+# 3.b.2 ---------------------------------------------------------
+# Total net official development assistance to medical research and basic health sectors
+
+# SH.XPD.SOSE.GX.ZS	 - Social Security expenditure on health (% government expenditure on health)
+# SH.XPD.PCAP.GX	   - Government health expenditure per capita (current US$)
+# DT.ODA.DACD.HLTH.GEN.CD	 - Gross ODA aid disbursement for general health, DAC donors total (current US$)
+
+ind <- 'SH.XPD.PCAP.GX'
+C030b02 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+
+# IN.HLTH.DISTHOSPTL.NUM	- Number of District Hospitals 
+# SH.STA.BASS.ZS	        - People using basic sanitation services (% of population)
+# SH.STA.ACSN	            - Improved sanitation facilities (% of population with access)
+# SH.STA.ACSN.UR.Q1.ZS	  - Access to improved sanitation facilities, urban (% of urban population): Q1 (lowest)
+
+
+# API_SH.XPD.CHEX.GD.ZS_DS2_en_csv_v2_937980.zip
+# ind <- 'SH.XPD.CHEX.GD.ZS'
+# C030d02 <- wb(indicator = ind, country = "countries_only",
+#               startdate = yr_start, enddate = yr_end) %>%
+#   as.data.frame() %>%
+#   spread(key = date, value = value) %>%
+#   left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+df <- read.csv('./Data/data_01_raw/World Bank/API_SH.XPD.CHEX.GD.ZS_DS2_en_csv_v2_937980.csv',
+               stringsAsFactors = F, skip = 3) %>%
+  select(- paste0('X', seq(1960, 1999))) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "Country.Code"))%>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3_eora")) %>%
+  rename('indicator' = 'Indicator.Name',
+         "country_eora" = "country_eora.x")
+names(df)
+iname <- unique(df$indicator)[1]; iname
+fname <- paste0(dir.process, iname, '.xlsx'); fname
+# write_xlsx(x = df, path = fname)
+```
+
+
+
+
+
+
+
+### Goal 4 - Quality Education
+```{r}
+### few years ----------------------------------
+# PISA: Mean performance on the reading scale
+# LO.PISA.REA.FE	PISA: Mean performance on the reading scale. Female
+# LO.PISA.REA.MA	PISA: Mean performance on the reading scale. Male
+
+
+ind <- 'SE.SCH.LIFE.FE' # Expected years of schooling, female
+ind <- 'SE.SCH.LIFE.MA' # Expected years of schooling, male
+ind <- 'SE.PRM.ENRR'    # Gross enrollment ratio, primary, both sexes (%)
+```
+
+
+```{r - School enrollment}
+# SE.PRM.NENR	    School enrollment, primary (% net)
+# SE.PRM.ENRR.FE	School enrollment, primary, female (% gross)
+# SE.PRM.ENRR.MA	School enrollment, primary, male (% gross)
+# SE.PRM.NENR.FE	School enrollment, primary, female (% net)
+# SE.PRM.NENR.MA	School enrollment, primary, male (% net)
+
+# SE.TER.ENRR	      School enrollment, tertiary (% gross)
+# SE.ENR.TERT.FM.ZS	School enrollment, tertiary (gross), gender parity index (GPI)
+# SE.TER.ENRR.FE	  School enrollment, tertiary, female (% gross)
+# SE.TER.ENRR.MA	  School enrollment, tertiary, male (% gross)
+
+
+
+### 1. this is the percent, but we aim to have data on the numbers ---------------------------------
+ind <- 'SE.TER.ENRR'
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+unique(dfwb$indicator)
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(dfwb)
+### 3. get a cleaned data and save to dir
+fname <- paste0(dir.process, iname, '_FILLNA.xlsx'); fname;
+dfwb_fillna_4yrs <- readxl::read_excel(fname) %>%
+  dplyr::select(iso3_eora, country_eora, `2000`, `2005`, `2010`, `2015`)  %>%
+  arrange(iso3_eora)
+names(dfwb_fillna_4yrs) <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+writexl::write_xlsx(x = dfwb_fillna_4yrs, path = paste0(dir.cleaned, iname, '_4yrs.xlsx'))
+print(paste0('There are ', round(sum(is.na(dfwb_fillna_4yrs))/(190*4)*100, digits = 1), '% NA'))
+f_pct <- paste0(dir.cleaned, iname, '_4yrs.xlsx')
+
+
+
+### to obtain the population at the age range, and then calculate the number of tertiary -----------
+# SP.POP.1564.TO	Population ages 15-64, total
+ind <- 'SP.POP.1564.TO'      
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+unique(dfwb$indicator)
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(dfwb)
+### 3. get a cleaned data and save to dir
+fname <- paste0(dir.process, iname, '_FILLNA.xlsx'); fname; 
+dfwb_fillna_4yrs <- readxl::read_excel(fname) %>%
+  dplyr::select(iso3_eora, country_eora, `2000`, `2005`, `2010`, `2015`)  %>%
+  arrange(iso3_eora)
+names(dfwb_fillna_4yrs) <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+writexl::write_xlsx(x = dfwb_fillna_4yrs, path = paste0(dir.cleaned, iname, '_4yrs.xlsx'))
+print(paste0('There are ', round(sum(is.na(dfwb_fillna_4yrs))/(190*4)*100, digits = 1), '% NA'))
+f_pop <- paste0(dir.cleaned, iname, '_4yrs.xlsx')
+
+
+
+
+### 3. to calculate the number of 'School enrollment, tertiary' ------------------------------------
+# School enrollment, tertiary (% gross)	Gross enrollment ratio is the ratio of total enrollment, regardless of age, to the population of the age group that officially corresponds to the level of education shown. Tertiary education, whether or not to an advanced research qualification, normally requires, as a minimum condition of admission, the successful completion of education at the secondary level.
+
+f_pct
+f_pop
+
+d1 <- readxl::read_excel(f_pct) %>% gather(key = year, value = pct, 3:6)
+d2 <- readxl::read_excel(f_pop) %>% gather(key = year, value = pop, 3:6)
+
+db <- merge(d1, d2, by = c('iso3', 'ctr', 'year'), all = T) %>%
+  mutate(tertiary = round(pct * 0.01 * pop, digits = 0)) %>%
+  select(-pct, -pop) %>%
+  spread(key = 'year', value = 'tertiary')
+
+writexl::write_xlsx(x = db, path = paste0(dir.cleaned, 'School enrollment, tertiary_population', '_4yrs.xlsx'))
+print(paste0('There are ', round(sum(is.na(db))/(190*4)*100, digits = 1), '% NA'))
+
+
+```
+
+
+```{r - other}
+# UIS.SLE.1	    School life expectancy, primary, both sexes (years)
+# UIS.SLE.1.F	  School life expectancy, primary, female (years)
+# UIS.SLE.1.M	  School life expectancy, primary, male (years)
+# UIS.SLE.23	  School life expectancy, secondary, both sexes (years)
+# UIS.SLE.23.F	School life expectancy, secondary, female (years)
+# UIS.SLE.23.M	School life expectancy, secondary, male (years)
+# UIS.SLE.56	  School life expectancy, tertiary, both sexes (years)
+# UIS.SLE.56.F	School life expectancy, tertiary, female (years)
+# UIS.SLE.56.M	School life expectancy, tertiary, male (years)
+ind <- 'UIS.SLE.1'
+ind <- 'UIS.SLE.1'
+ind <- 'UIS.SLE.1.M'
+ind <- 'UIS.SLE.1.F'
+ind <- 'UIS.SLE.56'
+C040101 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+
+##### S0401 ----------------------------------------------------
+# IT.NET.USER.ZS	++ Individuals using the Internet (% of population)
+ind <- 'IT.NET.USER.ZS'; iname <- 'Individuals using the Internet_pct'
+df <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+fname <- paste0(dir.process, iname, '.csv'); fname
+
+
+
+
+##### C040a01.02 -----------------------------------------------------
+# IT.CEL.SETS	     ++ Mobile cellular subscriptions
+# IT.CEL.SETS.P2   ++ Mobile cellular subscriptions (per 100 people)
+# IT.CEL.SETS.P3	  + Mobile phone subscribers (per 1,000 people)
+# https://ourworldindata.org/internet
+ind <- 'IT.CEL.SETS'; iname <- 'Mobile cellular subscriptions'
+df <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+fname <- paste0(dir.process, iname, '.csv'); fname
+
+
+
+# SE.XPD.TOTL.GD.ZS	  + Government expenditure on education, total (% of GDP)
+# UIS.XGDP.0.FSGOV	  - Government expenditure on pre-primary education as % of GDP (%)
+# UIS.XGDP.1.FSGOV	  + Government expenditure on primary education as % of GDP (%)
+# UIS.XGDP.23.FSGOV	  + Government expenditure on secondary education as % of GDP (%)
+# UIS.XGDP.56.FSGOV	  + Government expenditure on tertiary education as % of GDP (%)
+# UIS.XGDP.4.FSGOV	  - Government expenditure on post-secondary non-tertiary education as % of GDP (%)
+
+# UIS.XGDP.FSGOV.FDINSTADM.FFD	 -- Government expenditure in educational institutions as % of GDP (%)
+# UIS.XGDP.1.FSGOV.FDINSTADM.FFD -- Government expenditure in primary institutions as % of GDP (%)
+# XGDP.23.FSGOV.FDINSTADM.FFD	   -- Government expenditure in secondary institutions education as % of GDP (%)
+# XGDP.56.FSGOV.FDINSTADM.FFD	   -- Government expenditure in tertiary institutions as % of GDP (%)
+# SE.XPD.EDUC.ZS	               -- Public Expenditure on Education  (% GDP)
+# UIS.XUNIT.USCONST.1.FSGOV	  + Government expenditure per primary student (constant US$)
+# UIS.XUNIT.USCONST.23.FSGOV	+ Government expenditure per secondary student (constant US$)
+
+ind <- 'UIS.XUNIT.USCONST.1.FSGOV'
+ind <- 'UIS.XUNIT.USCONST.23.FSGOV'
+ind <- "UIS.XGDP.56.FSGOV"
+ind <- 'SE.XPD.TOTL.GD.ZS'; iname <- 'Government expenditure on education'
+C040b01 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+fname <- paste0(dir.process, iname, '.xlsx'); fname
+
+
+
+
+
+
+
+```
+
+
+
+
+
+### Goal 5 - Gender Equality
+
+  
+  SDG indicator 5.5.2 - Proportion of women in managerial positions (%)
+
+```{r - Women in managerial positions - ILO}
+
+### all available indicators from ILOSTAT ----------------------------------
+toc <- get_ilostat_toc()
+toc2 <- get_ilostat_toc(search = c('Annual', 'women|famale'), fixed = F, lang = 'en')
+
+
+### Get a single dataset ---------------------------------------------------------------------------
+# SDG_T552_NOC_RT_A; SDG_T552_NOC_RT; SDG indicator 5.5.2 - Proportion of women in managerial positions (%)
+# SDG_0552_NOC_RT_A; SDG_0552_NOC_RT; SDG indicator 5.5.2 - Proportion of women in senior and middle management positions (%)
+
+
+## 1. The number
+id_indicator <- 'SDG_T552_NOC_RT_A'
+# id_indicator <- 'INJ_FATL_SEX_MIG_NB_A' ## this one is very similar to the above one
+
+fatal0 <- get_ilostat(id = id_indicator, segment = 'indicator', time_format = 'num', type = 'both') 
+names(fatal0)
+
+fatal1 <- fatal0 %>%
+  dplyr::select(#ref_area, ref_area.label, classif1, classif1.label, time, obs_value
+                -source, -source.label, -indicator, -indicator.label, 
+                -obs_status, -obs_status.label, -note_indicator, -note_indicator.label, 
+                -note_source, -note_source.label) %>%
+  # dplyr::filter(str_detect(classif1.label, "Total|total")) %>%
+  dplyr::mutate(ref_area.label = ref_area) %>%
+  # dplyr::filter(str_detect(sex, "SEX_T")) %>%
+  as.data.frame()
+
+
+
+## To take the max value
+fatal2 <- fatal1 %>% 
+  ungroup() %>%
+  group_by(ref_area, ref_area.label, time) %>%
+  dplyr::summarise(obs_value = mean(obs_value, na.rm=TRUE)) %>%
+  # dplyr::rename(iso3 = ref_area, name = ref_area.label, year = time) %>%
+  as.data.frame()
+
+
+fatal <- fatal2 %>%
+  dplyr::select(ref_area, ref_area.label, time, obs_value) %>%
+  as.data.frame()
+
+## To check data availability across years
+fatal2_wide <- fatal2 %>%
+  arrange(time, ref_area) %>%
+  pivot_wider(names_from = time, values_from = obs_value) %>%
+  # dplyr::select(ref_area, ref_area.label, time, obs_value) %>%
+  merge(x = ctr_eora, y = ., by.x = "iso3_eora", by.y = "ref_area", all.x = T) %>%
+  arrange(ref_area.label, country_eora) %>%
+  as.data.frame()
+
+## check spatial coverage
+# fatal2_wide_shp <- merge(shp, fatal2_wide, by.x = 'iso_a3', by.y = 'iso3_eora', all.x = T) %>%
+#   select(`2015`)
+# plot(fatal2_wide_shp)
+
+
+## To fill NA
+# df <- fatal2_wide
+
+iname <- 'Proportion of women in managerial positions (%)'; iname
+### 2. fill NA
+function_fill_na_ILOSTAT(fatal2_wide)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## "There are 21.1% NA"
+
+
+## Since data for China in 2010 and 2015 are missing, we use data from 中国2010年人口普查资料 to fill the gap. 
+## Data for 2015 were taken from https://m.kunming.cn/news/c/2017-03-08/4544637.shtml#/
+xls <- list.files(path = dir.cleaned, pattern = '^Proportion of women in managerial', full.names = T); xls
+df  <- readxl::read_excel(path = xls) %>% as.data.frame() %>%
+  dplyr::mutate(`2010` = ifelse(iso3=='CHN' & is.na(`2010`), 25.13358783, `2010`)) %>%
+  dplyr::mutate(`2015` = ifelse(iso3=='CHN' & is.na(`2015`), 28.00000000, `2015`)) %>%
+  as.data.frame()
+
+writexl::write_xlsx(x = df, path = paste0(dir.cleaned, iname, '_4yrs.xlsx'))
+```
+
+
+
+
+
+  **Refer to data for SDG 8**
+```{r - employment}
+# SG.OWN.PRRT.MR	+ Married men and married women have equal ownership rights to property (1=yes; 0=no)
+# SG.LAW.OBHB.MR	+ Married women are required by law to obey their husbands (1=yes; 0=no)
+
+# gwp1.1	-- Access to a mobile phone or internet at home, female (% age 15+)
+# gwp1.2	-- Access to a mobile phone or internet at home, male (% age 15+)
+
+# WP_time_01.3	-- Account at a financial institution, female (% age 15+) [ts]
+# WP14887_7.3	  -- Account at a financial institution, female (% age 15+) [w2]
+# WP_time_01.2	-- Account at a financial institution, male (% age 15+) [ts]
+# WP14887_7.2	  -- Account at a financial institution, male (% age 15+) [w2]
+# WP11623_4.3	  -- Account at a formal financial institution, female (% age 15+)
+# WP11623_4.2	  -- Account at a formal financial institution, male (% age 15+)
+
+# SL.EMP.MPYR.FE.ZS	++ Employers, female (% of female employment) (modeled ILO estimate)
+# SL.EMP.MPYR.MA.ZS	++ Employers, male (% of male employment) (modeled ILO estimate)
+ind <- 'SL.EMP.MPYR.FE.ZS'; iname <- 'Employers, female_pct_ILO'
+ind <- 'SL.EMP.MPYR.MA.ZS'; iname <- 'Employers, male_pct_ILO'
+# C050b01 <- wb(indicator = ind, country = "countries_only",
+#               startdate = yr_start, enddate = yr_end) %>%
+#   as.data.frame() %>%
+#   spread(key = date, value = value) %>%
+#   left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+# fname <- paste0(dir.process, iname, '.csv'); fname
+# write.csv(x = C050b01, file = fname, row.names = F)
+
+
+
+# SL.EMP.TOTL.SP.ZS	      ++Employment to population ratio, 15+, total (%) (modeled ILO estimate)
+# SL.EMP.TOTL.SP.NE.ZS	   +Employment to population ratio, 15+, total (%) (national estimate)
+# SL.EMP.TOTL.SP.MA.ZS	  ++Employment to population ratio, 15+, male (%)   (modeled ILO estimate)
+# SL.EMP.TOTL.SP.FE.ZS	  ++Employment to population ratio, 15+, female (%) (modeled ILO estimate)
+# SL.EMP.TOTL.SP.MA.NE.ZS	 +Employment to population ratio, 15+, male (%)   (national estimate)
+# SL.EMP.TOTL.SP.FE.NE.ZS	 +Employment to population ratio, 15+, female (%) (national estimate)
+# ind <- 'SL.EMP.TOTL.SP.MA.ZS';
+# ind <- 'SL.EMP.TOTL.SP.FE.ZS'
+# ind <- 'SL.EMP.TOTL.SP.MA.NE.ZS'
+# ind <- 'SL.EMP.TOTL.SP.FE.NE.ZS'
+# S0503 <- wb(indicator = ind, country = "countries_only",
+#               startdate = yr_start, enddate = yr_end) %>%
+#   as.data.frame() %>%
+#   spread(key = date, value = value) %>%
+#   left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+# SL.UEM.TOTL.ZS	      ++ Unemployment, total (% of total labor force) (modeled ILO estimate)
+# SL.UEM.TOTL.MA.ZS	    ++ Unemployment, male (% of male labor force) (modeled ILO estimate)
+# SL.UEM.TOTL.FE.ZS	    ++ Unemployment, female (% of female labor force) (modeled ILO estimate)
+# SL.UEM.TOTL.NE.ZS	     + Unemployment, total (% of total labor force) (national estimate)
+# SL.UEM.TOTL.FE.NE.ZS	 + Unemployment, female (% of female labor force) (national estimate)
+# SL.UEM.TOTL.MA.NE.ZS	 +Unemployment, male (% of male labor force) (national estimate)
+ind <- 'SL.UEM.TOTL.MA.ZS'
+ind <- 'SL.UEM.TOTL.FE.ZS'
+# S0504 <- wb(indicator = ind, country = "countries_only",
+#               startdate = yr_start, enddate = yr_end) %>%
+#   as.data.frame() %>%
+#   spread(key = date, value = value) %>%
+#   left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+```
+
+
+
+
+### Goal 6 - Clean Water and Sanitation
+
+
+#### - water withdrawals
+
+  We choose to use the data "Total freshwater withdrawal" from `FAO AQUASTAT`, because it is more complete than the combined data from WB, OWID, and eurostat. 
+  
+```{r - <FAO_aquastat>}
+csv <- paste0(dir.raw, 'FAO_aquastat/aquastat-Total freshwater withdrawal (10^9 m3_yr).csv'); csv
+dfao <- read_csv(file = csv) %>%
+  dplyr::select(2, seq(4, 24, by = 4)) 
+names(dfao) <- c('ctr', 1990, 1995, 2000, 2005, 2010, 2015)
+dfao_total <- dfao %>%
+  dplyr::filter(!is.na(ctr)) %>%
+  merge(x = ., y = iso_eora_ex, by.x = 'ctr', by.y = 'Row', all.x = T) %>%
+  arrange(!is.na(iso3_eora)) %>%
+  as.data.frame() %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3_eora")) %>%
+  dplyr::select(-ctr) %>%
+  as.data.frame()
+names(dfao_total) <- c('ctr', 'iso3', '1990', '1995' ,"2000", "2005", "2010", "2015")
+### any duplicated value? --> NO  
+dfao_total$iso3_eora[duplicated(dfao_total$iso3_eora)]
+print(paste0('There are ', round(sum(is.na(dfao_total))/(190*4)*100, digits = 1), '% NA'))
+
+iname <- gsub('.csv|aquastat-', '', basename(csv)); iname
+function_fill_na(df = dfao_total)
+```
+
+
+
+```{r - <WB + OWID + eurostat>, eval=FALSE, include=FALSE}
+
+### 1. data source #1: World Bank ------------------------------------------------------------------------
+###
+# ER.H2O.FWTL.K3	 - Annual freshwater withdrawals, total (billion cubic meters)
+# ER.H2O.FWTL.ZS	 - Annual freshwater withdrawals, total (% of internal resources)
+# ER.H2O.FWAG.ZS	 + Annual freshwater withdrawals, agriculture (% of total freshwater withdrawal)
+# ER.H2O.FWDM.ZS	 + Annual freshwater withdrawals, domestic (% of total freshwater withdrawal)
+# ER.H2O.FWIN.ZS	 + Annual freshwater withdrawals, industry (% of total freshwater withdrawal)
+# EE.BOD.CHEM.ZS	-- Water pollution, chemical industry (% of total BOD emissions)
+# EE.BOD.CGLS.ZS	-- Water pollution, clay and glass industry (% of total BOD emissions)
+# EE.BOD.FOOD.ZS	-- Water pollution, food industry (% of total BOD emissions)
+# EE.BOD.MTAL.ZS	-- Water pollution, metal industry (% of total BOD emissions)
+# EE.BOD.OTHR.ZS	-- Water pollution, other industry (% of total BOD emissions)
+# EE.BOD.PAPR.ZS	-- Water pollution, paper and pulp industry (% of total BOD emissions)
+# EE.BOD.TXTL.ZS	-- Water pollution, textile industry (% of total BOD emissions)
+# EE.BOD.WOOD.ZS	-- Water pollution, wood industry (% of total BOD emissions)
+# ER.GDP.FWTL.M3.KD	 + Water productivity, total (constant 2010 US$ GDP per cubic meter of total freshwater withdrawal)
+
+# ind <- 'ER.GDP.FWTL.M3.KD'
+ind <- 'ER.H2O.FWTL.K3' ## Annual freshwater withdrawals, total (billion cubic meters)
+dfwb <- wb(indicator = ind, country = "countries_only",
+           startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+# write.csv(x = dfwb, file = paste0(dir.process, 'freshwater_withdrawals_billion_m3.csv'))
+
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+fname <- paste0(dir.process, iname, '.csv'); fname
+write.csv(x = dfwb, file = fname, row.names = F)
+
+### fill NA
+df <- read.csv(fname, stringsAsFactors = F)
+names(df)
+source('function_fill_na_wb.R')
+function_fill_na_wb(df)
+fname <- paste0(dir.process, iname, '_FILLNA.xlsx'); fname
+df_wd <- readxl::read_excel(fname) %>%
+  dplyr::select(iso3_eora, country_eora, `2000`, `2005`, `2010`, `2015`)  %>%
+  arrange(iso3_eora)
+names(df_wd) <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+df1 <- df_wd %>% gather(key = year, value = value, `2000`:`2015`)
+  
+
+
+### 2. data source #2: OWID data to fill NA --------------------------------------------------
+### m3
+dir.owid <- './Data/data_01_raw/Our World in Data/'
+csv <- 'water-withdrawals-per-capita.csv'
+owid <- read.csv(file = paste0(dir.owid, csv), stringsAsFactors = F) %>%
+  filter(Year >= 1990) %>%
+  spread(key = Year, value = 4) %>%
+  left_join(x  = ctr_eora, y = ., by = c("iso3_eora" = "Code")) %>%
+  # mutate_if(is.numeric, ~replace_na(., '..')) %>%
+  dplyr::select(iso3_eora, country_eora, `2000`, `2005`, `2010`, `2015`) %>%
+  as.data.frame() %>%
+  arrange(iso3_eora)
+names(owid) <- c('iso3', 'ctr', "2000","2005","2010","2015")
+pop <- readxl::read_excel(
+  path = './Data/data_02_intermediate/dt01_ctr_profile/xlsx/cleaned/Population, total_4yrs.xlsx') %>%
+  arrange(iso3) 
+ 
+pop_l  <- pop  %>% gather(key = year, value = pop, 3:6)
+owid_l <- owid %>% gather(key = year, value = water_pc, 3:6)
+
+col_comm <- intersect(colnames(pop_l), colnames(owid_l))
+df_owid <- merge(x = pop_l, y = owid_l, by = col_comm, all = T) %>%
+  dplyr::mutate(water = pop * water_pc/10^9) %>% ### m3 --> billion m3
+  dplyr::select(1:3, water) %>%
+  spread(key = year, value = water)
+df2 <- df_owid %>% gather(key = year, value = value, `2000`:`2015`)
+
+
+
+### 3. data source #3: eurostat --------------------------------------------------------------
+### https://ec.europa.eu/eurostat/databrowser/view/ten00002/default/table?lang=en
+### 10^6 m3
+getwd()
+file <- list.files(path = './Data/data_01_raw/eurostat', pattern = '^TEN00002', full.names = T); file
+d0 <- readxl::read_excel(file, sheet = 'Sheet 1', skip = 9) %>%
+  gather(key = year, value = value, 2:ncol(.)) %>%
+  dplyr::mutate(year = as.numeric(year)) %>%
+  dplyr::filter(!is.na(year)) %>%
+  rename('ctr' = 'TIME') %>%
+  spread(key = year, value = value)
+
+### add full names of geo, industry
+f.metadata <- './Data/data_01_raw/eurostat/metadata.xlsx'
+geo     <- readxl::read_excel(f.metadata, sheet = 'GEO')
+unit    <- readxl::read_excel(file, sheet = 'Sheet 1', range = 'C6', col_names = 'unit'); print(unit)
+
+### match iso3c and iso2c
+library(countrycode)
+country_names <- ctr$iso3_eora; country_names
+iso2c <- countrycode(country_names,
+            origin = 'iso3c',
+            destination = 'iso2c') #%>% as.data.frame()
+ctr_code <- data.frame(
+  ctr,
+  abbr = toupper(iso2c)) %>%
+  arrange(!is.na(abbr)) %>%
+  rename('iso3' = 'iso3_eora') %>%
+  dplyr::select(iso3, abbr)
+
+df3 <- d0 %>%
+  merge(x=., y=geo, by.x='ctr', by.y='Label', all.y=T) %>%
+  ### revise some of the ctr code 
+  dplyr::mutate(Code = ifelse(ctr == 'United Kingdom', 'GB', Code), 
+                Code = ifelse(ctr == 'Greece', 'GR', Code),
+                `2000` = NA,
+                `2005` = `2006`) %>%
+  merge(x=., y=ctr_code, by.x='Code', by.y='abbr', all.x=T) %>%
+  ### reorder cols
+  dplyr::select(ctr, Code, iso3, everything()) %>%
+  dplyr::select(iso3, ctr, `2000`, `2005`, `2010`, `2015`) %>%
+  arrange(!is.na(iso3), ctr) %>%
+  dplyr::filter(!is.na(iso3)) %>%
+  gather(key = year, value = value, `2000`:`2015`) %>%
+  dplyr::mutate(value = as.numeric(value)/1000) %>%  ### million m3 --> billion m3
+  # spread(key = year, value = value) %>%
+  as.data.frame()
+names(df3)
+
+
+  
+### combine these 3 data sources: first to use world bank data, and then OWID, and then eurostat -------------------------------
+col_comm <- intersect(names(df1), names(df2))[1:3]; col_comm
+dfs <- 
+  merge(x = df1, y = df2, by = col_comm, all.x = T) %>%
+  merge(x = .,   y = df3, by = col_comm, all.x = T) %>%
+  dplyr::mutate(
+    val = ifelse(
+      !is.na(value.x), value.x, ifelse(
+        !is.na(value.y), value.y, value)),
+    val = round(val, digits = 4)) %>%
+  dplyr::select(c(1:3, 7)) %>%
+  spread(key = year, value = val)
+
+### save to results
+fname <- paste0(dir.process, 'cleaned/', iname, '_4yrs.xlsx'); fname
+# writexl::write_xlsx(x = dfs, path = fname)
+# function_fill_na(dfs)
+```
+
+
+ 
+
+
+#### - water resources
+  There are 3 data sources, and the `WB` data is the same as `FAO_aquastat`. 
+  We choose WB data, because we have code to fill the NA.
+  We did not use data from `eurostat` because no additional country data can be used for filling the NA in `WB` data. 
+```{r}
+### 1. data source #1 - FAO_aquastat ---------------------------------------------------------------------
+###
+### Total renewable water resources
+csv <- paste0(dir.raw, 'FAO_aquastat/aquastat_Total renewable water resources (10^9 m3yr).csv'); csv
+dfao <- read_csv(file = csv) %>%
+  dplyr::select(2, seq(4, 24, by = 4)) 
+names(dfao) <- c('ctr', 1990, 1995, 2000, 2005, 2010, 2015)
+dfao_total <- dfao %>%
+  dplyr::filter(!is.na(ctr)) %>%
+  merge(x = ., y = iso_eora_ex, by.x = 'ctr', by.y = 'Row', all.x = T) %>%
+  arrange(!is.na(iso3_eora)) %>%
+  as.data.frame() %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3_eora")) %>%
+  as.data.frame()
+### any duplicated value? --> NO  
+dfao_total$iso3_eora[duplicated(dfao_total$iso3_eora)]
+print(paste0('There are ', round(sum(is.na(dfao_total))/(190*4)*100, digits = 1), '% NA'))
+
+
+
+###
+### Total internal renewable water resources (source 1)
+csv <- paste0(dir.raw, 'FAO_aquastat/aquastat-Total internal renewable water resources (IRWR) (10^9 m3_yr).csv'); csv
+dfao <- read_csv(file = csv) %>%
+  dplyr::select(2, seq(4, 24, by = 4)) 
+names(dfao) <- c('ctr', 1990, 1995, 2000, 2005, 2010, 2015)
+dfao_in <- dfao %>%
+  dplyr::filter(!is.na(ctr)) %>%
+  merge(x = ., y = iso_eora_ex, by.x = 'ctr', by.y = 'Row', all.x = T) %>%
+  arrange(!is.na(iso3_eora)) %>%
+  as.data.frame() %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3_eora")) %>%
+  as.data.frame() %>%
+  dplyr::select(iso3_eora, country_eora, `2000`:`2015`)  %>%
+  arrange(iso3_eora)
+### any duplicated value? --> NO  
+dfao_in$iso3_eora[duplicated(dfao_in$iso3_eora)]
+names(dfao_in) <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+print(paste0('There are ', round(sum(is.na(dfao_in))/(190*4)*100, digits = 1), '% NA'))
+
+
+
+
+### 2. data source #2 - World Bank ---------------------------------------------------------------------
+###
+### Total internal renewable water resources (source 2)
+# ER.H2O.INTR.K3	    + Renewable internal freshwater resources, total (billion cubic meters)
+ind <- 'ER.H2O.INTR.K3' 
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+
+
+### 2. fill NA
+function_fill_na_wb(dfwb)
+
+
+### 3. get a cleaned data and save to dir
+# function_format_4yrData_save(iname = iname)
+fname <- paste0(dir.process, iname, '_FILLNA.xlsx'); fname
+dfwb_fillna_4yrs <- readxl::read_excel(fname) %>%
+  dplyr::select(iso3_eora, country_eora, `2002`:`2014`)  %>%
+  arrange(iso3_eora)
+names(dfwb_fillna_4yrs) <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+fname <- paste0(dir.cleaned, iname, '_4yrs.xlsx'); fname
+writexl::write_xlsx(x = dfwb_fillna_4yrs, path = fname)
+print(paste0('There are ', round(sum(is.na(dfwb_fillna_4yrs))/(190*4)*100, digits = 1), '% NA'))
+
+
+```
+
+
+
+  Following the above code, and separate them here. 
+```{r}
+### 3. data source #3: eurostat ------------------------------------------------------------------------
+### --> NO DATA can be used for filling the missing ones
+### https://ec.europa.eu/eurostat/databrowser/view/ten00002/default/table?lang=en
+### Renewable freshwater resources  10^6 m3
+# getwd()
+# file <- list.files(path = './data_01_raw/eurostat', pattern = '^TEN00001', full.names = T); file
+# d0 <- readxl::read_excel(file, sheet = 'Sheet 1', skip = 8) %>%
+#   dplyr::select(1:2) 
+# names(d0) <- c('ctr', 'value') 
+# d0 <- d0 %>%
+#   dplyr::mutate(value = as.numeric(value)) %>%
+#   dplyr::filter(!is.na(value))
+# 
+# ### add full names of geo, industry
+# f.metadata <- './data_01_raw/eurostat/metadata.xlsx'
+# geo     <- readxl::read_excel(f.metadata, sheet = 'GEO')
+# unit    <- readxl::read_excel(file, sheet = 'Sheet 1', range = 'C6', col_names = 'unit'); print(unit)
+# ### match iso3c and iso2c
+# library(countrycode)
+# country_names <- ctr$iso3_eora; country_names
+# iso2c <- countrycode(country_names,
+#             origin = 'iso3c',
+#             destination = 'iso2c') #%>% as.data.frame()
+# ctr_code <- data.frame(
+#   ctr,
+#   abbr = toupper(iso2c)
+# ) %>%
+#   arrange(!is.na(abbr)) %>%
+#   rename('iso3' = 'iso3_eora') %>%
+#   dplyr::select(iso3, abbr)
+# 
+# df3 <- d0 %>%
+#   merge(x=., y=geo, by.x='ctr', by.y='Label', all.y=T) %>%
+#   ### revise some of the ctr code 
+#   dplyr::mutate(Code = ifelse(ctr == 'United Kingdom', 'GB', Code), 
+#                 Code = ifelse(ctr == 'Greece', 'GR', Code)) %>%
+#   merge(x=., y=ctr_code, by.x='Code', by.y='abbr', all.x=T) %>%
+#   ### reorder cols
+#   dplyr::select(iso3, ctr, iso3, everything()) %>%
+#   dplyr::select(-Code) %>%
+#   arrange(!is.na(iso3), ctr) %>%
+#   dplyr::filter(!is.na(iso3)) %>%
+#   dplyr::mutate(value = as.numeric(value)/1000) %>%  ### million m3 --> billion m3
+#   # spread(key = year, value = value) %>%
+#   as.data.frame()
+# names(df3)
+
+```
+
+
+
+#### - Other
+```{r }
+# IE.PPI.WATR.CD	 + Investment in water and sanitation with private participation (current US$)
+# SH.H2O.BASW.ZS	++ People using basic drinking water services (% of population) ## 2000-2015
+ind <- 'IE.PPI.WATR.CD'; iname <- 'Investment in water and sanitation'
+S0601 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+fname <- paste0(dir.process, iname, '.xlsx'); fname
+
+
+
+
+# SH.H2O.SMDW.ZS	  + People using safely managed drinking water services (% of population)
+# SH.H2O.SMDW.RU.ZS	- People using safely managed drinking water services, rural (% of rural population)
+# SH.H2O.SMDW.UR.ZS	- People using safely managed drinking water services, urban (% of urban population)
+
+ind <- 'SH.H2O.SMDW.UR.ZS'
+C050a04 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+# SH.STA.BASS.ZS	  + People using basic sanitation services (% of population) #2000-2015
+# SH.STA.BASS.RU.ZS	+ People using basic sanitation services, rural (% of rural population)
+# SH.STA.BASS.UR.ZS	+ People using basic sanitation services, urban (% of urban population)
+ind <- 'SH.STA.BASS.ZS'
+S0602 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+# SH.STA.SMSS.ZS	  People using safely managed sanitation services (% of population)
+# SH.STA.SMSS.RU.ZS	People using safely managed sanitation services, rural (% of rural population)
+# SH.STA.SMSS.UR.ZS	People using safely managed sanitation services, urban? (% of urban population)
+ind <- 'SH.STA.SMSS.ZS'
+C050a06 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+```
+
+
+
+
+
+
+### Goal 7 - Affordable and Clean Energy
+```{r - ??electricity}
+# EG.ELC.ACCS.ZS	   ++ Access to electricity (% of population)
+# EG.ELC.ACCS.UR.ZS	 ++ Access to electricity, urban (% of urban population)
+# EG.ELC.ACCS.RU.ZS	 ++ Access to electricity, rural (% of rural population)
+
+ind <- 'EG.ELC.ACCS.ZS'
+
+
+
+
+
+
+
+# EG.EGY.PRIM.PP.KD	  ++ Energy intensity level of primary energy (MJ/$2011 PPP GDP)
+# EG.CFT.ACCS.ZS	       Access to clean fuels and technologies for cooking  (% of population)
+ind <- 'EG.EGY.PRIM.PP.KD'; iname <- 'Energy intensity primary ene (MJ_2011 PPP GDP)'
+ind <- 'EG.CFT.ACCS.ZS'
+C0703 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+```
+
+
+
+
+```{r - energy consumption}
+
+### Energy use ----------------------------------------------------------------
+###
+# 1.1_TOTAL.FINAL.ENERGY.CONSUM	  ++ Total final energy consumption (TFEC)
+# EG.USE.PCAP.KG.OE	               + Energy use (kg of oil equivalent per capita)
+# EG.USE.COMM.GD.PP.KD             + Energy use (kg of oil equivalent) per $1,000 GDP (constant 2011 PPP)
+# EG.USE.COMM.KT.OE	             -- Energy use (kt of oil equivalent)
+
+ind <- '1.1_TOTAL.FINAL.ENERGY.CONSUM'
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(dfwb)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname)
+
+
+
+
+
+### Renewable energy ---------------------------------------------------------
+###
+# EG.FEC.RNEW.ZS	            ++ Renewable energy consumption (% of total final energy consumption)
+# 2.1_SHARE.TOTAL.RE.IN.TFEC	++ Renewable energy consumption (% in TFEC)
+# 3.1_RE.CONSUMPTION	        ++ Renewable energy consumption (TJ)
+# 4.1_SHARE.RE.IN.ELECTRICITY	++ Renewable electricity (% in total electricity output)
+# EG.ELC.RNWX.ZS	             + Electricity production from renewable sources, excluding hydroelectric (% of total)
+# EG.ELC.RNWX.KH	             + Electricity production from renewable sources, excluding hydroelectric (kWh)
+
+ind <- '3.1_RE.CONSUMPTION';  
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(dfwb)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname)
+
+```
+
+
+
+### Goal 8 - Decent Work and Economic Growth
+```{r - employment?}
+# SL.EMP.TOTL.SP.NE.ZS	  + Employment to population ratio, 15+, total (%) (national estimate)
+# SL.EMP.TOTL.SP.ZS	     ++ Employment to population ratio, 15+, total (%) (modeled ILO estimate)
+# SL.EMP.TOTL.SP.FE.NE.ZS	+ Employment to population ratio, 15+, female (%) (national estimate)
+# SL.EMP.TOTL.SP.FE.ZS	 ++ Employment to population ratio, 15+, female (%) (modeled ILO estimate)
+# SL.EMP.TOTL.SP.MA.ZS	 ++ Employment to population ratio, 15+, male (%) (modeled ILO estimate)
+# SL.EMP.TOTL.SP.MA.NE.ZS	- Employment to population ratio, 15+, male (%) (national estimate)
+# SL.IND.EMPL.ZS	       ++ Employment in industry (% of total employment) (modeled ILO estimate)
+### many missiong -----------------------
+# SL.EMP.TOTL	            - Number of people employed
+# SL.UEM.TOTL	            - Number of people unemployed
+ind <- "SL.EMP.TOTL.SP.FE.ZS"     # [1991-2015]
+ind <- "SL.EMP.TOTL.SP.FE.NE.ZS"  # [1991-2015]
+ind <- "SL.EMP.TOTL.SP.ZS"; iname <- 'Employment to population ratio_modeled ILO'
+C080301 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+fname <- paste0(dir.process, iname, '.csv'); fname
+
+
+
+# SL.UEM.TOTL.ZS	      Unemployment, total (% of total labor force) (modeled ILO estimate)
+# SL.UEM.TOTL.NE.ZS	    Unemployment, total (% of total labor force) (national estimate)
+# SL.UEM.TOTL.FE.ZS	    Unemployment, female (% of female labor force) (modeled ILO estimate)
+# SL.UEM.TOTL.FE.NE.ZS	Unemployment, female (% of female labor force) (national estimate)
+# SL.UEM.TOTL.MA.ZS	    Unemployment, male (% of male labor force) (modeled ILO estimate)
+# SL.UEM.TOTL.MA.NE.ZS	Unemployment, male (% of male labor force) (national estimate)
+### many missing values -------------------
+# SL.TLF.0714.FE.ZS 	- Children in employment, female (% of female children ages 7-14)
+# SL.TLF.0714.MA.ZS 	- Children in employment, male (% of male children ages 7-14)
+# SL.TLF.0714.ZS	    - Children in employment, total (% of children ages 7-14)
+
+ind <- "SL.UEM.TOTL.ZS"              # []
+C080502 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+
+# ST.INT.ARVL	    ++ International tourism, number of arrivals     ## 1995- 2015
+# ST.INT.RCPT.CD	++ International tourism, receipts (current US$) ## 1995- 2015
+ind <- 'ST.INT.RCPT.CD' ## 1995- 2015
+ind <- 'ST.INT.ARVL'
+C080503 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+
+
+# i_ATMs_pop	    ATMs per 100,000 adults
+# GFDD.AI.25	    ATMs per 100,000 adults
+# FB.ATM.TOTL.P5	Automated teller machines (ATMs) (per 100,000 adults)
+# GFDD.AI.01	    Bank accounts per 1000 adults
+# GFDD.AI.02	    Bank branches per 100,000 adults 
+# FB.CBK.BRCH.P5	Commercial bank branches (per 100,000 adults)
+ind <- 'i_ATMs_pop'     ## 2011 - 
+ind <- 'GFDD.AI.25'     ## 2001 - 
+ind <- 'FB.ATM.TOTL.P5' ## 2004 - 
+ind <- 'GFDD.AI.01'
+ind <- 'GFDD.AI.02'     ## 2001 - 
+ind <- 'FB.CBK.BRCH.P5' ## 2004 - 
+ind <- "WP14889.1"
+C081001 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+```
+
+
+
+
+```{r - workers - ILO}
+## 1. Employees by sex and economic activity (thousands) -------------------------------------------
+wk <- get_ilostat(id = 'EES_TEES_SEX_EC2_NB_A', segment = 'indicator', time_format = 'num', type = 'both') %>%
+  dplyr::filter(sex == 'SEX_T') %>%
+  dplyr::select(ref_area, ref_area.label, classif1, classif1.label, time, obs_value) %>%
+  dplyr::filter(str_detect(classif1.label, "Total|total")) %>%
+  arrange(ref_area, time) %>%
+  as.data.frame()
+
+wk_test <- wk %>% 
+  dplyr::select(-classif1) %>%
+  pivot_wider(names_from = classif1.label, values_from = obs_value)
+
+wk1 <- wk %>%
+  dplyr::select(ref_area, ref_area.label, time, obs_value)
+
+
+
+
+## 2. Employees by sex and economic activity (thousands)--------------------------------------------
+wk <- get_ilostat(id = 'EES_TEES_SEX_ECO_NB_A', segment = 'indicator', time_format = 'num', type = 'both') %>%
+  dplyr::filter(sex == 'SEX_T') %>%
+  dplyr::select(ref_area, ref_area.label, classif1, classif1.label, time, obs_value) %>%
+  dplyr::filter(str_detect(classif1.label, "Total|total")) %>%
+  arrange(ref_area, time) %>%
+  as.data.frame()
+
+wk_test <- wk %>% 
+  dplyr::select(-classif1) %>%
+  pivot_wider(names_from = classif1.label, values_from = obs_value)
+
+wk_integrate <- wk %>% 
+  ungroup() %>%
+  group_by(ref_area, ref_area.label, time) %>%
+  dplyr::summarise(obs_value = mean(obs_value, na.rm=TRUE))
+
+wk2 <- wk_integrate %>%
+  ungroup() %>%
+  dplyr::select(ref_area, ref_area.label, time, obs_value)
+
+
+
+
+
+## 3. Employment by sex and economic activity (thousands) ------------------------------------------
+wk <- get_ilostat(id = 'EMP_TEMP_SEX_ECO_NB_A', segment = 'indicator', time_format = 'num', type = 'both') %>%
+  dplyr::filter(sex == 'SEX_T') %>%
+  dplyr::select(ref_area, ref_area.label, classif1, classif1.label, time, obs_value) %>%
+  dplyr::filter(str_detect(classif1.label, "Total|total")) %>%
+  arrange(ref_area, time) %>%
+  as.data.frame()
+
+wk_test <- wk %>% 
+  dplyr::select(-classif1) %>%
+  pivot_wider(names_from = classif1.label, values_from = obs_value)
+
+wk_integrate <- wk %>% 
+  ungroup() %>%
+  group_by(ref_area, ref_area.label, time) %>%
+  dplyr::summarise(obs_value = mean(obs_value, na.rm=TRUE))
+
+wk3 <- wk_integrate %>%
+  ungroup() %>%
+  dplyr::select(ref_area, ref_area.label, time, obs_value)
+
+
+
+## 4. Employment by sex and status in employment (thousands) ---------------------------------------
+wk <- get_ilostat(id = 'EMP_TEMP_SEX_STE_NB_A', segment = 'indicator', time_format = 'num', type = 'both') %>%
+  dplyr::filter(sex == 'SEX_T') %>%
+  dplyr::select(ref_area, ref_area.label, classif1, classif1.label, time, obs_value) %>%
+  dplyr::filter(str_detect(classif1.label, "Total|total")) %>%
+  arrange(ref_area, time) %>%
+  as.data.frame()
+
+wk_test <- wk %>% 
+  dplyr::select(-classif1) %>%
+  pivot_wider(names_from = classif1.label, values_from = obs_value)
+
+wk_integrate <- wk %>% 
+  ungroup() %>%
+  group_by(ref_area, ref_area.label, time) %>%
+  dplyr::summarise(obs_value = mean(obs_value, na.rm=TRUE))
+
+wk4 <- wk_integrate %>%
+  ungroup() %>%
+  dplyr::select(ref_area, ref_area.label, time, obs_value)
+
+length(unique(wk4$ref_area))
+length(unique(wk$ref_area))
+
+
+
+
+
+## To compare the data from 4 sources --------------------------------------------------------------
+wk_compare <- 
+  merge(
+    x = wk1 %>% dplyr::select(-ref_area.label) %>% dplyr::rename(wk1 = obs_value), 
+    y = wk2 %>% dplyr::select(-ref_area.label) %>% dplyr::rename(wk2 = obs_value),  
+    by = c('ref_area', 'time'), all = T) %>%
+  merge(
+    x = ., 
+    y = wk3 %>% dplyr::select(-ref_area.label) %>% dplyr::rename(wk3 = obs_value),  
+    by = c('ref_area', 'time'), all = T) %>%
+  merge(
+    x = ., 
+    y = wk4 %>% dplyr::select(-ref_area.label) %>% dplyr::rename(wk4 = obs_value),  
+    by = c('ref_area', 'time'), all = T)
+
+
+colSums(is.na(wk_compare))
+
+## plot
+wk_compare %>%
+  # filter(value_cal < 30 & value < 30) %>%
+  ggplot() +
+  geom_point(aes(x = wk1, y = wk2)) +
+  geom_point(aes(x = wk1, y = wk3), color = 'red',  alpha = 0.3, size = 5) +
+  geom_point(aes(x = wk1, y = wk4), color = 'blue', alpha = 0.3, size = 2) +
+  scale_y_log10() + scale_x_log10() +
+  theme_bw()
+
+wk_compare %>%
+  ggplot() +
+  geom_point(aes(x = wk1, y = wk2), color = 'blue', alpha = 0.3, size = 2) +
+  scale_y_log10() + scale_x_log10() +
+  theme_bw()
+
+wk_compare %>%
+  ggplot() +
+  geom_point(aes(x = wk3, y = wk4), color = 'blue', alpha = 0.3, size = 2) +
+  scale_y_log10() + scale_x_log10() +
+  theme_bw()
+
+
+### to decide data or integrate data ---------------------------------------------------------------
+workers <- wk_compare %>%
+  
+  ## one way is to take the `Employment`, instead of `Employees` -related data
+  # dplyr::select(-wk1, -wk2) %>%
+  # gather(key = 'source', value = 'obs_value', wk3:wk4) %>%
+  
+  ## another is to best use of all the available data
+  gather(key = 'source', value = 'obs_value', 3:ncol(.)) %>%
+  
+  group_by(ref_area, time) %>%
+  dplyr::summarise(obs_value = max(obs_value, na.rm=TRUE))
+
+
+yr_nData <- workers %>%
+  group_by(time) %>%
+  tally()
+## -> only after 1970, there are better data for all countries
+
+### convert to the unified format
+workers_wide <- workers %>%
+  dplyr::filter(time >= 1970) %>%
+  spread(key = time, value = obs_value) %>%
+  merge(x = ctr_eora, y = ., by.x = "iso3_eora", by.y = 'ref_area', all.x = T) %>%
+  dplyr::mutate(
+                indicatorID = NA, 
+                indicator   = 'workers_thousands', 
+                iso2c       = NA,
+                country     = NA,
+                ) %>%
+  dplyr::select(country_eora, iso3_eora, indicatorID, indicator, iso2c, country, everything()) %>%
+  as.data.frame()
+
+var_w <- workers_wide
+iname <- unique(var_w$indicator)[!is.na(unique(var_w$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(var_w)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## "There are 4.2% NA"
+```
+
+
+
+
+
+
+  **Occupational injuries** (Indicator description)
+  Method of computation
+  Given that relative measures are easier to interpret and favour comparability between countries, activities and over time, ILOSTAT presents statistics on the occupational injuries incidence rate, calculated as follows:
+
+  - Fatal occupational injuries incidence rate = Number of new cases of fatal occupational injuries during the reference period x 100’000 / Number of workers in the reference group
+
+  - Non-fatal occupational injuries incidence rate = Number of new cases of non-fatal occupational injuries during the reference period x 100’000 / Number of workers in the reference group
+  
+  https://ilostat.ilo.org/resources/concepts-and-definitions/description-occupational-injuries/
+```{r - fatal}
+### Cases of fatal occupational injury by economic activity | Annual
+# fname <- paste0(dir.raw, 'ILOSTAT/INJ_FATL_ECO_NB_A-full-2021-03-23.csv'); fname
+# fatal <- read_csv(file = fname) %>%
+#   # filter(`ref_area.label` == ctr, 
+#   #        # `sex.label` == 'Sex: Total',
+#   #        time >= yr_start,
+#   #        time <= yr_end) %>%
+#   as.data.frame() %>%
+#   dplyr::select(ref_area, ref_area.label, classif1, 
+#                 # classif1.label, 
+#                 time, obs_value) %>%
+#   dplyr::filter(classif1 == 'ECO_AGGREGATE_TOTAL') %>%
+#   dplyr::mutate(time = as.numeric(time)) %>%
+#   as.data.frame() %>%
+#   arrange(ref_area, time) %>%
+#   pivot_wider(names_from = time, values_from = obs_value) %>%
+#   merge(x = ., y = ctr_eora, by.x = 'ref_area', by.y = 'iso3_eora', all.y = T) %>%
+#   dplyr::rename(iso3_eora = ref_area) %>%
+#   dplyr::select(iso3_eora, country_eora, ref_area.label, everything()) %>%
+#   as.data.frame()
+# names(fatal)
+# str(fatal)
+
+
+library(Rilostat)
+
+
+### all available indicators from ILOSTAT ----------------------------------
+toc <- get_ilostat_toc()
+toc2 <- get_ilostat_toc(search = c('Annual', 'fatal|Fatal'), fixed = F, lang = 'en')
+toc3 <- get_ilostat_toc(search = c('Annual', 'fatal|Fatal'), fixed = F)
+toc4 <- get_ilostat_toc(search = c('Annual', 'worker|Worker'), fixed = F)
+toc5 <- get_ilostat_toc(search = c('Annual', 'Employ|employ'), fixed = F) %>% arrange(indicator.label)
+
+
+
+
+### Get a single dataset ---------------------------------------------------
+
+# INJ_FATL_ECO_NB_A;     INJ_FATL_ECO_NB; Cases of fatal occupational injury by economic activity
+# INJ_FATL_SEX_MIG_NB_A; INJ_FATL_SEX_MIG_NB; Cases of fatal occupational injury by sex and migrant status
+
+
+## 1. Cases of fatal occupational injury by economic activity
+id_indicator <- 'INJ_FATL_ECO_NB_A'
+# id_indicator <- 'INJ_FATL_SEX_MIG_NB_A' ## this one is very similar to the above one
+
+fatal0 <- get_ilostat(id = id_indicator, segment = 'indicator', time_format = 'num', type = 'both') 
+names(fatal0)
+
+fatal1 <- fatal0 %>%
+  dplyr::select(#ref_area, ref_area.label, classif1, classif1.label, time, obs_value
+                -source, -source.label, -indicator, -indicator.label, 
+                -obs_status, -obs_status.label, -note_indicator, -note_indicator.label, -note_source, -note_source.label) %>%
+  dplyr::filter(str_detect(classif1.label, "Total|total")) %>%
+  # dplyr::filter(str_detect(sex, "SEX_T")) %>%
+  as.data.frame()
+unique(fatal1$classif1.label)
+
+## there are several columns that contain the similar data information, here we can compare them.
+##  You will notice two are basically the same.
+##  Then, we can take the max value across the four columns to decide the 'total cases'. 
+fatal1_test <- fatal1 %>% 
+  dplyr::select(-classif1) %>%
+  pivot_wider(names_from = classif1.label, values_from = obs_value)
+
+## To take the max value
+fatal2 <- fatal1 %>% 
+  ungroup() %>%
+  group_by(ref_area, ref_area.label, time) %>%
+  dplyr::summarise(obs_value = max(obs_value, na.rm=TRUE)) %>%
+  # dplyr::rename(iso3 = ref_area, name = ref_area.label, year = time) %>%
+  as.data.frame()
+
+
+fatal <- fatal2 %>%
+  dplyr::select(ref_area, ref_area.label, time, obs_value) %>%
+  as.data.frame()
+
+## To check data availability across years
+fatal2_wide <- fatal2 %>%
+  arrange(time, ref_area) %>%
+  pivot_wider(names_from = time, values_from = obs_value) %>%
+  # dplyr::select(ref_area, ref_area.label, time, obs_value) %>%
+  merge(x = ctr_eora, y = ., by.x = "iso3_eora", by.y = "ref_area", all = T) %>%
+  arrange(ref_area.label, country_eora) %>%
+  as.data.frame()
+
+## check spatial coverage
+# fatal2_wide_shp <- merge(shp, fatal2_wide, by.x = 'iso_a3', by.y = 'iso3_eora', all.x = T) %>%
+#   select(`2015`)
+# plot(fatal2_wide_shp)
+
+
+## To fill NA
+# df <- fatal2_wide
+
+iname <- id_indicator; iname
+### 2. fill NA
+function_fill_na_ILOSTAT(fatal2_wide)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## "There are 31.4% NA"
+```
+
+
+
+```{r - non-fatal}
+### all available indicators from ILOSTAT ----------------------------------------------------------
+toc <- get_ilostat_toc()
+toc2 <- get_ilostat_toc(search = c('Annual', 'non-fatal|non-Fatal'), fixed = F, lang = 'en')
+toc3 <- get_ilostat_toc(search = c('Annual', 'non-fatal|non-Fatal'), fixed = F)
+
+# INJ_NFTL_ECO_NB_A     - INJ_NFTL_ECO_NB     - Cases of non-fatal occupational injury by economic activity
+# INJ_NFTL_INJ_ECO_NB_A - INJ_NFTL_INJ_ECO_NB - Cases of non-fatal occupational injury by type of incapacity and economic activity
+# INJ_NFTL_SEX_MIG_NB_A - INJ_NFTL_SEX_MIG_NB - Cases of non-fatal occupational injury by sex and migrant status
+# INJ_NFTL_SEX_INJ_MIG_NB_A - INJ_NFTL_SEX_INJ_MIG_NB - Cases of non-fatal occupational injury by sex, type of incapacity and migrant status
+
+
+### Get a single dataset ---------------------------------------------------------------------------
+## 1. Cases of non-fatal occupational injury by economic activity
+id_indicator <- 'INJ_NFTL_ECO_NB_A'
+# id_indicator <- 'INJ_NFTL_SEX_MIG_NB_A'      ## this is different from the above one
+# id_indicator <- 'INJ_NFTL_SEX_INJ_MIG_NB_A'
+
+non_fatal0 <- get_ilostat(id = id_indicator, segment = 'indicator', time_format = 'num', type = 'both') 
+
+non_fatal1 <- non_fatal0 %>%
+  dplyr::select(ref_area, ref_area.label, classif1, 
+                classif1.label,
+                # sex,
+                time, obs_value) %>%
+  dplyr::filter(str_detect(classif1.label, "Total|total")) %>%
+  # dplyr::filter(str_detect(sex, "SEX_T")) %>%
+  as.data.frame()
+unique(non_fatal1$classif1.label)
+
+## there are several columns that contain the similar data information, here we can compare them.
+##  You will notice two are basically the same.
+##  Then, we can take the max value across the four columns to decide the 'total cases'. 
+non_fatal1_test <- non_fatal1 %>% 
+  dplyr::select(-classif1) %>%
+  pivot_wider(names_from = classif1.label, values_from = obs_value)
+
+## To take the max value
+non_fatal2 <- non_fatal1 %>% 
+  ungroup() %>%
+  group_by(ref_area, ref_area.label, time) %>%
+  dplyr::summarise(obs_value = max(obs_value, na.rm=TRUE)) %>%
+  # dplyr::rename(iso3 = ref_area, name = ref_area.label, year = time) %>%
+  as.data.frame()
+
+
+non_fatal <- non_fatal2 %>%
+  dplyr::select(ref_area, ref_area.label, time, obs_value) %>%
+  as.data.frame()
+
+## To check data availability across years
+non_fatal2_wide <- non_fatal2 %>%
+  arrange(time, ref_area) %>%
+  pivot_wider(names_from = time, values_from = obs_value) %>%
+  # dplyr::select(ref_area, ref_area.label, time, obs_value) %>%
+  merge(x = ctr_eora, y = ., by.x = "iso3_eora", by.y = "ref_area", all = T) %>%
+  arrange(ref_area.label, country_eora) %>%
+  as.data.frame()
+
+## check spatial coverage
+# non_fatal2_wide_shp <- merge(shp, non_fatal2_wide, by.x = 'iso_a3', by.y = 'iso3_eora', all.x = T) %>%
+#   select(`2015`)
+# plot(non_fatal2_wide_shp)
+
+
+## To fill NA
+# df <- non_fatal2_wide
+
+iname <- id_indicator; iname
+### 2. fill NA
+function_fill_na_ILOSTAT(non_fatal2_wide)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## "There are 33.6% NA"
+```
+
+
+
+
+
+
+  **This is to test if ILO's data are consistent**
+  There are three data source for this same indicator. 
+```{r - fatal per 100k}
+## 1. SDG indicator 8.8.1 - Fatal occupational injuries per 100'000 workers ------------------------
+dat1 <- get_ilostat(id = 'SDG_F881_SEX_MIG_RT_A', segment = 'indicator', time_format = 'num', type = 'both') %>%
+  dplyr::filter(sex == 'SEX_T') %>%
+  dplyr::select(ref_area, ref_area.label, classif1,
+                classif1.label,
+                time, obs_value) %>%
+  dplyr::filter(str_detect(classif1.label, "Total|total"))
+unique(dat2$classif1.label)
+
+ft1 <- dat1 %>%
+  dplyr::filter(classif1 == 'MIG_STATUS_TOTAL') %>%
+  arrange(time, ref_area) %>%
+  pivot_wider(names_from = time, values_from = obs_value) %>%
+  dplyr::select(-classif1, - classif1.label) %>%
+  arrange(ref_area) %>%
+  as.data.frame()
+
+length(unique(dat1$ref_area))
+length(unique(ft1$ref_area))
+
+
+
+## 2. Fatal occupational injuries per 100'000 workers by economic activity -------------------------
+dat2 <- get_ilostat(id = 'INJ_FATL_ECO_RT_A', segment = 'indicator', time_format = 'num', type = 'both') %>%
+  # dplyr::filter(sex == 'SEX_T') %>%
+  dplyr::select(ref_area, ref_area.label, classif1,
+                classif1.label,
+                time, obs_value) 
+
+dat2_total <- dat2 %>%
+  dplyr::filter(str_detect(classif1.label, "Total|total")) %>%
+  # arrange(time, ref_area) %>%
+  arrange(ref_area, time) %>%
+  # pivot_wider(names_from = time, values_from = obs_value) %>%
+  dplyr::mutate(obs_value = ifelse(ref_area=='THA' & time == 2014, obs_value/100, obs_value)) %>% ## this data point seems wrong, we correct it here. 
+  as.data.frame()
+
+dat2_test <- dat2_total %>%
+  dplyr::select(-classif1) %>%
+  pivot_wider(names_from = classif1.label, values_from = obs_value) %>%
+  # pivot_wider(names_from = time, values_from = obs_value) %>%
+  as.data.frame()
+
+## data from different sources seem the same, so we can combine the data from different sources to get a better data coverage
+dat2_integrate <- dat2_total %>%
+  group_by(ref_area, ref_area.label, time) %>%
+  dplyr::summarise(obs_value = mean(obs_value, na.rm=TRUE)) %>%
+  as.data.frame()
+## after combine the data, we bind the new data with the raw data to see if they match well
+dat2_integrate_test <- merge(dat2_test, dat2_integrate, by = c('ref_area', 'time'), all = T)
+
+
+# ft2 <- dat2_integrate %>% 
+#   arrange(time, ref_area) %>%
+#   pivot_wider(names_from = time, values_from = obs_value) %>%
+#   arrange(ref_area) %>%
+#   as.data.frame() 
+
+### there can be some country without "total", but have data for each "by economic activity"
+dat2_integrate2 <- dat2 %>%
+  dplyr::filter(!ref_area %in% unique(dat2_integrate$ref_area)) %>% 
+  arrange(ref_area, time) %>%
+  ungroup() %>% group_by(ref_area, ref_area.label, time) %>%
+  dplyr::summarise(obs_value = mean(obs_value, na.rm = TRUE)) %>%
+  as.data.frame()
+
+ft2 <- rbind(dat2_integrate, dat2_integrate2) %>% arrange(time, ref_area) %>%
+  pivot_wider(names_from = time, values_from = obs_value) %>%
+  arrange(ref_area)
+
+length(unique(dat2$ref_area))
+length(unique(ft2$ref_area))
+
+
+
+
+## 3. Fatal occupational injuries per 100'000 workers by sex and migrant status --------------------
+# INJ_FATL_SEX_MIG_RT_A; 
+dat3 <- get_ilostat(id = 'INJ_FATL_SEX_MIG_RT_A', segment = 'indicator', time_format = 'num', type = 'both') %>%
+  dplyr::filter(sex == 'SEX_T') %>%
+  dplyr::select(ref_area, ref_area.label, classif1, classif1.label, time, obs_value) 
+
+ft <- dat3 %>%
+  dplyr::filter(str_detect(classif1.label, "Total|total")) %>%
+  arrange(ref_area, time) %>%
+  as.data.frame()
+unique(ft$classif1.label)
+
+ft3 <- ft %>%
+  ungroup() %>%
+  dplyr::select(ref_area, ref_area.label, time, obs_value)
+
+length(unique(ft3$ref_area))
+length(unique(dat3$ref_area))
+
+
+
+
+
+### combine ft1, ft2, ft3 ------------------------------------------------------------------------------------------------
+ft1_l <- ft1 %>% gather(key = time, value = obs_value, 3:ncol(.))
+ft2_l <- ft2 %>% gather(key = time, value = obs_value, 3:ncol(.))
+
+ft100k <- 
+  merge(x = ft1_l %>% dplyr::rename(ft1 = obs_value), 
+        y = ft2_l %>% dplyr::rename(ft2 = obs_value) %>% dplyr::select(-ref_area.label), 
+        by = c('ref_area', 'time'), all = T) %>%
+  merge(x = ., 
+        y = ft3 %>% dplyr::rename(ft3 = obs_value)  %>% dplyr::select(-ref_area.label), 
+        by = c('ref_area','time'), all = T) %>%
+  filter(time >= 2000)  %>%
+  filter(time %in% c(2000, 2005, 2010, 2015))  %>%
+  as.data.frame()
+
+## plot 
+ft100k %>%
+  ggplot() +
+  geom_point(aes(x = ft1, y = ft2), size = 2) +
+  # geom_point(aes(x = ft1, y = ft3), color = 'red', alpha = 0.8) +
+  theme_bw()
+ft100k %>%
+  ggplot() +
+  geom_point(aes(x = ft2, y = ft3), color = 'red', alpha = 0.8) +
+  theme_bw()
+
+ft100k_check <- ft100k %>% filter(ref_area=='THA') %>% arrange(time)
+
+ft100k_integrate <- ft100k %>%
+  ungroup() %>%
+  gather(key = 'source', value = 'obs_value', 4:ncol(.))  %>%
+  group_by(ref_area, time) %>%
+  dplyr::summarise(obs_value = mean(obs_value, na.rm=TRUE))%>%
+  as.data.frame()
+
+# str(dat23_update)
+print(paste0('There are ', round(sum(is.na(ft100k_integrate$obs_value)), digits = 1), ' NA'))
+print(paste0('There are ', round(sum(is.na(ft100k$ft1)), digits = 1), ' NA'))
+print(paste0('There are ', round(sum(is.na(ft100k$ft2)), digits = 1), ' NA'))
+print(paste0('There are ', round(sum(is.na(ft100k$ft3)), digits = 1), ' NA'))
+
+
+
+### convert to the unified format
+ft100k_update1 <- ft100k_integrate %>%
+  spread(key = time, value = obs_value) %>%
+  merge(x = ctr_eora, y = ., by.x = "iso3_eora", by.y = 'ref_area', all.x = T) %>%
+  dplyr::mutate(
+                indicatorID = NA, 
+                indicator   = 'fatal_per100k', 
+                iso2c       = NA,
+                country     = NA,
+                ) %>%
+  dplyr::select(country_eora, iso3_eora, indicatorID, indicator, iso2c, country, everything()) %>%
+  as.data.frame()
+
+var_w <- ft100k_update1
+iname <- unique(var_w$indicator)[!is.na(unique(var_w$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(var_w)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## "There are 42% NA"
+```
+
+
+
+
+
+
+
+
+  *- fatal per 100k - cal* ans compare to ILO's data on the same indicator. 
+```{r eval=FALSE, include=FALSE}
+# detach("package:stats")  # Unload stats
+
+### to calculate fatal per 100k workers -----------------------------------------------------
+fatal_per100k_cal <- 
+  merge(
+    x = fatal   %>% dplyr::filter(time >= 2000) %>% dplyr::rename(fatal  = obs_value),
+    y = workers %>% dplyr::filter(time >= 2000) %>% dplyr::rename(worker = obs_value),
+    by = c('ref_area', 'time')) %>%
+  dplyr::mutate(value_cal = fatal/(worker*1000)*100000)
+
+fatal_per100k_ilo <- ft100k_integrate ## dat23_update
+
+fatal_per100k_compare <- 
+  merge(
+    x = fatal_per100k_cal, 
+    y = fatal_per100k_ilo,   # %>% select(-ref_area.label)
+    by = c('ref_area', 'time'))
+
+## plot
+fatal_per100k_compare %>%
+  filter(value_cal < 30 & obs_value < 30) %>%
+  ggplot(aes(x = value_cal, y = obs_value)) +
+  geom_point() +
+  xlab('my calculation') + ylab('data by ILO') +
+  theme_bw()
+```
+
+
+
+
+
+### Goal 9 - Industry, Innovation, and Infrastructure
+
+  We choose to use the data from `EDGAR`, because EORA also use this data as the inputs. We also use part of the `WB` data to fill the NA in EDGAR.
+
+```{r - emissions--CO2 <WB> }
+# EN.ATM.CO2E.KT	      ++ CO2 emissions (kt)
+# EN.ATM.CO2E.KD.GD	    ++ CO2 emissions (kg per 2010 US$ of GDP)         
+# EN.ATM.CO2E.PP.GD.KD  ++ CO2 emissions (kg per 2011 PPP $ of GDP)
+# EN.ATM.CO2E.PP.GD	    ++ CO2 emissions (kg per PPP $ of GDP)
+# EN.ATM.CO2E.PC	      ++ CO2 emissions (metric tons per capita)
+# EN.ATM.CO2E.EG.ZS	    ++ CO2 intensity (kg per kg of oil equivalent energy use)
+
+# EN.ATM.CO2E.KD.87.GD	-- CO2 emissions, industrial (kg per 1987 US$ of GDP)
+# EN.ATM.CO2E.GDP	      -- CO2 emissions, industrial (kg per 1987 US$ of GDP)
+# EN.CO2.MANF.ZS	       + CO2 emissions from manufacturing industries and construction (% of total fuel combustion)
+# EN.CO2.MANF.MT	      -- CO2 emissions from manufacturing industries and construction (million metric tons)
+
+# EN.ATM.GHGT.KT.CE	    ++ Total greenhouse gas emissions (kt of CO2 equivalent)
+# EN.ATM.GHGT.ZG	      ++ Total greenhouse gas emissions (% change from 1990)
+
+
+### CO2 emissions --------------------------------------------------------------
+ind <- "EN.ATM.CO2E.KT"
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(dfwb)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname)
+```
+
+
+
+```{r - emissions--CO2 <EDGAR> }
+###	EDGAR: https://edgar.jrc.ec.europa.eu/overview.php?v=50_GHG (same source for EORA)
+
+getwd()
+
+### 1, we use this data, as it is also used in EORA --------------------------
+xls <- './Data/data_01_raw/EDGAR_GHG/v50_CO2_excl_short-cycle_org_C_1970_2018/v50_CO2_excl_short-cycle_org_C_1970_2018.xls'
+### the unit here is Gg, and 1 gigagram = 1 kiloton (metric)
+sheet <- 'TOTALS BY COUNTRY'
+skip <- 8
+df0 <- readxl::read_excel(path = xls, sheet = sheet, skip = skip)
+df1 <- df0 %>% 
+  dplyr::select(ISO_A3, Name, `2000`, `2005`, `2010`, `2015`) %>%
+  merge(., ctr, by.x = 'ISO_A3', by.y = 'iso3_eora', all.y = T) %>%
+  dplyr::select(ISO_A3, Name, `2000`, `2005`, `2010`, `2015`) %>%
+  ### to format the numbers
+  gather(key = 'year', value = 'value', `2000`:`2015`) %>%
+  dplyr::mutate(value = round(value, digits = 3)) %>%
+  spread(key = year, value = value) %>%
+  arrange(ISO_A3) %>%
+  arrange(!is.na(Name))
+colnames_formal <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+names(df1) <- colnames_formal
+
+
+
+
+### 2, we use `world bank` data to fill the missing ones ------------------------
+ind <- 'EN.ATM.CO2E.KT'
+dfwb <- wb(indicator = ind, country = "countries_only",
+           startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+
+fname <- list.files(path = dir.cleaned, pattern = 'CO2 emissions \\(kt\\)_4yrs.xlsx', full.names = T); fname
+df2 <- readxl::read_excel(fname) 
+
+
+
+
+### 3. compare the 2 data
+df12 <- merge(df1, df2, by = 'iso3')
+library(scales)
+ggplot(data = df12) +
+  geom_point(aes(x = `2015.x`, y = `2015.y`)) +
+  # scale_x_continuous(trans = log2_trans()) +
+  # scale_y_continuous(trans = log2_trans()) +
+  scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x), 
+                labels = trans_format("log10", math_format(10^.x))) +
+  scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+  theme_bw()
+### ---> it looks these 2 data sets are very similar
+
+
+
+### 4, fill data gap -----------------------------------------------------------
+ctr_na <- df1 %>% 
+  dplyr::filter(is.na(ctr)) %>%
+  dplyr::select(iso3)
+ctr_na_ls <- unique(ctr_na$iso3); ctr_na_ls
+df2.fill <- df2 %>%
+  dplyr::filter(iso3 %in% ctr_na_ls)
+
+### rbind data
+df3 <- df1 %>% 
+  dplyr::filter(!is.na(ctr)) %>% ### the non-NA data in df1
+  rbind(df2.fill) %>%            ### append the fill-NA data in df2
+  arrange(iso3)
+
+### the ROW data gap -------------------------------------------------------------
+### the global total value, for calculating the data for ROW
+### (1). use world bank data
+# wld <- wb(indicator = ind, country = "WLD",
+#            startdate = yr_start, enddate = yr_end) %>%
+#   as.data.frame() %>%
+#   # distinct(iso3c, .keep_all = T) %>%
+#   dplyr::select(1:3, country) %>%
+#   dplyr::filter(date %in% c(2000, 2005, 2010, 2015)) %>%
+#   spread(key = date, value = value)
+# names(wld) <- colnames_formal
+### --> the data of World is even smaller than several countries, not sure how is that???
+
+### (2). use sum 
+wld <- df0 %>%
+  dplyr::select(ISO_A3, Name, `2000`, `2005`, `2010`, `2015`)%>%
+  summarize_if(is.numeric, sum, na.rm=TRUE)
+dat <- df3 %>%
+  summarize_if(is.numeric, sum, na.rm=TRUE) %>%
+  as.data.frame() 
+row <- (wld - dat) %>%
+  cbind(iso3 = 'ROW', ctr = 'Rest of the World, calculated') %>%
+  dplyr::select(all_of(colnames_formal))
+  
+df4 <- df3 %>% 
+  dplyr::filter(iso3 != 'ROW') %>%  ### remove the ROW row that have no data
+  rbind(row) %>%                    ### append the calculated ROW data       
+  arrange(iso3)
+
+
+### 5, save to results
+fname <- paste0(dir.process, 'cleaned/', iname, '_4yrs.xlsx'); fname
+writexl::write_xlsx(x = df4, path = fname)
+```
+
+
+
+
+```{r - emissions--GHG}
+### GHG emissions --------------------------------------------------------------
+ind <- "EN.ATM.GHGT.KT.CE"
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+unique(dfwb$indicator)
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+
+### 2. fill NA
+function_fill_na_wb(dfwb)
+
+### 3. get a cleaned data and save to dir
+# function_format_4yrData_save(iname = iname) ## NO 2015 DATA, fill the gap using 2012 data
+fname <- paste0(dir.process, iname, '_FILLNA.xlsx'); fname
+dfwb_fillna_4yrs <- readxl::read_excel(fname) %>%
+  # dplyr::mutate(`2015` = `2012`) %>%
+  dplyr::select(iso3_eora, country_eora, `2000`, `2005`, `2010`, ncol(.))  %>%
+  arrange(iso3_eora)
+names(dfwb_fillna_4yrs) <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+writexl::write_xlsx(x = dfwb_fillna_4yrs, path = paste0(dir.cleaned, iname, '_4yrs.xlsx'))
+print(paste0('There are ', round(sum(is.na(dfwb_fillna_4yrs))/(190*4)*100, digits = 1), '% NA'))
+
+```
+
+
+
+
+```{r - other}
+# IS.RRS.PASG.KM	   + Railways, passengers carried (million passenger-km)
+# IS.RRS.GOOD.MT.K6	 + Railways, goods transported (million ton-km)
+# IS.AIR.PSGR	      ++ Air transport, passengers carried
+# SF.TRN.RAIL.GDS   -- Railways, goods transported (million ton-km)
+# SF.TRN.AIR.PSGR	  -- Air transport, passengers carried (thousands)
+# IS.AIR.PSGR.P3	  -- Air transport, passengers carried (thousands)
+
+ind <- 'IS.RRS.PASG.KM'
+ind <- "IS.RRS.GOOD.MT.K6"
+ind <- "IS.AIR.PSGR"
+C9 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+
+##### C090201 ------------------------------------------- #
+# NV.IND.MANF.ZS	++ Manufacturing, value added (% of GDP)
+# NV.IND.MANF.KD	++ Manufacturing, value added (constant 2010 US$) [prefer this one]
+# NA.GDP.MNF.KR	  -- GDP on Manufacturing Sector (in IDR Million), Constant Price
+ind <- "NV.IND.MANF.ZS"
+ind <- "NV.IND.MANF.KD"; iname <- 'Manufacturing, value added_constant'
+df <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+fname <- paste0(dir.process, iname, '.csv'); fname
+
+
+
+
+
+
+### few country -------------------------
+# FB.FIN.INFO.XQ	Financial information infrastructure index (0=less developed to 10=more developed)
+# IE.PPI.ICTI.CD	Investment in ICT with private participation (current US$) [too few]
+# IE.PPI.TELE.CD	Investment in telecoms with private participation (current US$)
+# IE.PPI.ENGY.CD	Investment in energy with private participation (current US$)
+# IE.PPI.TRAN.CD	Investment in transport with private participation (current US$)
+# IE.PPI.WATR.CD	Investment in water and sanitation with private participation (current US$)
+# IT.TEL.INVS.CN	Telecommunications investment (current LCU)
+
+# IN.HLTH.GOVHOSPTL.NUM	    + Government Hospitals (Number)
+# IN.HLTH.GOVHOSPTL.PER100K	+ Government Hospitals (Number) Per 100,000 Population
+
+### no data -----------------------------
+# DAK.INFR.CR      Total Specific Allocation Grant for Infrastructure (in IDR Billion)
+# DAK.INFR.IRIG.CR Total Specific Allocation Grant for Infrastructure Sector (Subsect: Irrigation) (in IDR Billion)
+# DAK.INFR.ROD.CR	 Total Specific Allocation Grant for Infrastructure Sector (Subsect: Road) (in IDR Billion)
+# DAK.INFR.H2O.CR	 Total Specific Allocation Grant for Infrastructure Sector (Subsect: Water) (in IDR Billion)
+
+ind <- "IE.PPI.ENGY.CD"
+ind <- "IE.PPI.TRAN.CD"       
+ind <- 'DAK.INFR.H2O.CR' 
+
+C090a01 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+
+
+# IT.TEL.TOTL.P2	  + Fixed line and mobile cellular subscriptions (per 100 people)
+# IE.ICT.TOTL.GD.ZS	+ Information and communication technology expenditure (% of GDP)
+# IT.CEL.SETS	     ++ Mobile cellular subscriptions
+# IT.CEL.SETS.P2   ++ Mobile cellular subscriptions (per 100 people)
+# IT.CEL.SETS.P3	  + Mobile phone subscribers (per 1,000 people)
+# IC.FRM.INNOV.T5	  + Percent of firms having their own Web site
+# IC.FRM.INNOV.T6	  + Percent of firms using e-mail to interact with clients/suppliers
+# IP.JRN.ARTC.SC	 ++ Scientific and technical journal articles
+# IT.TEL.TOTL.P3	  + Telephone (mainlines and mobile phone) subscribers (per 1,000 people)
+ind <- 'IT.TEL.TOTL.P2' 
+ind <- 'IE.ICT.TOTL.GD.ZS' # 2003 - 2009
+
+ind <- 'IT.CEL.SETS'       # 1990 - 2015
+ind <- 'IT.CEL.SETS.P2'    # 1990 - 2015
+
+ind <- 'IT.CEL.SETS.P3'    # 1990 - 2011
+ind <- 'IC.FRM.INNOV.T5'
+ind <- 'IC.FRM.INNOV.T6'
+ind <- 'IP.JRN.ARTC.SC'    # 2003 - 2015
+ind <- 'IT.TEL.TOTL.P3'
+C090c01 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+# write.csv(x = C090c01, file = paste0(dir.process, 'Mobile cellular subscriptions.csv'))
+# write.csv(x = C090c01, file = paste0(dir.process, 'Mobile cellular subscriptions_per100.csv'))
+
+
+
+
+# gwp1	          -- Access to a mobile phone or internet at home (% age 15+)
+# 2.0.cov.Int	    -- Coverage: Internet 
+# IT.NET.USER.ZS	++ Individuals using the Internet (% of population)
+# IT.NET.USER	     + Internet users
+# IT.NET.USER.P3	 + Internet users (per 1,000 people)
+# IT.NET.EDUC.ZS	-- Schools connected to the Internet (%)
+ind <- 'IT.NET.USER.ZS'
+ind <- 'IT.NET.USER'
+ind <- 'IT.NET.EDUC.ZS'
+S0901 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+```
+
+
+
+
+### Goal 10 - Reducing Inequality
+
+#### - Labour income share
+```{r }
+
+### all available indicators from ILOSTAT ----------------------------------------------------------
+toc <- get_ilostat_toc(search = c('Annual', 'Labour income share'), fixed = F, lang = 'en')
+
+# SDG_1041_NOC_RT_A; SDG_1041_NOC_RT; SDG indicator 10.4.1 - Labour income share as a percent of GDP (%)
+# LAP_2GDP_NOC_RT_A; LAP_2GDP_NOC_RT; Labour income share as a percent of GDP -- ILO modelled estimates, July 2019 (%)
+
+### Get a single dataset ---------------------------------------------------------------------------
+id_indicator <- 'SDG_1041_NOC_RT_A'
+# id_indicator <- 'LAP_2GDP_NOC_RT_A' ## this is the same as the above
+
+dt0 <- get_ilostat(id = id_indicator, segment = 'indicator', time_format = 'num', type = 'both') 
+
+dt1 <- dt0 %>%
+  dplyr::select(-source, -source.label, -indicator, -indicator.label, 
+                -obs_status, -obs_status.label 
+                #-note_indicator, -note_indicator.label, -note_source, -note_source.label
+                ) %>%
+  # dplyr::filter(str_detect(classif1.label, "Total|total")) %>%
+  # dplyr::filter(str_detect(sex, "SEX_T")) %>%
+  as.data.frame()
+unique(dt1$classif1.label)
+
+
+dt <- dt1 %>%
+  dplyr::select(ref_area, ref_area.label, time, obs_value) %>%
+  as.data.frame()
+
+## To check data availability across years
+dt2_wide <- dt %>%
+  # arrange(time, ref_area) %>%
+  pivot_wider(names_from = time, values_from = obs_value) %>%
+  # dplyr::select(ref_area, ref_area.label, time, obs_value) %>%
+  merge(x = ctr_eora, y = ., by.x = "iso3_eora", by.y = "ref_area", all.x = T) %>%
+  # arrange(ref_area.label, country_eora) %>%
+  as.data.frame()
+
+names(dt2_wide)
+
+## there is no data before 2004, so we use data in 2014 as a proxy for 2000. 
+dt2_wide <- dt2_wide %>% dplyr::mutate(`2000` = `2004`)
+
+## check spatial coverage
+dt2_wide_shp <- merge(shp, dt2_wide, by.x = 'iso_a3', by.y = 'iso3_eora', all.x = T) %>%
+  dplyr::select(`2015`)
+plot(dt2_wide_shp)
+
+
+iname <- id_indicator; iname
+### 2. fill NA
+function_fill_na_ILOSTAT(dt2_wide)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## "There are 7.9% NA"
+
+```
+
+
+
+```{r}
+# EG.ELC.ACCS.RU.ZS	 ++ Access to electricity, rural (% of rural population)
+# EG.ELC.ACCS.UR.ZS	 ++ Access to electricity, urban (% of urban population)
+ind <- 'EG.ELC.ACCS.RU.ZS'
+ind <- 'EG.ELC.ACCS.UR.ZS'
+C100401 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+
+# SL.EMP.WORK.FE.ZS	++ Wage and salaried workers, female (% of female employment) (modeled ILO estimate)
+# SL.EMP.WORK.MA.ZS	++ Wage and salaried workers, male (% of male employment) (modeled ILO estimate)
+ind <- 'SL.EMP.WORK.FE.ZS'
+C100401 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+
+# SL.EMP.MPYR.FE.ZS	++ Employers, female (% of female employment) (modeled ILO estimate)
+# SL.EMP.MPYR.MA.ZS	++ Employers, male (% of male employment) (modeled ILO estimate)
+# IC.FRM.GEN.GEND4	 + Percent of firms with a female top manager
+# IC.FRM.GEN.GEND1	 + Percent of firms with female participation in ownership
+ind <- 'SL.EMP.MPYR.FE.ZS'
+ind <- 'SL.EMP.MPYR.MA.ZS'
+
+ind <- 'IC.FRM.GEN.GEND1'
+C200205 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+
+# SH.H2O.SAFE.RU.Q1.ZS	-- Access to an improved water source, rural (% of rural population): Q1 (lowest)
+# SH.H2O.SAFE.UR.Q1.ZS	-- Access to an improved water source, urban (% of urban population): Q1 (lowest)
+# EG.ELC.ACCS.RU.ZS	    ++ Access to electricity, rural (% of rural population)
+# EG.ELC.ACCS.UR.ZS	    ++ Access to electricity, urban (% of urban population)
+# SH.STA.ACSN.RU.Q1.ZS	-- Access to improved sanitation facilities, rural (% of rural population): Q1 (lowest)
+# SH.STA.ACSN.UR.Q1.ZS	-- Access to improved sanitation facilities, urban (% of urban population): Q1 (lowest)
+# SH.STA.BASS.RU.ZS	     + People using basic sanitation services, rural (% of rural population) ## 2000 - 2015
+# SH.STA.BASS.UR.ZS	     + People using basic sanitation services, urban (% of urban population)
+# SH.H2O.SMDW.RU.ZS	 - People using safely managed drinking water services, rural (% of rural population)
+# SH.H2O.SMDW.UR.ZS	 - People using safely managed drinking water services, urban (% of urban population)
+# SH.STA.SMSS.RU.ZS	 - People using safely managed sanitation services, rural (% of rural population)
+# SH.STA.SMSS.UR.ZS	 - People using safely managed sanitation services, urban (% of urban population)
+
+# ccx_unempr_pop_rur -- Unemployment rate - rural
+# ccx_unempr_pop_urb -- Unemployment rate - urban
+ind <- 'EG.ELC.ACCS.RU.ZS'
+ind <- 'EG.ELC.ACCS.UR.ZS'
+
+ind <- 'SP.URB.TOTL.IN.ZS'
+ind <- 'SP.RUR.TOTL.ZS'
+
+ind <- 'SP.POP.1564.TO.ZS' ## Population ages 15-64 (% of total population)
+S1004 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+df <- S1004
+iname <- unique(df$indicator)[1]; iname
+fname <- paste0(dir.process, iname, '.xlsx'); fname
+# write_xlsx(x = df, path = fname)
+```
+
+
+
+
+
+
+### Goal 11 - Sustainable Cities and Communities
+
+```{r - PM2.5}
+
+## Please refer to the same data in `Goal 3` section. 
+
+```
+
+
+
+
+```{r}
+
+# IS.ROD.ALLS.ZS	   -- Access to an all-season road (% of rural population)
+# IS.AIR.DPRT	       ++ Air transport, registered carrier departures worldwide
+# SH.STA.SMSS.UR.ZS	  + People using safely managed sanitation services, urban (% of urban population)
+# SH.ACS.DIST.Q5.ZS	 -- Problems in accessing health care (distance to health facility) (% of women): Q5 (highest)
+# SH.ACS.TRAN.Q5.ZS	 -- Problems in accessing health care (having to take transport) (% of women): Q5 (highest)
+# NV.SRV.TRAN.KN	   -- Transport, storage and communication, value added (constant LCU)
+ind <- 'IS.AIR.DPRT'
+C110201 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+
+# NY.ADJ.DPEM.GN.ZS	 ++ Adjusted savings: particulate emission damage (% of GNI)
+# NY.ADJ.DPEM.CD	   ++ Adjusted savings: particulate emission damage (current US$)
+ind <- 'NY.ADJ.DPEM.GN.ZS'
+ind <- 'NY.ADJ.DPEM.CD'
+C110502 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+
+
+
+
+# IN.HLTH.CHC.NUM	              -- Number of Community Health Centers (CHCs)
+# IN.HLTH.DISTHOSPTL.NUM	      -- Number of District Hospitals
+# SH.H2O.SAFE.UR.Q1.ZS	        -- Access to an improved water source, urban (% of urban population): Q1 (lowest)
+# 1.3_ACCESS.ELECTRICITY.URBAN	++ Access to electricity (% of urban population)
+# EG.ELC.ACCS.UR.ZS	             + Access to electricity, urban (% of urban population)
+# SH.STA.ACSN.UR.Q1.ZS	 -- Access to improved sanitation facilities, urban (% of urban population): Q1 (lowest)
+# EG.NSF.ACCS.UR.ZS	     -- Access to non-solid fuel, urban (% of urban population)
+# SH.H2O.BASW.UR.ZS	 ++ People using basic drinking water services, urban (% of urban population)
+# SH.STA.BASS.UR.ZS	 ++ People using basic sanitation services, urban (% of urban population)
+# SH.STA.ODFC.UR.ZS	 ++ People practicing open defecation, urban (% of urban population)
+# SH.H2O.SMDW.UR.ZS	  + People using safely managed drinking water services, urban (% of urban population)
+# SH.STA.SMSS.UR.ZS	  + People using safely managed sanitation services, urban (% of urban population)
+# EN.POP.SLUM.UR.ZS	  + Population living in slums (% of urban population)
+ind <- '1.3_ACCESS.ELECTRICITY.URBAN'  ## Access to electricity
+ind <- 'SH.STA.ODFC.UR.ZS'
+S1103 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+ind <- 'SH.H2O.BASW.UR.ZS' # People using basic drinking water services, urban (% of urban population)
+S1101 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+ind <- 'SH.STA.BASS.UR.ZS' ## People using basic sanitation services
+ind <- 'SH.STA.SMSS.UR.ZS'
+S1102 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+
+
+
+### too many missing values
+# per_nprog.overlap_pop_urb	 - Population not receiving Social Protection (%) -urban
+# per_saonl.overlap_pop_urb	 - Population only receiving All Social Assistance (%) -urban
+# per_sionl.overlap_pop_urb	 - Population only receiving All Social Insurance (%) -urban
+# per_silm.overlap_pop_urb	 - Population receiving All Social Insurance and Labor Market (%) -urban
+
+```
+
+
+
+
+
+
+### Goal 12 - Responsible Consumption and Production
+
+#### - Domestic material extraction <GMFD>
+  DE    Domestic extraction (unit: tonne)
+  MF    Material footprint            = DE + RMEIM - RMEEX
+  DMC   Domestic material consumption = DE + IM - EX
+
+  RMEIM - Raw material equivalent of imports
+  RMEEX - Raw material equivalent of exports
+
+  IM    Physical imports (direct, territorial)
+  EX    Physical imports (direct, territorial)
+
+  DMI   Direct material input = DE + IM
+  PTB   Physical trade balance = IM - EX
+  
+  - in theory the global total of DE should be equal to the global total of MF
+  - Data Source: https://www.resourcepanel.org/global-material-flows-database
+  
+```{r}
+
+dir.plus <- './Data/data_02_intermediate/dt02_flows/Global Material Flows Database_unep_irp/'
+
+### Resource consumption or emissions under the current trading world situation -------------------------
+xls <- paste0(path = dir.plus, 'DE.csv'); xls 
+var_w <- readr::read_csv(file = xls) %>% as.data.frame() %>% 
+  dplyr::filter(!is.na(`Flow Type`)) %>%
+  # dplyr::select(Country, `Flow Type`, `2000`:`2015`) %>%
+  merge(x = iso_eora_ex, y = ., by.x = "Row", by.y = "Country", all.y = T) %>%
+  dplyr::filter(!is.na(`Flow Type`)) %>%
+  merge(x = ctr_eora, y = ., by = "iso3_eora", all.x = T) %>%
+  ### format as WB data
+  arrange(!is.na(iso3_eora)) %>%
+  dplyr::rename('indicator' = 'Flow Type', 'country' = 'Row') %>%
+  dplyr::mutate(indicatorID = NA, iso2c = NA) %>%
+  dplyr::select(country_eora, iso3_eora, indicatorID, indicator, iso2c, country, everything()) %>%
+  as.data.frame()
+
+iname <- 'Domestic material extraction'; iname
+### 2. fill NA
+function_fill_na_wb(var_w)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## "There are 14.7% NA"
+```
+
+
+
+#### - Material footprint
+
+```{r }
+
+xls <- paste0(path = dir.plus, 'MF.csv'); xls 
+var_w <- read_csv(file = xls) %>% as.data.frame() %>% 
+  dplyr::filter(!is.na(`Flow Type`)) %>%
+  # dplyr::select(Country, `Flow Type`, `2000`:`2015`) %>%
+  merge(x = iso_eora_ex, y = ., by.x = "Row", by.y = "Country", all.y = T) %>%
+  dplyr::filter(!is.na(`Flow Type`)) %>%
+  merge(x = ctr_eora, y = ., by = "iso3_eora", all.x = T) %>%
+  ### format as WB data
+  arrange(!is.na(iso3_eora)) %>%
+  dplyr::rename('indicator' = 'Flow Type', 'country' = 'Row') %>%
+  dplyr::mutate(indicatorID = NA, iso2c = NA) %>%
+  dplyr::select(country_eora, iso3_eora, indicatorID, indicator, iso2c, country, everything()) %>%
+  as.data.frame()
+iname <- 'Material footprint'; iname
+### 2. fill NA
+function_fill_na_wb(var_w)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## "There are 14.7% NA"
+```
+
+
+
+
+#### - ??emission--N--NOX
+```{r }
+### 1990-2008 -------------------------
+# EN.ATM.NOXE.AG.ZS	    + Agricultural nitrous oxide emissions (% of total) 
+# EN.ATM.NOXE.AG.KT.CE	+ Agricultural nitrous oxide emissions (thousand metric tons of CO2 equivalent)
+# EN.ATM.METH.AG.ZS	    + Agricultural methane emissions (% of total)
+# EN.ATM.METH.AG.KT.CE	+ Agricultural methane emissions (thousand metric tons of CO2 equivalent)
+# EN.ATM.NOXE.AG.ZS	    + Agricultural nitrous oxide emissions (% of total)
+# EN.ATM.NOXE.AG.KT.CE	+ Agricultural nitrous oxide emissions (thousand metric tons of CO2 equivalent)
+
+# EN.ATM.METH.ZG	    + Methane emissions (% change from 1990)  ## 1991-2012
+# EN.ATM.METH.PC	   -- Methane emissions (kt of CO2 equivalent per capita)
+# EN.ATM.METH.KT.CE	  + Methane emissions (kt of CO2 equivalent) ## 1991-2012
+# EN.ATM.NOXE.ZG	    + Nitrous oxide emissions (% change from 1990)
+# EN.ATM.NOXE.PC	   -- Nitrous oxide emissions (metric tons of CO2 equivalent per capita)
+# EN.ATM.NOXE.MT.CE	 -- Nitrous oxide emissions (metric tons of CO2 equivalent)
+# EN.ATM.NOXE.KT.CE	  + Nitrous oxide emissions (thousand metric tons of CO2 equivalent) ## 1991-2012
+# EE.BOD.CHEM.ZS	   -- Water pollution, chemical industry (% of total BOD emissions)
+# EE.BOD.MTAL.ZS	   -- Water pollution, metal industry (% of total BOD emissions)
+
+
+
+ind <- 'EE.BOD.MTAL.ZS'
+```
+
+
+
+
+
+#### - ??R&D
+```{r }
+
+# SP.POP.TECH.RD.P6	  + Technicians in R&D (per million people)
+# SP.POP.SCIE.RD.P6	  + Researchers in R&D (per million people)
+# SP.POP.TECH.RD  	 -- Technicians in research and development  (per million people)
+# GB.XPD.RSDV.GD.ZS	  + Research and development expenditure (% of GDP)
+# GB.XPD.RD.GNP.ZS	 -- Expenditures for research and development (% of GNP)
+ind <- 'SP.POP.TECH.RD.P6'
+ind <- 'SP.POP.SCIE.RD.P6'
+ind <- 'GB.XPD.RSDV.GD.ZS'; iname <- 'Research and development expenditure_pctGDP'
+S1205 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+fname <- paste0(dir.process, iname, '.csv'); fname
+# write.csv(x = S1205, file = fname, row.names = F)
+```
+
+
+
+
+
+### Goal 13	- Climate Action
+```{r}
+# 6.1_PRIMARY.ENERGY.INTENSITY	++ Energy intensity level of primary energy (MJ/$2005 PPP)
+# EG.EGY.PRIM.PP.KD	            ++ Energy intensity level of primary energy (MJ/$2011 PPP GDP)
+# EN.ATM.NOXE.EG.ZS	    ++ Nitrous oxide emissions in energy sector (% of total)
+# EN.ATM.NOXE.EG.KT.CE	++ Nitrous oxide emissions in energy sector (thousand metric tons of CO2 equivalent)
+# EN.ATM.NOXE.IN.ZS      - Nitrous oxide emissions in industrial and energy processes (% of total nitrous oxide emissions)
+# EN.ATM.NOXE.EI.ZS	    -- Nitrous oxide emissions in industrial and energy processes (% of total nitrous oxide emissions)
+
+# RISE.EA.PR	-- RISE Energy Access - Policies and Regulations
+# RISE.EA.PS	-- RISE Energy Access - Pricing and Subsidies
+# RISE.EA.PE	-- RISE Energy Access - Procedural Efficiency
+# RISE.EE.PR	-- RISE Energy Efficiency - Policies and Regulations
+# RISE.EE.PS	-- RISE Energy Efficiency - Pricing and Subsidies
+# RISE.EE.PE	-- RISE Energy Efficiency - Procedural Efficiency
+# RISE.RE.PR	-- RISE Renewable Energy - Policies and Regulations
+# RISE.RE.PS	-- RISE Renewable Energy - Pricing and Subsidies
+# RISE.RE.PE	-- RISE Renewable Energy - Procedural Efficiency
+ind <- '6.1_PRIMARY.ENERGY.INTENSITY'
+ind <- 'EG.EGY.PRIM.PP.KD'
+ind <- 'EN.ATM.NOXE.EG.ZS'
+ind <- 'EN.ATM.NOXE.EG.KT.CE'
+S1303 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+```
+
+
+```{r - ??emissions-agriculture}
+### CO2 emissions in agriculture --------------------------------------------
+# EN.ATM.METH.AG.ZS	    + Agricultural methane emissions (% of total) # 1990 - 2008
+# EN.ATM.METH.AG.KT.CE	+ Agricultural methane emissions (thousand metric tons of CO2 equivalent)
+# EN.ATM.NOXE.AG.ZS	    + Agricultural nitrous oxide emissions (% of total)
+# EN.ATM.NOXE.AG.KT.CE	+ Agricultural nitrous oxide emissions (thousand metric tons of CO2 equivalent)
+# TM.TAX.MRCH.DP.ZS	    - Tariff barriers, share of lines domestic peaks, all products (%)
+# TM.TAX.MANF.DP.ZS	    - Tariff barriers, share of lines domestic peaks, manufactured products (%)
+# TM.TAX.TCOM.DP.ZS	    - Tariff barriers, share of lines domestic peaks, primary (%)
+# EN.ATM.GHGT.ZG	      ++ Total greenhouse gas emissions (% change from 1990)   ## 1991- 2012
+# EN.ATM.GHGT.KT.CE	    ++ Total greenhouse gas emissions (kt of CO2 equivalent) ## 1991- 2012
+# DAK.AGR.CR	          -- Total Specific Allocation Grant for Agriculture (in IDR Billion)
+ind <- 'EN.ATM.GHGT.ZG'
+S1304 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+```
+
+
+
+
+
+
+### Goal 14	Life Below Water
+
+```{r - Fertilizer}
+### Fertilizer data in WB -----------------------------------------------------------------------
+# AG.CON.FERT.ZS	   ++ Fertilizer consumption (kilograms per hectare of arable land)
+# AG.CON.FERT.PT.ZS	  + Fertilizer consumption (% of fertilizer production)
+# AG.CON.FERT.MT	   -- Fertilizer consumption (metric tons)
+# AG.USE.PEST.ZS	   -- Pesticide consumption (kg per hectare)
+# AG.CON.PEST.MT	   -- Pesticide consumption (metric tons)
+
+ind <- 'AG.CON.FERT.ZS'
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+
+### 2. fill NA
+function_fill_na_wb(dfwb)
+
+### 3. get a cleaned data and save to dir
+# function_format_4yrData_save(iname = iname) ### NO DATA FOR 2000 ---> USE 2002 DATA FOR 2000
+fname <- paste0(dir.process, iname, '_FILLNA.xlsx'); fname
+dfwb_fillna_4yrs <- readxl::read_excel(fname) %>%
+  dplyr::select(iso3_eora, country_eora, `2002`, `2005`, `2010`, `2015`)  %>%
+  arrange(iso3_eora)
+names(dfwb_fillna_4yrs) <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+writexl::write_xlsx(x = dfwb_fillna_4yrs, path = paste0(dir.cleaned, iname, '_4yrs.xlsx'))
+print(paste0('There are ', round(sum(is.na(dfwb_fillna_4yrs))/(190*4)*100, digits = 1), '% NA'))
+
+
+### Land data from WB
+file <- paste0(dir.cleaned, "Arable land (hectares)_4yrs.xlsx"); file
+arableLand_ha <- readxl::read_excel(path = file) %>%
+  gather(key = 'year', value = 'arable_ha', `2000`:`2015`)
+
+
+### Total Fertilizer consumption (kg)
+file <- paste0(dir.cleaned, "Fertilizer consumption (kilograms per hectare of arable land)_4yrs.xlsx"); file
+fertilizer_per_ha <- readxl::read_excel(path = file) %>%
+  gather(key = 'year', value = 'fert_kg_ha', `2000`:`2015`)
+
+fertilizer_ton <- merge(fertilizer_per_ha, arableLand_ha, by = c('iso3', 'ctr', 'year')) %>%
+  dplyr::mutate(fert_ton = fert_kg_ha * arable_ha/1000,
+                fert_ton = round(fert_ton, digits = 3)) %>%
+  arrange(iso3, year) %>%
+  dplyr::select(iso3, ctr, year, fert_ton) %>%
+  spread(key = year, value = fert_ton)
+writexl::write_xlsx(x = fertilizer_ton, path = paste0(dir.cleaned, 'Fertilizer consumption (ton)_4yrs.xlsx'))
+```
+
+
+
+
+
+```{r - Fertilizer-N-P-K}
+### Fertilizer data in OWID  ---------------------------------------------------------------------
+### will use Average application of Nitrogen, Phosphate, Potash  fertilizer, measured in kilograms of total nutrient per hectare. https://ourworldindata.org/fertilizers see downloaded data in the folder - "Our World in Data"
+### fertilizers per area of cropland (arable land and permanent crops)
+
+csv <- './Data/data_01_raw/Our World in Data/nitrogen-fertilizer-consumption.csv'
+n <- read.csv(file = csv, stringsAsFactors = F) %>%
+  spread(key = Year, value = "X.tonnes.") %>%
+  as.data.frame() %>%
+  dplyr::filter(Code != '')  %>% ## remove data for regions
+  dplyr::mutate(Code = as.character(Code),
+                Code = ifelse(Entity == 'USSR', 'SUN', Code)) %>%
+  merge(x = ctr_eora, y = ., by.x = "iso3_eora", by.y = "Code", all.x = T) %>%
+  arrange(!is.na(country_eora)) %>%
+  as.data.frame()
+### 2. fill NA
+fill_na_owid(n)
+### 3. get a cleaned data and save to dir
+fname <- (paste0(dir.process, gsub('.csv', '', basename(csv)), '_OWID_FILLNA.xlsx')); fname
+dfwb_fillna_4yrs <- readxl::read_excel(fname) %>%
+  dplyr::select(iso3_eora, country_eora, `2000`, `2005`, `2010`, ncol(.))  %>%
+  arrange(iso3_eora)
+names(dfwb_fillna_4yrs) <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+writexl::write_xlsx(x = dfwb_fillna_4yrs, path = paste0(dir.cleaned, 'nitrogen-fertilizer-consumption_ton_OWID_4yrs.xlsx'))
+print(paste0('There are ', round(sum(is.na(dfwb_fillna_4yrs))/(190*4)*100, digits = 1), '% NA'))
+
+
+
+
+csv <- './Data/data_01_raw/Our World in Data/phosphate-fertilizer-consumption.csv'
+p <- read.csv(file = csv) %>%
+  spread(key = 'Year', value = "X.tonnes.") %>%
+  as.data.frame() %>%
+  dplyr::filter(Code != '')  %>% ## remove data for regions
+  dplyr::mutate(Code = as.character(Code),
+                Code = ifelse(Entity == 'USSR', 'SUN', Code)) %>%
+  merge(x = ctr_eora, y = ., by.x = "iso3_eora", by.y = "Code", all.x = T) %>%
+  arrange(!is.na(country_eora)) %>%
+  as.data.frame()
+### 2. fill NA
+fill_na_owid(p)
+### 3. get a cleaned data and save to dir
+fname <- (paste0(dir.process, gsub('.csv', '', basename(csv)), '_OWID_FILLNA.xlsx')); fname
+dfwb_fillna_4yrs <- readxl::read_excel(fname) %>%
+  dplyr::select(iso3_eora, country_eora, `2000`, `2005`, `2010`, ncol(.))  %>%
+  arrange(iso3_eora)
+names(dfwb_fillna_4yrs) <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+writexl::write_xlsx(x = dfwb_fillna_4yrs, 
+                    path = paste0(dir.cleaned, gsub('.csv', '', basename(csv)), '_ton_OWID_4yrs.xlsx'))
+print(paste0('There are ', round(sum(is.na(dfwb_fillna_4yrs))/(190*4)*100, digits = 1), '% NA'))
+
+
+
+
+
+
+
+csv <- './Data/data_01_raw/Our World in Data/potash-fertilizer-consumption.csv'
+k <- read.csv(file = csv)%>%
+  spread(key = 'Year', value = "X.tonnes.") %>%
+  as.data.frame() %>%
+  dplyr::filter(Code != '')  %>% ## remove data for regions
+  dplyr::mutate(Code = as.character(Code),
+                Code = ifelse(Entity == 'USSR', 'SUN', Code)) %>%
+  merge(x = ctr_eora, y = ., by.x = "iso3_eora", by.y = "Code", all.x = T) %>%
+  arrange(!is.na(country_eora)) %>%
+  as.data.frame()
+### 2. fill NA
+fill_na_owid(k)
+### 3. get a cleaned data and save to dir
+fname <- (paste0(dir.process, gsub('.csv', '', basename(csv)), '_OWID_FILLNA.xlsx')); fname
+dfwb_fillna_4yrs <- readxl::read_excel(fname) %>%
+  dplyr::select(iso3_eora, country_eora, `2000`, `2005`, `2010`, ncol(.))  %>%
+  arrange(iso3_eora)
+names(dfwb_fillna_4yrs) <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+writexl::write_xlsx(x = dfwb_fillna_4yrs, 
+                    path = paste0(dir.cleaned, gsub('.csv', '', basename(csv)), '_ton_OWID_4yrs.xlsx'))
+print(paste0('There are ', round(sum(is.na(dfwb_fillna_4yrs))/(190*4)*100, digits = 1), '% NA'))
+
+```
+
+
+
+
+
+```{r - other }
+### urban waste water --------------------------------------------------------
+# ind <- './aquastat__wastewater_fao.csv' ## too many missing years
+# ind0 <- read.csv(ind, header = T, strip.white = T) %>% #, row.names = F, col.names = T, sep = '.\t')
+#   dplyr::select(1, 3, 5,6) 
+# 
+# unique(ind0$Variable.Name)
+# 
+# ind1 <- ind0 %>%
+#   filter(Variable.Name == 'Produced municipal wastewater',
+#          Year >= 1990) %>%
+#   spread(key = Year, value = Value)
+# 
+# C140101.2 <- wb(indicator = ind, country = "countries_only",
+#               startdate = yr_start, enddate = yr_end) %>%
+#   as.data.frame() %>%
+#   spread(key = date, value = value) %>%
+#   left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+
+
+
+
+# ER.FSH.CAPT.MT	 ++ Capture fisheries production (metric tons)
+# ER.FSH.PROD.MT	 ++ Total fisheries production (metric tons)
+# NRRV.SHR.FSH.CR	 -- Total Natural Resources Revenue Sharing from Fishery (in IDR, realization value)
+# DAK.FSH.CR	     -- Total Specific Allocation Grant for Fishery (in IDR Billion)
+# EN.FSH.THRD.NO	 -- Fish species, threatened
+# KFISH_MEAL	     -- Fishmeal, $/mt, constant 2000$
+# FISH_MEAL	       -- Fishmeal, $/mt, current$
+# DT.ODA.DACD.PROD.AGRI.CD	      + Gross ODA aid disbursement for agriculture, forestry and fishing sector, DAC donors total (current US$)
+# DT.ODA.DACD.PROD.AGRI.FISH.CD	 ++ Gross ODA aid disbursement for fishing, DAC donors total (current US$) ## 1990 - 2012
+
+ind <- 'ER.FSH.CAPT.MT'
+ind <- 'ER.FSH.PROD.MT'
+
+ind <- 'DT.ODA.DACD.PROD.AGRI.FISH.CD'
+ind <- 'DAK.FSH.CR'
+C140701 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+
+
+# ER.MRN.PTMR.ZS	Marine protected areas (% of territorial waters)
+# ER.MRN.PTMR.NO	Marine protected areas (number)
+# ER.MRN.PTMR.K2	Marine protected areas (sq. km)
+# ER.PTD.TOTL.ZS	Terrestrial and marine protected areas (% of total territorial area)
+# ER.LND.PTLD.K2	Terrestrial protected areas  (sq. km)
+# ER.LND.PTLD.ZS	Terrestrial protected areas (% of total land area)
+ind <- 'DAK.FSH.CR'
+C140701 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+```
+
+
+
+#### - Fertilizers Use per cropland - FAO
+
+  Fertilizers Use per area of cropland (kg/ha), which can be a proxy of coastal *eutrophication*.
+  
+```{r }
+
+FAOsearch(dataset="Fertilizers", full = FALSE)
+
+### Load crop production data
+dir.fao <- paste0(dir.raw, 'FAOSTAT/'); dir.fao
+
+fao_ef  <- get_faostat_bulk(code = "EF",   data_folder = dir.fao); ## Fertilizers indicators
+fao_rfn <- get_faostat_bulk(code = "RFN",  data_folder = dir.fao); ## Fertilizers by Nutrient
+
+names(fao_ef)
+names(fao_rfn)
+
+unique(fao_ef$item)
+unique(fao_ef$element)
+
+datasetname <- 'Fertilizers Use per area of cropland'
+### Cache the file i.e. save the data frame in the serialized RDS format for fast reuse later.
+fname <- paste0(dir.fao, datasetname, ".rds"); fname
+# saveRDS(fao_ef, fname)
+### Now you can load your local version of the data from the RDS file
+# FAO_FBS <- readRDS(fname)
+
+str(fao_ef)
+unique(fao_ef$item)
+```
+
+
+
+
+```{r - N}
+
+item_name <- "Nutrient nitrogen N (total)"
+
+dt1 <- fao_ef %>%
+  dplyr::filter(item == item_name) %>%
+  as.data.frame()
+  
+dt2 <- dt1 %>%
+  dplyr::filter(year>=1990) %>%
+  ### link with country code
+  merge(x = ., y = ctr.fao, by.x = 'area_code', by.y = 'FAOSTAT', all.x = T) %>%
+  dplyr::select(-area_code, -item_code, -element_code, -year_code, -flag) %>% 
+  dplyr::select('area', 'Short name', 'ISO3', everything()) 
+
+unit <- unique(dt2$unit); unit
+
+dt <- dt2 %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "ISO3")) %>%
+  dplyr::select(-`Short name`, -unit, -area, -item) #%>%
+  
+
+
+### 1. format data
+df <- dt %>%
+  spread(key = 'year', value = 'value') %>%
+  # dplyr::select(-ncol(.)) %>%
+  
+  dplyr::mutate(indicatorID = item_name, indicator = indicatorID, iso2c = '', country = '') %>%
+  dplyr::select("country_eora", "iso3_eora","indicatorID","indicator","iso2c","country", everything()) %>%
+  as.data.frame() %>%
+  dplyr::select(where(not_all_na)) %>%
+  as.data.frame() 
+names(df)  
+
+iname <- paste(item_name, unique(fao_ef$element), gsub('/', '_', unit), sep = '_'); iname
+### 2. fill NA
+function_fill_na_wb(df)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## "There are 18.4% NA"
+```
+
+
+
+
+```{r - P}
+
+item_name <- "Nutrient phosphate P2O5 (total)"
+
+dt1 <- fao_ef %>%
+  dplyr::filter(item == item_name) %>%
+  as.data.frame()
+  
+dt2 <- dt1 %>%
+  dplyr::filter(year>=1990) %>%
+  ### link with country code
+  merge(x = ., y = ctr.fao, by.x = 'area_code', by.y = 'FAOSTAT', all.x = T) %>%
+  dplyr::select(-area_code, -item_code, -element_code, -year_code, -flag) %>% 
+  dplyr::select('area', 'Short name', 'ISO3', everything()) 
+
+unit <- unique(dt2$unit); unit
+
+dt <- dt2 %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "ISO3")) %>%
+  dplyr::select(-`Short name`, -unit, -area, -item) #%>%
+  
+
+
+### 1. format data
+df <- dt %>%
+  spread(key = 'year', value = 'value') %>%
+  # dplyr::select(-ncol(.)) %>%
+  dplyr::mutate(indicatorID = item_name, indicator = indicatorID, iso2c = '', country = '') %>%
+  dplyr::select("country_eora", "iso3_eora","indicatorID", "indicator","iso2c","country", everything()) %>%
+  as.data.frame() %>%
+  dplyr::select(where(not_all_na)) %>%
+  as.data.frame() 
+names(df)  
+
+iname <- paste(item_name, unique(fao_ef$element), gsub('/', '_', unit), sep = '_'); iname
+### 2. fill NA
+function_fill_na_wb(df)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## "There are 18.4% NA"
+```
+
+
+
+#### - Fisheries
+  
+  **Indicator**
+  SDG 14.4 "By 2020, effectively regulate harvesting and end overfishing, ..." with 14.4.1 "Proportion of fish stocks within biologically sustainable levels" (see https://unstats.un.org/sdgs/indicators/indicators-list/) when combined with countries' total fishery production data.
+  
+  **Fisheries Production or fishery harvest data**
+    *Total fisheries production (metric tons)* measures the volume of aquatic species caught by a country for all commercial, industrial, recreational and subsistence purposes. The harvest from mariculture, aquaculture and other kinds of fish farming is also included.
+    *Capture fisheries production (metric tons)* measures the volume of fish catches landed by a country for all commercial, industrial, recreational and subsistence purposes.
+    *FAO FishStatJ* Capture production by sources provides a better data that distinguish inland and marine production, as well we wild captured and farmed (or called mariculture, aquaculture). In this study, we chose to use this data for analysis. 
+  
+```{r }
+# ind <- 'ER.FSH.PROD.MT'; ## Total fisheries production (metric tons)
+# ind <- 'ER.FSH.CAPT.MT'; ## Capture fisheries production (metric tons)
+# ### 1. download data from WB
+# dfwb  <- wb(indicator = ind, country = "countries_only",
+#             startdate = yr_start, enddate = yr_end) %>%
+#   as.data.frame() %>%
+#   spread(key = date, value = value) %>%
+#   left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+# unique(dfwb$indicator)
+# iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+# ### 2. fill NA
+# function_fill_na_wb(dfwb)
+# ### 3. get a cleaned data and save to dir
+# function_format_4yrData_save(iname = iname) # "There are 2.1% NA"
+
+
+
+
+source('./Code/11_FAO_FishStatJ.R')
+```
+
+
+
+
+
+
+
+  **Fisheries Trade data**
+    1. The `UN Comtrade` data reports trade by weight, but it is product weight rather than live weight of species. 
+  
+    2. The `BACI` data derived from Comtrade is also about the weight of products rather than the weight of species. 
+    
+    3. Dr. Jessica Gephart is working on a new trade database as part of this project (https://www.nsf.gov/awardsearch/showAward?AWD_ID=2121238&HistoricalAwards=false) to fill the data gap. 
+    
+```{r}
+
+```
+
+
+
+
+### Goal 15	Life On Land
+```{r}
+### see above data in Goal 2 section
+
+```
+
+
+
+
+### Goal 16	Peace, Justice, and Strong Institutions
+```{r}
+
+```
+
+
+
+
+
+### Goal 17	Partnerships for the Goals
+
+```{r - ODA}
+### ODA aid ----------------------------------------------------------
+# DT.ODA.DACD.GVCS.GEN.CD	 + Gross ODA aid disbursement for general government and civil society, DAC donors total (current US$)
+# DT.ODA.DACD.GVCS.CD	     - Gross ODA aid disbursement for government & civil society, DAC donors total (current US$)
+# DT.ODA.DACD.SOCI.CD	     - Gross ODA aid disbursement for social infrastructure & services,  DAC donors total (current US$)
+# DT.ODA.DACD.TSEC.CD	     - Gross ODA aid disbursement for total sector allocable, DAC donors total (current US$)
+
+# BG.KLT.DINV.GD.ZS	    -- Gross foreign direct investment (% of GDP)
+# BG.KLT.DINV.GD.PP.ZS	-- Gross foreign direct investment (% of GDP, PPP)
+
+# DT.ODA.ALLD.KD	++ 17.4% NA - Net official development assistance and official aid received (constant 2013 US$)
+# DT.ODA.ALLD.CD	++ 17.4% NA - Net official development assistance and official aid received (current US$)
+# DT.ODA.ODAT.KD	++ 22.6% NA - Net official development assistance received (constant 2014 US$)
+# DT.ODA.ODAT.CD1	-  22.6% NA - Net official development assistance received (current US$)
+# DT.ODA.ODAT.CD	-  22.6% NA - Net official development assistance received (current US$)
+# DT.ODA.OATL.KD	--            Net official aid received (constant 2014 US$)
+# DT.ODA.OATL.CD	--            Net official aid received (current US$)
+
+
+
+### 1. download data from WB
+ind <- 'DT.ODA.ALLD.KD';
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+unique(dfwb$indicator)
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+
+### 2. fill NA
+function_fill_na_wb(dfwb)
+
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## "There are 17.4% NA"
+```
+
+
+
+
+  **Foreign direct investment**, net inflows (BoP, current US$) --> https://data.worldbank.org/indicator/BX.KLT.DINV.CD.WD
+  Foreign direct investment refers to direct investment equity flows in the reporting economy. It is the sum of equity capital, reinvestment of earnings, and other capital. Direct investment is a category of *cross-border investment* associated with a resident in one economy having control or a significant degree of influence on the management of an enterprise that is resident in another economy. Ownership of 10 percent or more of the ordinary shares of voting stock is the criterion for determining the existence of a direct investment relationship. Data are in current U.S. dollars.
+
+  ID: BX.KLT.DINV.CD.WD
+  Source: International Monetary Fund, Balance of Payments database, supplemented by data from the United Nations Conference on Trade and Development and official national sources.
+```{r - FDI}
+# BN.KLT.DINV.DRS.GDP.ZS	-- Foreign direct investment, net inflows (% of GDP)
+# BN.KLT.DINV.DRS.GDI.ZS	-- Foreign direct investment, net inflows (% of GDI)
+# BN.KLT.DINV.CD.DRS	    -- Foreign direct investment, net inflows (US$)
+# BN.KLT.DINV.CD	        ++ 7.9% NA - Foreign direct investment, net (BoP, current US$)
+# BM.KLT.DINV.WD.GD.ZS	  ++ 8.7% NA - Foreign direct investment, net outflows (% of GDP)
+# BM.KLT.DINV.GD.ZS	      --           Foreign direct investment, net outflows (% of GDP)
+# BM.KLT.DINV.CD.WD	      ++ 7.4% NA - Foreign direct investment, net outflows (BoP, current US$)
+
+# BX.KLT.DINV.WD.GD.ZS	++ 6.2% NA - Foreign direct investment, net inflows (% of GDP)
+# BX.KLT.DINV.DT.GI.ZS	--           Foreign direct investment, net inflows (% of gross capital formation)
+# BX.KLT.DINV.DT.GD.ZS	--           Foreign direct investment, net inflows (% of GDP)
+# BX.KLT.DINV.CD.WD	    ++ 4.7% NA - Foreign direct investment, net inflows (BoP, current US$)
+# BX.KLT.DINV.CD.DT	    --           Foreign direct investment, net equity inflows in reporting economy (DRS, current US$)
+
+
+### 1. download data from WB
+ind <- 'BX.KLT.DINV.CD.WD';
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+unique(dfwb$indicator)
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+
+### 2. fill NA
+function_fill_na_wb(dfwb)
+
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## "There are 4.7% NA"
+```
+
+
+
+  **DAC**
+  The Organisation for Economic Co-operation and Development's (OECD) Development Assistance Committee (DAC) is a forum to discuss issues surrounding aid, development and poverty reduction in developing countries. It describes itself as being the "venue and voice" of the world's major donor countries.
+  As of early 2021 there are *30 members of DAC* (see list below), including the European Union which acts as a full member of the committee.
+  -- Frome https://en.wikipedia.org/wiki/Development_Assistance_Committee
+
+
+
+```{r - Aid flows from DAC donors}
+# DC.DAC.USAL.CD	Net bilateral aid flows from DAC donors, United States (current US$) --> 22.5% NA
+# DC.DAC.TOTL.CD	Net bilateral aid flows from DAC donors, Total (current US$)
+# DC.DAC.SWEL.CD	Net bilateral aid flows from DAC donors, Sweden (current US$)
+# DC.DAC.SVNL.CD	Net bilateral aid flows from DAC donors, Slovenia (current US$)
+# DC.DAC.SVKL.CD	Net bilateral aid flows from DAC donors, Slovak Republic (current US$)
+# DC.DAC.PRTL.CD	Net bilateral aid flows from DAC donors, Portugal (current US$)
+# DC.DAC.POLL.CD	Net bilateral aid flows from DAC donors, Poland (current US$)
+# DC.DAC.NZLL.CD	Net bilateral aid flows from DAC donors, New Zealand (current US$)
+# DC.DAC.NORL.CD	Net bilateral aid flows from DAC donors, Norway (current US$)
+# DC.DAC.NLDL.CD	Net bilateral aid flows from DAC donors, Netherlands (current US$)
+# DC.DAC.LUXL.CD	Net bilateral aid flows from DAC donors, Luxembourg (current US$)
+# DC.DAC.KORL.CD	Net bilateral aid flows from DAC donors, Korea, Rep. (current US$)
+# DC.DAC.JPNL.CD	Net bilateral aid flows from DAC donors, Japan (current US$)
+# DC.DAC.ITAL.CD	Net bilateral aid flows from DAC donors, Italy (current US$)
+# DC.DAC.ISLL.CD	Net bilateral aid flows from DAC donors, Iceland (current US$)
+# DC.DAC.IRLL.CD	Net bilateral aid flows from DAC donors, Ireland (current US$)
+# DC.DAC.GRCL.CD	Net bilateral aid flows from DAC donors, Greece (current US$)
+# DC.DAC.GBRL.CD	Net bilateral aid flows from DAC donors, United Kingdom (current US$)
+# DC.DAC.FRAL.CD	Net bilateral aid flows from DAC donors, France (current US$)
+# DC.DAC.FINL.CD	Net bilateral aid flows from DAC donors, Finland (current US$)
+# DC.DAC.ESPL.CD	Net bilateral aid flows from DAC donors, Spain (current US$)
+# DC.DAC.DNKL.CD	Net bilateral aid flows from DAC donors, Denmark (current US$)
+# DC.DAC.DEUL.CD	Net bilateral aid flows from DAC donors, Germany (current US$)
+# DC.DAC.CZEL.CD	Net bilateral aid flows from DAC donors, Czech Republic (current US$)
+# DC.DAC.CHEL.CD	Net bilateral aid flows from DAC donors, Switzerland (current US$)
+# DC.DAC.CECL.CD	Net bilateral aid flows from DAC donors, European Union institutions (current US$)
+# DC.DAC.CANL.CD	Net bilateral aid flows from DAC donors, Canada (current US$)
+# DC.DAC.BELL.CD	Net bilateral aid flows from DAC donors, Belgium (current US$)
+# DC.DAC.AUTL.CD	Net bilateral aid flows from DAC donors, Austria (current US$)
+# DC.DAC.AUSL.CD	Net bilateral aid flows from DAC donors, Australia (current US$)
+
+
+### 1. download data from WB
+ind <- 'DC.DAC.USAL.CD';
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+unique(dfwb$indicator)
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+
+### 2. fill NA
+function_fill_na_wb(dfwb)
+
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## 
+```
+
+
+
+
+
+
+
+
+```{r - }
+# DP.DOD.DECT.CR.CG.Z1	-- 481.Gross Central Government Debt (PSDCG)(% of GDP)
+# DT.ODA.ALLD.XPD.ZS	  -- Aid (% of central government expenditures)
+# 9.6_PBA	           -- Aid provided through program based approaches (% of international aid to education)
+# 9.1_AID.ALIGNMENT	 -- Alignment of aid to education (% of total international aid to education)
+# GB.TDS.FRGN.CN	    - Central government debt service, external (current LCU)
+# GB.DOD.TOTL.GDP.ZS -- Central government debt, total (% of GDP)
+# GB.DOD.TOTL.GD.ZS	 -- Central government debt, total (% of GDP)
+# GC.DOD.TOTL.GD.ZS	  - Central government debt, total (% of GDP)
+# GC.DOD.TOTL.CN	   - Central government debt, total (current LCU)
+# DB.DOD.DLXF.CD	  -- Central Government External Debt (US$)
+# GB.REV.XAGT.CN	   - Central government revenue excluding all grants  (current LCU)
+# GB.REV.XAGT.CN.ZS	 - Central government revenues, excluding all grants (% of GDP)
+# NE.CON.GOVT.KN.87.ZG	-- General government consumption (annual % growth)
+# NE.CON.GOVT.KD.87	    -- General government consumption (constant 1987 US$)
+# NE.CON.GOVT.ZS	      ++ General government final consumption expenditure (% of GDP)
+# NE.CON.GOVT.KD	       + General government final consumption expenditure (constant 2010 US$)
+
+### Education ------------------------------------------
+# UIS.XGDP.FSGOV.FDINSTADM.FFD	  -- Government expenditure in educational institutions as % of GDP (%)
+# UIS.XGDP.4.FSGOV.FDINSTADM.FFD	-- Government expenditure in post-secondary non-tertiary institutions as % of GDP (%)
+# UIS.XGDP.0.FSGOV.FDINSTADM.FFD	-- Government expenditure in pre-primary institutions as % of GDP (%)
+# UIS.XGDP.1.FSGOV.FDINSTADM.FFD	-- Government expenditure in primary institutions as % of GDP (%)
+# XGDP.23.FSGOV.FDINSTADM.FFD	 -- Government expenditure in secondary institutions education as % of GDP (%)
+# XGDP.56.FSGOV.FDINSTADM.FFD	 -- Government expenditure in tertiary institutions as % of GDP (%)
+# SE.XPD.TOTL.GD.ZS	  + Government expenditure on education, total (% of GDP)
+# UIS.XGDP.4.FSGOV	  - Government expenditure on post-secondary non-tertiary education as % of GDP (%)
+# UIS.XGDP.0.FSGOV	  - Government expenditure on pre-primary education as % of GDP (%)
+# UIS.XGDP.1.FSGOV	  + Government expenditure on primary education as % of GDP (%)
+# UIS.XGDP.23.FSGOV	  + Government expenditure on secondary education as % of GDP (%)
+# UIS.XGDP.56.FSGOV	  + Government expenditure on tertiary education as % of GDP (%)
+
+### Health ------------------------------------------
+# SH.XPD.PCAP.GX	             - Government health expenditure per capita (current US$)
+# IN.HLTH.GOVHOSPTL.NUM	       + Government Hospitals (Number)
+# IN.HLTH.GOVHOSPTL.PER100K	   + Government Hospitals (Number) Per 100,000 Population
+# IN.HLTH.GOVHOSPTL.BEDS.NUM	    -- Government Hospitals Number of beds
+# IN.HLTH.GOVHOSPTL.BEDS.PER100K	-- Government Hospitals Number of beds Per 100,000 Population
+# NE.GDI.FPUB.ZS	    - Gross public investment (% of GDP)
+# SH.XPD.PUBL.ZS	   -- Health expenditure, public (% of GDP)
+# SH.XPD.PUBL.GX.ZS	 -- Health expenditure, public (% of government expenditure)
+# SH.XPD.PUBL	       -- Health expenditure, public (% of total health expenditure)
+# NE.DAB.TOTL.ZS	   ++ Gross national expenditure (% of GDP)
+# NE.DAB.TOTL.KD	   ++ Gross national expenditure (constant 2010 US$)
+
+
+
+# NE.IMP.GNFS.ZS	   ++ Imports of goods and services (% of GDP)
+# NE.IMP.GNFS.KD.ZG	 ++ Imports of goods and services (annual % growth)
+# NE.IMP.GNFS.KD	   ++ Imports of goods and services (constant 2010 US$)
+# NE.EXP.GNFS.ZS	   ++ Exports of goods and services (% of GDP)
+# NE.EXP.GNFS.KD.ZG	  + Exports of goods and services (annual % growth)
+# NE.EXP.GNFS.KD	    + Exports of goods and services (constant 2010 US$)
+
+# MS.MIL.XPND.ZS	   ++ Military expenditure (% of central government expenditure)
+# MS.MIL.XPND.GD.ZS	 ++ Military expenditure (% of GDP)
+
+ind <- 'NE.EXP.GNFS.KD'
+ind <- 'MS.MIL.XPND.GD.ZS'; iname = 'Military expenditure (% of GDP)'
+S17 <- wb(indicator = ind, country = "countries_only",
+              startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+fname <- paste0(dir.process, iname, '.csv'); fname
+# write.csv(x = S17, file = fname, row.names = F)
+```
+
+
+
+
+
+
+
+
+# ================================
+
+## FILL DATA GAP
+
+```{r UNDP data, eval=FALSE, include=FALSE}
+
+### Country list -----------------------------------------------------------
+getwd()
+dir.undp <- './Data/data_01_raw/UNDP/'
+ctr_undp <- read_xlsx(path = paste0(dir.undp, 'Country_UNDP_Eora_match.xlsx'), 
+                      sheet = 2) %>%
+  dplyr::filter(!is.na(iso3_undp)) %>%
+  dplyr::mutate_if(is.factor, as.character) %>%
+  # mutate(Country_UNDP = as.factor(Country_UNDP)) %>%
+  dplyr::select(2:3) %>% as.data.frame()
+
+### DATA --------------------------------------------------------------------
+csv <- 'Female share of employment in senior and middle management (%).csv'
+csv <- 'Government expenditure on education (% of GDP).csv'
+# csv <- 'Internet users, total (% of population).csv'
+undp <- read.csv(file = paste0(dir.undp, csv), skip = 1, 
+                 stringsAsFactors = F) %>%
+  select_if(not_all_na) %>% as.data.frame()
+str(undp)
+
+
+n <- ncol(undp); n
+
+undp$Country
+str(undp_tidy)
+str(ctr_undp)
+# undp_tidy <- merge(x = ctr_undp, y = undp_tidy, 
+#                    by.x="Country_UNDP", by.y = "Country", all.y = T)
+
+undp_tidy <- undp %>% select(-n, -(n-1)) %>% mutate(Country=trimws(Country))%>%
+  right_join(x = ctr_undp, y = ., by = c("Country_UNDP" = "Country")) %>%
+  left_join(x  = ctr_eora, y = ., by = c("iso3_eora" = "iso3_undp")) %>%
+  # distinct(iso3_eora, .keep_all = T)
+  # select(-c(seq(4, 26, by = 2))) %>% ### remove some useless cols
+  gather(key = year, value = value, 5:n) %>%
+  mutate(year  = gsub('X','', year),
+         # value = as.numeric(gsub('\\.\\.', NA, value),
+         value = as.numeric(value)
+         ) %>%
+  spread(key = year, value = value)
+  
+names(undp_tidy)
+str(undp_tidy)
+##  find out the duplicate rows
+# df <- undp_tidy
+# duplicate_indexes <- which(duplicated(df[c('iso3_eora')]),)
+# dup <- df[duplicate_indexes, ]
+
+
+
+
+
+#### FILL NA -------------------------------------------------------------
+df  <- undp_tidy
+dfs <- data.frame()
+for (i in seq(1:length(df$iso3_eora))) {
+  print(i) 
+  ### loop each country code
+  print(df$iso3_eora[i]) 
+  
+  df1 <- df %>%
+    filter(iso3_eora == df$iso3_eora[i]) %>% ## ROW, ERI, KWT, MNE
+    gather(key = 'year', value =  'value', X2000:X2018) %>%
+    mutate(year = gsub('X', '', year)) %>%
+    mutate(year = year(as.Date(year, format="%Y"))) %>%
+    arrange(year) # %>% ## order by date
+  ### if too many NA, then NA; if less, use interpolation
+  if (sum(is.na(df1$value)) > (length(df1$iso3_eora)-2)) {
+    df1 <- df1 %>% 
+      mutate(value_ks = value)} 
+  else {
+    df1 <- df1 %>% 
+      mutate(value_ks = na_interpolation(x = value, option = 'stine'))} 
+  
+  dfs <- rbind(dfs, df1)
+}
+
+
+### plot and examine the interpolation
+sam <- sample(1:190, size = 20, replace = T)
+dfs %>%
+  ### randomly choose 20 countries and plot
+  # slice(sample(1:190, size = 20, replace = F)) %>%
+  # slice(1:39*10) %>%
+  filter(iso3_eora %in% df$iso3_eora[sample(1:190, size = 20, replace = T)]) %>% 
+
+  ggplot()+
+  geom_line(aes(x = year, y = value),    color = 'blue', size = 6) +
+  geom_line(aes(x = year, y = value_ks), color = 'red', size = 2) +
+  facet_wrap(~iso3_eora, scales = 'free_y') +
+  # xlim(1990, 2005) +
+  # ylim(0, 7*10^5)+
+  theme_bw()
+#
+
+
+dfs_update <- dfs %>%
+  select(-value) %>%
+  spread(key = year, value = value_ks)
+fname <- paste0(dir.process, gsub('.csv', '_FILLNA.csv', csv)); fname
+# write.csv(x = dfs_update, file = fname, row.names = F)
+
+
+
+fname <- paste0(dir.process, gsub('.csv', '_tidy.csv', csv)); fname
+write.csv(x = undp_tidy, file = fname, row.names = F)
+
+
+
+```
+
+
+### UNdata
+```{r}
+getwd()
+dir.undata <- './Data/data_01_raw/UNdata/'
+csv <- 'UNdata_Total wastewater generated.csv' ## only 31 countries
+csv <-paste0(dir.undata, csv); csv
+df <- read.csv(csv, stringsAsFactors = F) %>%
+  filter(!is.na(Value))
+ctr_undata <- unique(df$Country.or.Area) %>% as.data.frame()
+
+
+
+```
+
+
+
+
+
+
+
+### OECD
+```{r eval=FALSE, include=FALSE}
+getwd()
+dir.oecd <- './Data/data_01_raw/OECD/'
+csv <- 'BUILT_UP_16022020191532631.csv'; iname <- 'built_up_area_OECD'
+csv <- 'MATERIAL_RESOURCES_16022020202331503.csv'; iname <- 'material_consumption_oecdstat'
+csv <- 'SNA_TABLE11_16022020221726299.csv'; iname <- 'Government expenditure by function'
+csv <- 'AEI_NUTRIENTS_Agri-Environmental indicators_ Nutrients.csv'; iname<- 'ag_Nutrients'
+
+oecd <- read.csv(file = paste0(dir.oecd, csv), stringsAsFactors = F) %>%
+  filter(Year >= 2000,
+         # MEAS == 'SQKM',               ## built_up_area_OECD
+         VAR== "DMC_PC", Group == 'Total', ## material_consumption
+         # Function == "Basic research", ## Government expenditure
+         ) %>%
+  select(1:6, 'Year', "Unit", "Value") %>%
+  rename('COU' = 1) %>%
+  # group_by(COU, Year) %>%
+  # summarise(Value = sum(Value))
+  arrange(COU, Year) %>%
+  spread(key = Year, value = Value)  %>%
+  left_join(x  = ctr_eora, y = ., by = c("iso3_eora" = "COU"))
+lapply(oecd, unique) 
+fname <- paste0(dir.process, iname, '.csv'); fname
+write.csv(x = oecd, file = fname, row.names = F)
+  
+  
+  
+csv <- 'DP_LIVE__Material consumption.csv'; iname <- 'material_consumption_oecddata'
+oecd <- read.csv(file = paste0(dir.oecd, csv), stringsAsFactors = F) %>%
+  filter(TIME >= 2000) %>%
+  select(1:7) %>%
+  rename('COU' = 1, Year = TIME)
+
+names(oecd)
+summary(oecd)
+lapply(oecd, unique)
+oecd <- oecd %>%
+  arrange(COU, Year) %>%
+  spread(key = Year, value = Value)  %>%
+  left_join(x  = ctr_eora, y = ., by = c("iso3_eora" = "COU"))
+
+fname <- paste0(dir.process, iname, '.csv'); fname
+write.csv(x = oecd, file = fname, row.names = F)
+```
+
+
+**Agri-Environmental indicators: Nutrients**
+
+**Indicators**
+
+*Nutrient inputs*
+    Total Fertilisers
+        Total Inorganic Fertilisers
+        Total Organic Fertilisers (excluding livestock manure)
+    Net input of manure
+        Livestock Manure Production
+        Total Manure Withdrawals
+        Manure Imports
+    Other Nutrient Inputs
+        Atmospheric deposition
+        Biological Fixation
+        Total Seeds and Planting Materials
+*Nutrient outputs*
+    Total Harvested Crops
+        Total Cereals
+        Total Oil Crops
+        Total Dried Pulses and Beans
+        Total Industrial Crops
+        Other crops
+    Total Forage
+        Total Harvested Fodder Crops
+        Total Pasture
+    Nutrient removal by crop residues removed from the field
+    Nutrient removal by crop residues burned on the field
+    
+Balance (inputs minus outputs)
+Balance per hectare (Kilograms - only this one uses this unit)
+
+*Note: * too many missing data
+
+```{r - ag_Nutrients}
+csv <- 'AEI_NUTRIENTS_Agri-Environmental indicators_ Nutrients.csv'; iname<- 'ag_Nutrients'
+oecd <- read.csv(file = paste0(dir.oecd, csv), stringsAsFactors = F) %>%
+  select(1:2, 4, 6, 8, 10, 15) %>%
+  filter(Time >= 1990,
+         # Indicator != "Balance per hectare", 
+         Indicator == 'Nutrient inputs',
+         ) %>%
+  rename('COU' = 1, Year = Time) %>%
+  arrange(COU, Year) %>%
+  spread(key = Year, value = Value)  %>%
+  left_join(x  = ctr_eora, y = ., by = c("iso3_eora" = "COU"))
+  
+names(oecd)
+unique(oecd$Indicator)  
+unique(oecd$Nutrients)  
+unique(oecd$Unit)
+  
+# fname <- paste0(dir.process, iname, '.csv'); fname
+# write.csv(x = oecd, file = fname, row.names = F)
+```
+
+
+*wastewater*
+```{r}
+csv  <- 'WATER_DISCHARGE_Generation and discharge of wastewater.csv'
+oecd <- read.csv(file = paste0(dir.oecd, csv), stringsAsFactors = F) #%>%
+  select(1:2, 4, 6, 8, 10, 15) %>%
+  filter(Time >= 1990,
+         # Indicator != "Balance per hectare", 
+         Indicator == 'Nutrient inputs',
+         ) %>%
+  rename('COU' = 1, Year = Time) %>%
+  arrange(COU, Year) %>%
+  spread(key = Year, value = Value)  %>%
+  left_join(x  = ctr_eora, y = ., by = c("iso3_eora" = "COU"))
+  
+names(oecd)
+unique(oecd$Indicator)  
+unique(oecd$Nutrients)  
+unique(oecd$Unit)
+  
+```
+
+
+```{r - fill na, eval=FALSE, include=FALSE}
+### fill na
+df <- oecd
+source('function_fill_na_oecd.R')
+df <- oecd
+function_fill_na_oecd(df)
+```
+
+
+
+
+
+
+### OWID - our world in data
+```{r eval=FALSE, include=FALSE}
+getwd()
+dir.owid <- './Data/data_01_raw/Our World in Data/'
+
+csv <- 'share-of-population-living-in-poverty-by-national-poverty-lines.csv'
+csv <- 'share-of-the-population-living-in-extreme-poverty.csv'
+csv <- 'water-withdrawals-per-capita.csv'
+csv <- 'renewable-water-resources-per-capita.csv'
+csv <- 'cereal-yield.csv'
+csv <- 'total-government-revenue-of-gdp.csv'
+csv <- 'historical-gov-spending-gdp.csv'
+csv <- 'total-tax-revenues-gdp.csv'
+csv <- 'proportion-of-domestic-budget-funded-by-domestic-taxes-of-gdp.csv'
+csv <- 'foreign-direct-investment-net-outflows-of-gdp.csv'
+csv <- 'debt-service-of-exports-of-goods-services.csv'
+csv <- 'national-statistical-legislation.csv'
+csv <- 'health-expenditure-government-expenditure.csv'
+csv <- 'total-healthcare-expenditure-as-share-of-national-gdp-by-country.csv'
+
+csv <- 'mortality-from-ncds-sdgs.csv'
+csv <- 'death-rate-from-air-pollution-per-100000.csv'
+csv <- 'number-without-improved-water.csv'
+
+
+
+owid <- read.csv(file = paste0(dir.owid, csv), stringsAsFactors = F) %>%
+  filter(Year >= 1990) %>%
+  spread(key = Year, value = 4)  %>%
+  left_join(x  = ctr_eora, y = ., by = c("iso3_eora" = "Code")) %>%
+  mutate_if(is.numeric, ~replace_na(., '..')) %>%
+  # dplyr::select(1:3, `2000`, `2005`, `2010`, `2015`) %>%
+  as.data.frame()
+
+### fill na
+df  <- owid
+source("function_fill_na_owid.R")
+fill_na_owid(df)
+
+```
+
+
+
+
+
+## Other dataset
+
+### - Health
+
+```{r}
+
+
+
+```
+
+
+
+
+
+

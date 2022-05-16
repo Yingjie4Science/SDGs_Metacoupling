@@ -1,0 +1,349 @@
+---
+title: "Untitled"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+
+# Set up
+```{r Dirs and packages}
+knitr::opts_chunk$set(echo = TRUE)
+
+### To clear your environment 
+remove(list = ls())
+
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+setwd(dir)
+setwd('..') # set directory by one folder up
+getwd()
+
+dir.cleaned <- './Data/data_02_intermediate/dt01_ctr_profile/xlsx/cleaned/'
+dir.fig     <- './Data/Figure/'
+
+### packages
+source('./Code/_package list.R')
+```
+
+
+```{r Theme and font}
+theme_set(theme_bw())
+
+### plot settings
+unit_ns    <- 'cm'
+width_1col <- 8.8   ## 1-column
+width_2col <- 18    ## 2-column
+font       <- 'sans'     ## "TT Arial"
+font_size  <- 8          ##  Nature Sustainability: max = 7; min = 5
+theme_ns <- 
+  theme_bw()+
+  theme(
+    # axis.title =element_blank(),
+    # axis.text  =element_blank(),
+    # axis.ticks =element_blank(),
+    # panel.background = element_rect(fill = NA),
+    panel.grid.major.x = element_blank(),
+    # panel.grid.major = element_blank(),
+    # panel.grid.minor = element_line(colour = "red", size = 1),
+    legend.background = element_rect(fill="transparent"),
+    legend.key.size = unit(0.15,"cm"),
+    text = element_text(size=font_size)
+        )
+
+theme_map <- theme(
+    axis.title =element_blank(),
+    axis.text  =element_blank(),
+    axis.ticks =element_blank(),
+    panel.background = element_rect(fill = NA),
+    panel.grid  = element_blank())
+```
+
+
+#  Data
+
+## Country ISO3 code info
+```{r}
+### 1. country list from EORA webpage --------------------------------------------------------------
+ctr_eora <- readxl::read_xlsx('./Data/_eora_190country_iso3.xlsx') %>% ## eora_190country.xlsx
+  dplyr::mutate(iso3_eora = replace(iso3_eora, iso3_eora == "SUD", "SDN"), ## Sudan should be SDN
+                iso3_eora = replace(iso3_eora, iso3_eora == "SDS", "SSD")) ## South Sudan should be SSD
+str(ctr_eora)
+
+
+### 2. country list from MRIO results by Mengyu ----------------------------------------------------
+### to match country full_name and abbr 
+xls_iso_eora <- "./Data/_eora_190country_iso3_match_update.xlsx"
+iso_eora <- readxl::read_excel(path = xls_iso_eora)
+iso_eora_ex <- iso_eora
+
+
+### 3. overlap? --> yes
+ctr_eora_compare <- merge(x = ctr_eora, y = iso_eora_ex, by = 'iso3_eora', all.x = T) %>%
+  group_by(iso3_eora) %>%
+  tally() %>%
+  arrange(desc(n))
+```
+  
+  
+
+## Population by country
+```{r }
+pop <- readxl::read_excel(
+  path = paste0(dir.cleaned, 'Population, total_4yrs.xlsx')) %>%
+  # dplyr::select(-ctr) %>%
+  # merge(x = ., y = ctr_eora, by.x = 'iso3', by.y = 'iso3_eora', all.y = T) %>%
+  dplyr::mutate(`2000` = ifelse(iso3 == 'SUN', 289*10^6, `2000`),
+                `2005` = ifelse(iso3 == 'SUN', 289*10^6, `2005`),
+                `2010` = ifelse(iso3 == 'SUN', 289*10^6, `2010`),
+                `2015` = ifelse(iso3 == 'SUN', 289*10^6, `2015`),
+                
+                ### Taiwan, data from https://worldpopulationreview.com/countries/taiwan-population
+                `2000` = ifelse(iso3 == 'TWN', 21966527, `2000`),
+                `2005` = ifelse(iso3 == 'TWN', 22705713, `2005`),
+                `2010` = ifelse(iso3 == 'TWN', 23187551, `2010`),
+                `2015` = ifelse(iso3 == 'TWN', 23557477, `2015`),
+                
+                ### Curacao, data from world bank
+                `2000` = ifelse(iso3 == 'CUW', 133860, `2000`),
+                `2005` = ifelse(iso3 == 'CUW', 137658, `2005`),
+                `2010` = ifelse(iso3 == 'CUW', 148703, `2010`),
+                `2015` = ifelse(iso3 == 'CUW', 157980, `2015`)) %>%
+  arrange(iso3) 
+
+```
+
+
+
+
+## GDP by country
+
+```{r}
+gdp1 <- readxl::read_excel(
+  path = paste0(dir.cleaned, 'GDP (constant 2010 US$)_4yrs.xlsx')) %>%
+  # dplyr::select(-ctr) %>%
+  # merge(x = ., y = ctr_eora, by.x = 'iso3', by.y = 'iso3_eora', all.y = T) %>%
+  dplyr::mutate(`2000` = ifelse(iso3 == 'SUN', 2748*(289*10^6), `2000`), ## GDP per capita * population
+                `2005` = ifelse(iso3 == 'SUN', 2748*(289*10^6), `2005`),
+                `2010` = ifelse(iso3 == 'SUN', 2748*(289*10^6), `2010`),
+                `2015` = ifelse(iso3 == 'SUN', 2748*(289*10^6), `2015`),
+                ### data source: http://data.un.org/Data.aspx?d=SNAAMA&f=grID%3A101%3BcurrID%3AUSD%3BpcFlag%3A1%3BcrID%3A810#SNAAMA
+
+                ### Taiwan, data from https://eng.stat.gov.tw/ct.asp?xItem=37408&CtNode=5347&mp=5
+                `2000` = ifelse(iso3 == 'TWN', 330725*10^6, `2000`),
+                `2005` = ifelse(iso3 == 'TWN', 374042*10^6, `2005`),
+                `2010` = ifelse(iso3 == 'TWN', 444245*10^6, `2010`),
+                `2015` = ifelse(iso3 == 'TWN', 534474*10^6, `2015`),
+
+                ### Curacao, data from world bank
+                `2000` = ifelse(iso3 == 'CUW', 3038699608.93855, `2000`),
+                `2005` = ifelse(iso3 == 'CUW', 3038699608.93855, `2005`),
+                `2010` = ifelse(iso3 == 'CUW', 3038699608.93855, `2010`),
+                `2015` = ifelse(iso3 == 'CUW', 3151910782.12290, `2015`)) %>%
+  arrange(iso3) 
+
+gdp1_na <- gdp1 %>%
+  dplyr::filter(is.na(`2000`)|is.na(`2005`)|is.na(`2010`)|is.na(`2015`))
+
+
+gdp2 <- readxl::read_excel(
+  path = paste0(dir.cleaned, 'GDP (current US$)_4yrs.xlsx')) %>%
+  dplyr::filter(iso3 %in% unique(gdp1_na$iso3))
+
+pop_vgb <- pop %>%
+  dplyr::filter(iso3 == 'VGB')
+
+gdpx <- gdp1 %>%
+  dplyr::filter(!iso3 %in% unique(gdp1_na$iso3)) %>%
+  rbind(., gdp2) %>%
+  arrange(!is.na(`2000`)) %>%
+  dplyr::mutate(`2000` = ifelse(iso3 == 'PRK', 16283*10^6, `2000`), 
+                `2005` = ifelse(iso3 == 'PRK', 13945*10^6, `2005`),
+                `2010` = ifelse(iso3 == 'PRK', 13031*10^6, `2010`),
+                `2015` = ifelse(iso3 == 'PRK', 10608*10^6, `2015`),
+                
+                `2000` = ifelse(iso3 == 'SOM', 4049*10^6, `2000`), 
+                `2005` = ifelse(iso3 == 'SOM', 1093*10^6, `2005`),
+                `2010` = ifelse(iso3 == 'SOM', 2316*10^6, `2010`),
+                `2015` = ifelse(iso3 == 'SOM', 2052*10^6, `2015`),
+                ### https://countryeconomy.com/gdp/Somalia?year=2015
+                
+                `2000` = ifelse(iso3 == 'VGB', 42225*10^6*20311, `2000`), ## GDP per capita * population
+                `2005` = ifelse(iso3 == 'VGB', 42997*10^6*23107, `2005`),
+                `2010` = ifelse(iso3 == 'VGB', 36732*10^6*27794, `2010`),
+                `2015` = ifelse(iso3 == 'VGB', 40283*10^6*29152, `2015`)
+        ### http://data.un.org/Data.aspx?q=British+Virgin+Islands&d=SNAAMA&f=grID%3A101%3BcurrID%3AUSD%3BpcFlag%3A1%3BcrID%3A92
+  ) %>%
+  arrange(!is.na(`2000`))
+
+gdp <- gdpx %>%
+  arrange(iso3)
+writexl::write_xlsx(x = gdp, path = paste0(dir.cleaned, 'GDP (constant 2010 US$)_4yrs_update.xlsx'))
+```
+
+
+
+## Shapefile,Income Group
+```{r }
+# library(rnaturalearthdata)
+# library(rnaturalearth)
+# library(sf)
+
+shp <- ne_countries(scale = 'medium', type = 'countries', returnclass = 'sf') %>%
+  dplyr::select(name, type, iso_a3, economy, income_grp) %>%
+  dplyr::mutate(iso_a3 = ifelse(name == 'France', 'FRA', iso_a3))
+# plot(shp['iso_a3'])
+shp_iso_na <- shp %>% 
+  dplyr::filter(is.na(iso_a3))
+shp_iso_na$name
+
+
+### fill the gap 
+shp <- shp %>%
+  dplyr::mutate(iso_a3 = ifelse(name == "Norway", 'NOR', iso_a3),
+                iso_a3 = ifelse(name == "N. Cyprus", 'CYP', iso_a3)) %>%
+  filter(name != 'Antarctica')
+
+### group info from the shp data
+sort(unique(shp$economy))
+sort(unique(shp$income_grp))
+
+grp <- shp %>% 
+  st_drop_geometry() %>% 
+  ### re-code ctr group
+  mutate(eco_group = case_when(
+    str_detect(economy, "Developed") ~ "1. Developed",
+    str_detect(economy, "Emerging")  ~ "2. Developing",
+    str_detect(economy, "eveloping|Least") ~ "2. Developing",
+    TRUE ~ .$economy
+  ))  %>% 
+  ### re-code income group
+  dplyr::mutate(inc_group = case_when(
+    str_detect(income_grp, "High")  ~ "1. High income",
+    str_detect(income_grp, "Upper") ~ "2. Upper middle income",
+    str_detect(income_grp, "Lower") ~ "3. Lower middle income",
+    str_detect(income_grp, "Low income") ~ "4. Low income",
+    TRUE ~ .$income_grp)) %>%
+  dplyr::mutate(
+    group = tm::removeNumbers(inc_group),
+    group = gsub(":.*", "", group),
+    group = gsub("(?!\\:)[[:punct:]]", "", group, perl=TRUE),
+    group = stringr::str_squish(group)) %>%
+  arrange(!is.na(iso_a3)) %>% ### check missing info and fill the data gap
+  dplyr::select(-type, -economy,-income_grp) %>%
+  dplyr::mutate(iso_a3 = ifelse(name == 'Norway', 'NOR', iso_a3)) 
+
+# summary(grp)
+# Hmisc::describe(grp)
+# summarytools::dfSummary(grp)
+```
+
+
+```{r - Map of income}
+grp_shp <- merge(shp %>% dplyr::select(iso_a3), grp, by = 'iso_a3') %>%
+  dplyr::mutate(group = factor(group, levels = c('High income', 'Upper middle income', 'Lower middle income', 'Low income')))
+
+grp_shp %>%
+  ggplot() +
+  geom_sf(aes(fill = group), size = 0.1, color = 'gray50') +
+  scale_fill_manual(values = c('#2c7bb6', '#abd9e9', '#fdae61', '#d7191c'), name = 'Income group') +
+  theme(
+        text = element_text(size = 10),
+        legend.key.size   = unit(.3, 'cm'),  #change legend key size
+        legend.key.height = unit(.3, 'cm'),  #change legend key height
+        legend.key.width  = unit(.3, 'cm'),  #change legend key width
+        legend.text = element_text(size=8),  #change legend text font size
+        legend.position = c(0.12, 0.2), legend.margin=unit(0, "cm")) +
+  theme_map
+
+fname <- paste0(dir.fig, 'SI_Map_Income_Group.jpg'); fname
+ggsave(filename = fname, plot = last_plot(), width = 7, height = 3, units = 'in', dpi = 300)
+```
+
+
+```{r - Country info for SI Table}
+
+ctr_SI <- merge(x = ctr_eora, y = grp, 
+                by.x = 'iso3_eora', by.y = 'iso_a3', all.x = T) %>%
+  dplyr::select(country_eora, iso3_eora, group) %>%
+  distinct(country_eora, iso3_eora, .keep_all = T) %>%
+  dplyr::mutate(group = ifelse(iso3_eora == 'SUN' & is.na(group), 'Low income', group),
+                group = ifelse(iso3_eora == 'ANT' & is.na(group), 'High income', group)) %>%
+  dplyr::filter(str_detect(string = country_eora, pattern = '^Statistical', negate = T))
+names(ctr_SI)
+names(ctr_SI) <- c("Country Name", "Country ISO3 Code", "Income Group")
+
+```
+
+
+ 
+```{r - A fancy table}
+
+
+## 1. to add flag icon, we need 'iso2c'
+### match iso3c and iso2c
+library(countrycode)
+country_names <- ctr_SI$`Country ISO3 Code`; country_names
+iso2c <- countrycode(country_names,
+            origin = 'iso3c',
+            destination = 'iso2c')
+
+table.dat <- data.frame(ctr_SI, abbr = tolower(iso2c))
+
+## 2. to add flag info
+table.dat$Country <- sprintf('![](http://flagpedia.net/data/flags/mini/%s.png)', table.dat$abbr)
+
+
+table.s1 <- table.dat 
+
+
+## 3. to generate a fancy table  ----------------------------------
+library(knitr)
+library(kableExtra)
+options(kableExtra.auto_format = FALSE)
+lks <- sprintf('https://allianceone.coop/files/assets/default/images/iso-country-flags/png-country-4x3/res-640x480/%s.png',
+               table.s1$abbr)
+tbl_s1 <- table.s1 %>%
+  dplyr::mutate(Country = '') %>%
+  dplyr::select(-abbr) %>%
+  kable(x = ., align = 'l') %>% ## l --> left
+  kable_styling(bootstrap_options = c("striped", "hover"), fixed_thead = T) %>% ## c("striped", "hover", "condensed")
+  kable_classic(full_width = F, html_font = "Times New Roman", font_size = 10) %>%
+  # kable_material_dark() %>%
+  column_spec(column = 4, image = spec_image(lks, 60, 45))
+
+tbl_s1
+
+
+
+## 4. save as html
+save_kable(x = tbl_s1, file = paste0(dir.fig, 'SI_table_countryGroup.html'), latex_header_includes = T, self_contained = T)
+
+### then go to find the html and open it in Browser --> copy and paste it into a Word doc --> adjust font size 8 and bold the title
+### and title font size is 8.5 --> adjust to single-space, no space before and after --> fix table border on the top --> Done!
+
+### save to local xlsx 
+fname <- paste0(dir.fig, 'SI_table_countryGroup.xlsx');fname
+writexl::write_xlsx(x = table.s1, path = fname)
+
+```
+
+
+
+
+
+## Save as Rdata
+```{r}
+fname <- './Data/Ancillary_Data_ISO3code_shp.RData'
+save(iso_eora, pop, gdp, shp, grp, file = fname)
+
+fname <- './Data/Ancillary_Data_iso_eora_ex.RData'
+save(iso_eora_ex, file = fname)
+```
+
+
+
+

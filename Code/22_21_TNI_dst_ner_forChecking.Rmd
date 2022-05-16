@@ -1,0 +1,391 @@
+---
+title: "Untitled"
+author: "Yingjie"
+date: "9/23/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+This script aims to 
+
+  1. do the calculation based on the approach used in Xu and Li et al NS paper, and 
+  
+  2. compare and validate with results based on new loop-approach.  
+
+
+# Setup
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+
+### To clear your environment 
+# remove(list = ls())
+
+
+dir.eora_cleaned <- './Data/data_02_intermediate/dt02_flows/eora_cleaned/'
+dir.fig     <- './Data/Figure/'
+
+library(dplyr)
+library(ggplot2)
+library(cowplot)
+
+
+### This code was used in Xu & Li et al 2020 -----------------------------
+source('./Code/Func_Net_Import_Cal.R')
+```
+
+
+
+```{r - SI data}
+load('./Data/Ancillary_Data_ISO3code_shp.RData') ## iso_eora, pop, gdp, shp, grp
+
+grp_id <- grp %>%
+  dplyr::mutate(group_id = as.numeric(gsub("\\D", "", inc_group))) %>%
+  dplyr::select(iso_a3, group_id) %>%
+  dplyr::filter(!is.na(iso_a3)) %>%
+  as.data.frame()
+```
+
+
+
+# Data
+
+## neighbor matrix
+
+```{r}
+
+# load spatial relation: nearby or distant
+ner_dst_matrix <- './Data/_neighbor_matrix/_input_ctr_matrix_neighbor.xlsx'
+matrix.ner <- read_excel(path = ner_dst_matrix) %>% dplyr::select(-Country, -Neighbors) %>% column_to_rownames(var = "o")
+diag(matrix.ner) <- 1
+matrix.dst <- 1 - matrix.ner 
+matrix.not <- (matrix.ner + matrix.dst)
+```
+
+
+## Read in from excel
+```{r}
+
+# df.xlsx <- "0_capital.xlsx"
+df.xlsx <- paste0(dir.eora_cleaned, "Water.xlsx");          SDG <- 'SDG6'
+# df.xlsx <- "7_ene.xlsx";          SDG <- 'SDG7'
+# df.xlsx <- "8_mat.xlsx";          SDG <- 'SDG8'
+# df.xlsx <- "9_co2.xlsx";          SDG <- 'SDG9'
+# df.xlsx <- "12_mat-perCap.xlsx";  SDG <- 'SDG12'
+# df.xlsx <- "13_co2-forest.xlsx";  SDG <- 'SDG13'
+# df.xlsx <- "15_for.xlsx";         SDG <- 'SDG15'
+
+
+
+
+#### cal net import under different scenarios: (1) no trade, (2) only nearby trade, (3) only distant trade
+net_in_not <- Net_Import_Cal(df.xlsx = df.xlsx, matrix = matrix.not)
+net_in_ner <- Net_Import_Cal(df.xlsx = df.xlsx, matrix = matrix.ner)
+net_in_dst <- Net_Import_Cal(df.xlsx = df.xlsx, matrix = matrix.dst)
+
+```
+
+
+```{r}
+
+### compare to the New calculation approach -----
+net_in_ner_new <- net_imports_fromNer %>% 
+  dplyr::filter(ind == 'Water') %>%
+  dplyr::select(year, iso3, net_in) %>%
+  arrange(year, iso3) %>%
+  spread(key = year, value = net_in) %>%
+  column_to_rownames(var = 'iso3')
+
+dif <- net_in_ner - net_in_ner_new
+```
+
+
+
+
+
+
+
+## Indicator calculation
+### 6.4.1. WU/GDP
+```{r}
+### GDP data (10^6 $)
+
+
+GDP_c     <- gdp_rel_not %>% 
+  dplyr::filter(!iso3 %in% c("ANT", "ROW")) %>%
+  dplyr::rename(rel_c = gdp_rel, not_c = gdp_not) %>%
+  gather(key = scenario, value = value, 3:4) %>% spread(key = 'year', value = 'value')
+GDP_c_rel <- GDP_c %>% filter(scenario == 'rel_c') %>% dplyr::select(-scenario) %>% column_to_rownames(var = "iso3")
+GDP_c_not <- GDP_c %>% filter(scenario == 'not_c') %>% dplyr::select(-scenario) %>% column_to_rownames(var = "iso3")
+# GDP_c_ner <- GDP_c %>% filter(scenario == 'ner_c') %>% dplyr::select(-1, -17)
+# GDP_c_dst <- GDP_c %>% filter(scenario == 'dst_c') %>% dplyr::select(-1, -17)
+
+
+### WU - water use (1000 m3 = 10^3 m3 ???)
+loc <- rel %>% 
+  spread(key = 'year', value = 'value') %>%
+  dplyr::filter(!iso3 %in% c("ANT", "ROW")) %>%
+  column_to_rownames(var = "iso3")
+loc <- loc[ order(row.names(loc)), ] %>% as.data.frame()
+
+
+### cal GDP/WU ($/m3), to keep the row names, we cal using WU/GDP
+df_rel_c <- GDP_c_rel / (loc + 0     )
+df_not_c <- GDP_c_not / (loc + net_in_not)
+df_ner_c <- GDP_c_ner / (loc + net_in_dst) ## if only nearby trade, then add burden from distant-trade
+df_dst_c <- GDP_c_dst / (loc + net_in_ner)
+
+## normalization using the function - Func_norm_sdg_score
+score_c1 <- Func_norm_sdg_score_bad(df_rel_c, df_not_c, 
+                                    #df_ner_c, df_dst_c,
+                                    bottom = 0.025, top = 0.975)
+## look at the data distribution
+score_c1_long <- score_c1 %>% gather(year, value, 2:16)
+
+ggplot(score_c1_long, aes(x = value)) +
+  geom_histogram() +
+  facet_wrap(~scenario) +
+  theme_bw() +
+  ggtitle('Indicator 6.4.1')
+
+
+
+### save the data for side use ---------------------------------------------------
+getwd()
+normalized_score <- score_c1
+fname <- paste0(dir.root, '/data/data_myRData/normalized_score__', 'gdp_per_water', '.RData'); fname
+save(normalized_score, file = fname)
+```
+
+
+
+### 6.4.2. WU/WR
+```{r}
+### WU - water use (1000 m3 = 10^3 m3 ???)
+loc <- read_excel(df.xlsx, sheet = 'S7.net_import_nearby', col_names = T, range = ("R1:AI42")) 
+
+loc <- as.data.frame(loc[ , names(loc) != "...17"]) 
+# first col as row name
+loc <- data.frame(loc[,-1], row.names=loc[,1])
+loc <- loc[ order(row.names(loc)), ] %>% as.data.frame()
+
+
+### total water resources (10^9 m3)
+local_total <- (loc[, 16]*10^9) 
+
+df_rel_c <- (loc[, -16] + 0     ) *10^3/local_total
+df_not_c <- (loc[, -16] + net_in_not) *10^3/local_total
+df_ner_c <- (loc[, -16] + net_in_dst) *10^3/local_total 
+# ************** (loc + net distant imports) means SDG under only  nearby trade scenario
+df_dst_c <- (loc[, -16] + net_in_ner) *10^3/local_total 
+# ************** (loc + net nearby  imports) means SDG under only distant trade scenario
+
+
+## normalization using the function - Func_norm_sdg_score
+## load the function
+source(paste0(dir, "/Func_norm_sdg_score_good_bad.R"))
+
+score_c2 <- Func_norm_sdg_score_bad(df_rel_c, df_not_c, df_ner_c, df_dst_c,
+                                    bottom = 0.025, top = 0.975)
+## look at the data distribution
+score_c2_long <- score_c2 %>% gather(year, value, 2:16)
+ggplot(score_c2_long, aes(x = value)) +
+  geom_histogram() +
+  facet_wrap(~scenario) +
+  theme_bw() +
+  ggtitle('Indicator 6.4.2')
+
+
+### save the data for side use ---------------------------------------------------
+getwd()
+normalized_score <- score_c2
+fname <- paste0(dir.root, '/data/data_myRData/normalized_score__', 'water_stress', '.RData'); fname
+save(normalized_score, file = fname)
+
+```
+
+
+
+
+### Comapre two indicators
+
+```{r}
+
+score_c1_long_rel <- score_c1 %>% filter(scenario=='rel_c') %>%
+  dplyr::mutate(MeanScore = rowMeans(select(., `1995`:`2009`))) %>%
+  # arrange(rev(MeanScore)) %>%
+  as.data.frame() %>%
+  dplyr::mutate(colorID = rank(MeanScore)) %>%
+  gather(year, value, 2:16) %>%
+  dplyr::mutate(id = row_number())
+
+score_c2_long_rel <- score_c2 %>% filter(scenario=='rel_c') %>%
+  dplyr::mutate(MeanScore = rowMeans(select(., `1995`:`2009`))) %>%
+  dplyr::mutate(colorID = rank(MeanScore)) %>%
+  gather(year, value, 2:16)%>%
+  dplyr::mutate(id = row_number())
+str(score_c1_long_rel)
+
+
+ggplot(score_c2_long_rel, aes(x = reorder(nation, colorID), y = value, color =as.factor(colorID))) + 
+  # geom_point() + 
+  geom_boxplot() +
+  theme_bw() +
+  # ggtitle('Indicator 15.2.1') +
+  coord_flip() +
+  theme(legend.position="none")
+
+### plot these 2 indicators in one
+score_c12_long_rel <- merge(x = score_c1_long_rel, y = score_c2_long_rel, by = 'id') %>%
+  gather(indicator, value, c(value.x, value.y))
+
+
+unique(score_c12_long_rel$indicator)
+label_names <- c(`value.x` = "Indicator 6.4.1", `value.y` = "Indicator 6.4.2")
+
+ggplot(score_c12_long_rel, 
+       aes(x = reorder(nation.x, colorID.x), 
+           y = value, 
+           color =as.factor(colorID.x))) + 
+  # geom_point() + 
+  geom_boxplot() +
+  theme_bw() +
+  # ggtitle('SDG 15') +
+  ylab('SDG score') +
+  xlab('Country') +
+  coord_flip() +
+  facet_wrap(~indicator, scales = 'free_x', labeller = as_labeller(label_names))+
+  theme(legend.position="none")
+
+getwd()
+fname <- paste0(dir.figures, '/compare_2_indicators_', SDG, '-2020.png'); fname
+ggsave(filename = fname,  plot = last_plot(), width = 12, height = 6, units = "in", dpi = 500)
+
+```
+
+
+
+
+## Mean SDG score
+Take the mean of these two indicators
+```{r}
+SDG_score_c <- data.frame(score_c1[,1], 
+                          (score_c1[,2:16] + score_c2[,2:16])/2, 
+                          score_c1[,17:18]) %>% as.data.frame()
+names(SDG_score_c) <- c('nation', seq(1995, 2009), "scenario", "group")
+
+
+
+# save as csv for cal SDGc
+out.dir <- './_output_score'
+fname <- paste0(out.dir, '/score_c_', gsub('.xlsx', '', df.xlsx), '.csv'); fname
+write.csv(x = SDG_score_c, file = fname, row.names = T)
+
+```
+
+
+
+## Diff between dst and ner; by global/ group
+
+```{r}
+
+source(paste0(dir, "/single_diff_func_c_approach.R"))
+source(paste0(dir, "/single_diff_func_b_approach.R"))
+ 
+single_diff_func_c(SDG_score_c)
+# single_diff_func_b(score_b)
+
+```
+
+
+
+
+
+# Data_Descriptive_Stats
+
+## data
+```{r}
+library(tidyverse)
+library(reshape2) # expand long table to wide one
+library(scales) # to access break formatting functions
+
+
+s1 <- read_excel(df.xlsx, sheet = 1, col_names = T, range = "B1:AP616")
+
+names(s1)
+s3 = s1
+
+# add country name as a new col
+countries <- colnames(s1[1:41])
+colnames(s3) <- countries; length(countries)
+
+# add year seq to data frame 
+year_seq = rep(seq(1995, 2009, by=1), each = 41); year_seq
+s3$year <- year_seq
+
+### total imports
+s4 <- s3 %>% group_by(year) %>% summarise_all(funs(sum))
+s5 <- as.data.frame(t(s4[,-1])) ## tanspose data frame and keep the first col as new header
+colnames(s5) <- seq(1995, 2009, by=1)
+s5 <- s5[ order(row.names(s5)), ]
+
+### total  exports
+s6 <- s3 %>%
+  mutate(row.sum   = rowSums(s3[,1:41]),
+         year      = year_seq,
+         countries = rep(countries, times = 15)) %>% # times=15, each = 15
+  dcast(countries ~ year, value.var = 'row.sum')    # year as new col names
+s6 <- data.frame(s6[,-1], row.names=s6[,1])
+s6.1 <- s6[ order(row.names(s6)), ]
+
+
+### input data for plot
+ip <- s4[-1] %>% gather(key = 'nation', value = 'value') ## wide to long
+ep <- as.data.frame(t(s6)) %>% gather(key = 'nation', value = 'value')
+
+str(ip)
+
+ip.mean <- ip %>% group_by(nation) %>% dplyr::summarise(mean = mean(value))
+ip.new  <- merge(x = ip, y = ip.mean, by = 'nation', all.x = T)
+
+ip_ep <- rbind(
+  cbind(trade = 'imports', ip),
+  cbind(trade = 'exports', ep)
+)
+ip_ep.new  <- merge(x = ip_ep, y = ip.mean, by = 'nation', all.x = T)
+```
+
+
+## plot
+
+```{r}
+lab <- bquote('Virtual water transfered ('~1000~m^3*')')
+
+ggplot(data = ip_ep.new, aes(x = reorder(nation, mean), y = value, color = trade)) + ## log10(value)
+  # geom_point() + 
+  geom_boxplot() +
+  scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+  theme_bw() +
+  # ggtitle('Indicator 15.2.1') +
+  # coord_flip() +
+  # theme(legend.position="none") +
+  # scale_color_hue(direction = -1) +
+  # scale_colour_brewer(direction = -1)+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.3)) +
+  theme(legend.position = c(0.8, 0.2)) +
+  ylab(lab) +
+  xlab('Country')
+
+fname <- paste0(dir.figures, '/_Data_Descriptive_Stats_', SDG, '-2020.png'); fname
+ggsave(filename = fname, plot = last_plot(), width = 7, height = 5.5, units = "in", dpi = 500)
+
+```
+
+
+
+
+
+
+

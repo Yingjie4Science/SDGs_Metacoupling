@@ -1,0 +1,589 @@
+---
+title: "MRIO data cleaning"
+author: "Yingjie Li"
+date: "2021-03-01"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+  This script aims to 
+  
+  1. Combine the 4-year files for each footprint indicator in to one single dataframe. 
+  
+  2. Format the dataframe (e.g., rename, match country ISO3 code) and save it to `eora_cleaned` folder.
+  
+  3. Use heatmap to quick check the data quanlity. 
+  
+# Set up
+```{r Paths and packages}
+knitr::opts_chunk$set(echo = TRUE)
+
+### To clear your environment 
+remove(list = ls())
+
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+setwd(dir)
+setwd('..') # set directory by one folder up
+getwd()
+
+dir.eora         <- './Data/data_02_intermediate/dt02_flows/eora/'
+dir.eora_cleaned <- './Data/data_02_intermediate/dt02_flows/eora_cleaned/'
+dir.fig          <- './Data/Figure/'
+
+
+### packages
+source('./Code/_package list.R')
+```
+
+
+
+```{r Theme and font}
+theme_set(theme_bw())
+
+
+### plot settings
+unit_ns    <- 'cm'
+width_1col <- 8.8   ## 1-column
+width_2col <- 18    ## 2-column
+font       <- 'sans'     ## "TT Arial"
+font_size  <- 8          ##  Nature Sustainability: max = 7; min = 5
+theme_ns <- 
+  theme_bw()+
+  theme(
+    # axis.title =element_blank(),
+    # axis.text  =element_blank(),
+    # axis.ticks =element_blank(),
+    # panel.background = element_rect(fill = NA),
+    panel.grid.major.x = element_blank(),
+    # panel.grid.major = element_blank(),
+    # panel.grid.minor = element_line(colour = "red", size = 1),
+    legend.background = element_rect(fill="transparent"),
+    legend.key.size = unit(0.15,"cm"),
+    text = element_text(size=font_size)
+        )
+```
+
+
+```{r Ancillary data}
+load('./Data/Ancillary_Data_ISO3code_shp.RData') ## iso_eora, pop, gdp, shp, grp
+
+### extended country-iso3 pair list for matching
+load('./Data/Ancillary_Data_iso_eora_ex.RData')  ## ## iso_eora_ex
+
+
+### use the Eora data as the template 
+f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'template_eora.RData')
+load(f) # `temp_eora`
+```
+
+
+
+
+#  Data
+## Eora data Batch 
+
+  Batch read in and format as trade matrix among countries, for 2000, 2005, 2010, and 2015.
+  
+  Combine the 4-year data for each ft indicator into one single file, and save to `eora_cleaned` folder. 
+  
+```{r - ctr info}
+### to match country full_name and abbr 
+xls_iso_eora <- "./Data/_eora_190country_iso3_match_update.xlsx"
+iso_eora <- readxl::read_excel(path = xls_iso_eora)
+
+
+### to list all the input data files
+library(stringr)
+pattern <- '^YJ_'
+xls.eora.ls <- list.files(path = dir.eora, pattern = pattern, full.names = T); xls.eora.ls
+xls.ls <- basename(xls.eora.ls); xls.ls
+
+
+### to obtain the unique list of all the footprint indicator names
+inds <- substr(x = xls.ls, start = 4, stop = max(nchar(xls.ls))); inds
+inds <- str_sub(string = inds, end = -10); inds
+inds <- gsub(pattern = '_$', '', x = inds); inds
+inds <- unique(inds); inds
+print(paste0('The total number of Eora indicators: ', length(inds)))
+
+### save this indicator list as a file
+inds_df <- data.frame(indicator = inds)
+writexl::write_xlsx(x = inds_df, path = './Data/_indicators_io_list.xlsx')
+```
+  
+
+
+  **Rename files** - in case the name system is not consistent. 
+```{r}
+# name_old <- list.files(path = dir.eora, pattern="Water_scare", full.names = T)
+# name_old
+# name_new <- gsub('scare', 'scare_', name_old)
+# name_new <- gsub('__', '_', name_new)
+# name_new
+# file.rename(from = name_old, to = name_new)
+```
+  
+  
+
+```{r - loop read and combine xlsx}
+# pattern <- '^YJ_CO2'
+for (i in inds) {
+  # print(i)
+  iname = i
+  pattern <- paste0('^YJ_', i, '_20'); print(pattern)
+  xls.eora.ls <- list.files(path = dir.eora, pattern = pattern, full.names = T); print(xls.eora.ls)
+  
+  ### in case the pattern would match too many files, we use this `if else` function to pop out a warning message if anything goes wrong. 
+  if(length(xls.eora.ls) > 4 | length(xls.eora.ls) < 3) {
+    # print('Match error!') 
+    stop('Match error!')
+  } else {
+    
+    ### a null data frame
+    df.eora.x.all <- data.frame()
+    for (xls in xls.eora.ls) {
+      # print(xls)
+  
+      ### Extracting the last n characters from a string in R, and get the year number
+      yr <- str_sub(xls, -9, -6)
+      df.eora  <- readxl::read_excel(path = xls)
+      df.eora1 <- df.eora %>%
+        left_join(., iso_eora, by = c('Row' = 'Row')) %>% ## add ctr code
+        arrange(!is.na(iso3_eora))
+  
+      ### rename the cols
+      ctr_ls_eora <- unique(df.eora1$iso3_eora); ctr_ls_eora
+      names(df.eora1) <- c('ctr', ctr_ls_eora, 'iso3')
+  
+      ### reorder the col names
+      col_name_ctr <- names(df.eora1)[-c(1, ncol(df.eora1))];  ## remove "ctr" in the 1st col and "iso3" in the last
+      # print(col_name_ctr)
+      print(paste0('Number of countries: ', length(col_name_ctr)))
+  
+      df.eora.yr <- df.eora1 %>%
+        dplyr::mutate(year = yr) %>%
+        dplyr::select(year, ctr, iso3, all_of(col_name_ctr))
+  
+      ### append all 4 years data in one table
+      df.eora.x.all <- rbind(df.eora.x.all, df.eora.yr);
+  
+    }
+  
+    print(paste0('Total number of rows for the combine data set: ', nrow(df.eora.x.all)))
+  
+    ### save as xlsx
+    fname <- paste0(dir.eora_cleaned, iname, '.xlsx'); print(fname)
+    writexl::write_xlsx(x = df.eora.x.all, path = fname)
+  }
+}
+
+```
+
+
+
+
+  SHDB data has only 3 years (i.e., 2014, 2015, and 2019). To make all the data files have the same number of rows for easy data processing, we need to list `NA` data for 2000. 
+  
+```{r - format data}
+
+### to create NA data for 2000 
+xls  <- paste0(dir.eora_cleaned, "SHDB1.xlsx"); xls
+temp <- readxl::read_excel(path = xls) %>%
+  dplyr::filter(year == '2015') 
+
+add_na_2000 <- temp %>%
+  dplyr::mutate_if(is.numeric, funs(ifelse(!is.na(.), NA, .))) %>%
+  dplyr::mutate(year = '2000')
+# str(add_na_2000)
+
+
+### format all the SHDB data
+xls.ls <- list.files(path = dir.eora_cleaned, pattern = 'xlsx$', full.names = T); #xls.ls
+xls.ls.SHDB <- str_subset(xls.ls, pattern="SHDB"); xls.ls.SHDB
+
+for (xls in xls.ls.SHDB) {
+  print(xls)
+  df <- readxl::read_excel(path = xls)
+  yrs <- unique(df$year); yrs
+  
+  
+  ## if it does not have data for 2000, then add NA data; if includes, then skip and do nothing
+  if(!is.element('2000', yrs)) {           ## !'2000' %in% yrs
+    print('to add NA values to the year of 2000') 
+    df_new <- rbind(add_na_2000, df)
+    writexl::write_xlsx(x = df_new, path = xls)
+  } else{
+    print('skip')
+  }
+  
+}
+
+```
+
+
+
+
+
+## Other data sources
+
+```{r - arms trade}
+xls <- list.files(path = dir.arm, pattern = '_TIV_arms_trade_', full.names = T); xls
+df <- readxl::read_excel(path = xls) #%>%
+  ### format as the same as EORA data
+  # dplyr::mutate(ctr = NA) %>%
+  # dplyr::select(year, ctr, iso3, everything())
+## get the indicator name
+ind <- 'arms_trade'
+
+### Format the data in the same way as Eora cleaned ------------------------------------------------
+df_formatted <- df %>%
+  dplyr::filter(year %in% c(2000, 2005, 2010, 2015)) %>%
+  gather(key = 'to', value = 'value', 3:ncol(.)) %>%
+  merge(x = temp_eora, y = ., by.x = c('year', 'iso3', 'to'), by.y = c('year', 'iso3', 'to'), all.x = T)
+
+### To generate the same format as Eora in Matrix
+df_formatted <- df_formatted %>%
+  ungroup() %>%
+  arrange(year, iso3, to) %>%
+  dplyr::select(year, ctr, everything()) %>%
+  spread(key = to, value = value) %>%
+  arrange(year, iso3)
+
+
+### save to the `eora_cleaned` folder --------------------------------------------------------------
+df_formatted %>%
+  group_by(year) %>% tally()
+fname <- paste0(dir.eora_cleaned, ind, '.xlsx'); fname
+writexl::write_xlsx(x = df_formatted, path = fname)
+
+
+
+### Calculate net_imports --------------------------------------------------------------------------
+# net_imports <- data.frame()
+# net_in <- func_net_import(df = df)
+# net_imports <- rbind(net_imports, cbind(ind = ind, net_in)) %>%
+#   arrange(iso3, year)
+# 
+# 
+# ### check the data
+# sort(unique(net_imports$year))
+# unique(net_imports$ind)
+# length(unique(net_imports$ind))
+# 
+# 
+# net_imports3 <- net_imports %>%
+#   dplyr::filter(year %in% c(2000, 2005, 2010, 2015)) 
+```
+
+
+
+
+
+```{r - human_trafficking}
+
+xls <- list.files(path = dir.traffick, pattern = '_human_trafficking', full.names = T); xls
+df <- readxl::read_excel(path = xls) %>%
+  ### format as the same as EORA data
+  gather(key = 'to', value = 'value', 3:ncol(.)) %>%
+  pivot_wider(names_from = year, values_from = value) %>%
+  dplyr::mutate( `2000` = `2002`) %>%
+  # dplyr::mutate(ctr = NA) %>%
+  dplyr::select(iso3, everything()) %>%
+  gather(key = 'year', value = 'value', 3:ncol(.)) %>%
+  pivot_wider(names_from = to, values_from = value) %>%
+  # arrange(iso3, year) %>%
+  # dplyr::select(year, ctr, iso3, everything())
+  as.data.frame()
+
+## get the indicator name
+ind <- 'human_trafficking'
+
+
+### save to the `eora_cleaned` folder
+df_4yr <- df %>%
+  ungroup() %>% 
+  arrange(year, iso3) %>%
+  group_by(year, iso3) %>% ## ??? too few data, should use data in nearby years to fill the gap
+  dplyr::filter(year %in% c(2000, 2005, 2010, 2015)) 
+df_4yr %>%
+  group_by(year) %>% tally() ## ??? need to add all countries to the table, with NA
+
+
+
+### Format the data in the same way as Eora cleaned ------------------------------------------------
+df_formatted <- df %>%
+  dplyr::filter(year %in% c(2000, 2005, 2010, 2015)) %>%
+  gather(key = 'to', value = 'value', 3:ncol(.)) %>%
+  merge(x = temp_eora, y = ., by.x = c('year', 'iso3', 'to'), by.y = c('year', 'iso3', 'to'), all.x = T)
+
+### To generate the same format as Eora in Matrix
+df_formatted <- df_formatted %>%
+  ungroup() %>%
+  arrange(year, iso3, to) %>%
+  dplyr::select(year, ctr, everything()) %>%
+  spread(key = to, value = value) %>%
+  arrange(year, iso3)
+
+
+### save to the `eora_cleaned` folder --------------------------------------------------------------
+df_formatted %>%
+  group_by(year) %>% tally()
+fname <- paste0(dir.eora_cleaned, ind, '.xlsx'); fname
+writexl::write_xlsx(x = df_formatted, path = fname)
+
+
+
+### Calculate net_imports --------------------------------------------------------------------------
+# net_imports <- data.frame()
+# net_in <- func_net_import(df = df)
+# net_imports <- rbind(net_imports, cbind(ind = ind, net_in)) %>%
+#   arrange(iso3, year)
+# 
+# ### check the data
+# sort(unique(net_imports$year))
+# unique(net_imports$ind)
+# length(unique(net_imports$ind))
+# 
+# net_imports4 <- net_imports %>%
+#   dplyr::filter(year %in% c(2000, 2005, 2010, 2015)) 
+```
+
+
+
+
+```{r - peacekeeping?}
+### ".\Data\data_01_raw\Arm trade_Peacekeeping\UN_peacekeeping.Rmd"
+
+
+# xls <- list.files(path = dir.traffick, pattern = '_human_trafficking', full.names = T); xls
+# df <- readxl::read_excel(path = xls) %>%
+#   ### format as the same as EORA data
+#   gather(key = iso3.y, value = value, 3:ncol(.)) %>%
+#   pivot_wider(names_from = year, values_from = value) %>%
+#   dplyr::mutate(ctr = NA, `2000` = `2002`) %>%
+#   dplyr::select(ctr, iso3, everything()) %>%
+#   gather(key = year, value = value, 4:ncol(.)) %>%
+#   pivot_wider(names_from = iso3.y, values_from = value) %>%
+#   arrange(iso3, year) %>%
+#   dplyr::select(year, ctr, iso3, everything())
+# ## get the indicator name
+# ind <- 'human_trafficking'
+
+```
+
+
+
+```{r - student_flow}
+### get the indicator name
+ind <- 'student_flow'
+
+dir.student_flow <- './Data/data_01_raw/International Student flows/'
+xls <- list.files(path = dir.student_flow, pattern = 'output_student_flows_ALL_wide_', full.names = T); xls
+df <- readxl::read_excel(path = xls) %>%
+  ### format as the same as EORA data
+  # dplyr::mutate(ctr = NA) %>%
+  dplyr::rename(iso3 = send_iso) %>%
+  dplyr::select(year, iso3, everything())
+
+
+
+### check the number of countries in the data 
+df_4yr <- df %>%
+  ungroup() %>% 
+  arrange(year, iso3) %>%
+  group_by(year, iso3) %>% ## ??? if too few data, should use data in nearby years to fill the gap
+  dplyr::filter(year %in% c(2000, 2005, 2010, 2015)) 
+df_4yr %>%
+  group_by(year) %>% tally() ## ??? need to only include the 189 countries
+
+### Format the data in the same way as Eora cleaned ------------------------------------------------
+df_formatted <- df %>%
+  dplyr::filter(year %in% c(2000, 2005, 2010, 2015)) %>%
+  gather(key = 'to', value = 'value', 3:ncol(.)) %>%
+  merge(x = temp_eora, y = ., by.x = c('year', 'iso3', 'to'), by.y = c('year', 'iso3', 'to'), all.x = T)
+
+### To generate the same format as Eora in Matrix
+df_formatted <- df_formatted %>%
+  ungroup() %>%
+  arrange(year, iso3, to) %>%
+  dplyr::select(year, ctr, everything()) %>%
+  spread(key = to, value = value) %>%
+  arrange(year, iso3)
+
+
+### save to the `eora_cleaned` folder --------------------------------------------------------------
+df_formatted %>%
+  group_by(year) %>% tally()
+fname <- paste0(dir.eora_cleaned, ind, '.xlsx'); fname
+writexl::write_xlsx(x = df_formatted, path = fname)
+
+
+### Calculate net_imports --------------------------------------------------------------------------
+# net_imports <- data.frame()
+# net_in <- func_net_import(df = df)
+# net_imports <- rbind(net_imports, cbind(ind = ind, net_in)) %>%
+#   arrange(iso3, year)
+# 
+# ### check the data
+# sort(unique(net_imports$year))
+# unique(net_imports$ind)
+# length(unique(net_imports$ind))
+# 
+# net_imports5 <- net_imports %>%
+#   dplyr::filter(year %in% c(2000, 2005, 2010, 2015)) 
+```
+
+
+
+
+  Refer to the report "OECD FishPEM Model Capture Fisheries Trade Data" by Dr. Jessica Gephart. 
+```{r - TradeMatrix_marine_capture}
+### get the indicator name
+ind <- 'TradeMatrix_marine_capture'
+
+dir <- './Data/data_01_raw/FAOSTAT/Jessica Gephart/'
+# f <- 'marine_capture_trade_20211214.csv'        ## 1st version 2021-12-14
+f <- 'marine_capture_trade_5yrave_20220107.csv'   ## 2nd version 2022-01-07
+file <- paste0(dir, f)
+
+
+df0 <- readr::read_csv(file = file) %>%
+  # dplyr::distinct(exporter_iso3c, importer_iso3c, .keep_all = T) %>%
+  as.data.frame()
+
+
+df <- df0 %>%
+  rename(year = time_period) %>%
+  dplyr::mutate(year = 2015) %>%
+  dplyr::select(year, exporter_iso3c, importer_iso3c, `q.live`) %>%
+  spread(key = importer_iso3c, value = `q.live`)
+
+df %>%
+  group_by(year) %>% tally() ## 220 countries are in the raw data, but we need to only include the 189 countries
+
+
+
+### Format the data in the same way as Eora cleaned
+df_formatted <- df %>%
+  dplyr::rename(iso3 = exporter_iso3c) %>%
+  dplyr::filter(year %in% c(2000, 2005, 2010, 2015)) %>%
+  gather(key = 'to', value = 'value', 3:ncol(.)) %>%
+  merge(x = temp_eora, y = ., by.x = c('year', 'iso3', 'to'), by.y = c('year', 'iso3', 'to'), all.x = T)
+
+### To generate the same format as Eora in Matrix
+df_formatted <- df_formatted %>%
+  ungroup() %>%
+  arrange(year, iso3, to) %>%
+  dplyr::select(year, ctr, everything()) %>%
+  spread(key = to, value = value) %>%
+  arrange(year, iso3)
+
+
+### save to the `eora_cleaned` folder
+df_formatted %>%
+  group_by(year) %>% tally()
+fname <- paste0(dir.eora_cleaned, ind, '.xlsx'); fname
+writexl::write_xlsx(x = df_formatted, path = fname)
+
+```
+
+
+
+
+```{r - TradeMatrix_Cereals}
+
+# See "Cereal trade - maxtrix" section in `10_country_profileData_prepare.Rmd`
+
+```
+
+
+
+
+
+```{r - TradeMatrix_Pesticides_Hzd}
+
+# see `11_Comtrade_BACI_Pesticides.Rmd`
+
+```
+
+
+
+
+```{r - NCD death embodied in trade matrix}
+
+# See `NCDs_matrix.R`
+
+# source('./Data/data_01_raw/Health/NCDs_MinGonChung/NCDs_matrix.R')
+
+# ind <- "TradeMatrix_NCD_death_number"
+```
+
+
+
+
+
+
+
+
+## Heatmap - help check data
+
+  A heat map can more vivid to check the data quality. Here we took data in 2015 as an example. 
+  
+```{r}
+
+xls.ls <- list.files(path = dir.eora_cleaned, pattern = 'xlsx$', full.names = T); xls.ls
+
+yr <- 2015
+
+for (xls in xls.ls) {
+  print(xls)
+  df <- readxl::read_excel(path = xls) %>%
+    dplyr::filter(year == yr) %>%
+    as.data.frame()
+  # yrs <- unique(df$year); print(yrs)
+  iname <- gsub('.xlsx', '', basename(xls))
+  
+  
+  space_size = 0.3
+  
+  dfht <- df %>%
+    gather(key = 'receive', value = 'value', 4:ncol(.)) %>%
+    arrange(iso3, receive) %>%
+    ### transform the data to be comparable
+    dplyr::mutate(value = log10(value)) %>%
+    ### remove the self-to-self trade (too big values)
+    # dplyr::filter(iso3 != receive) %>%
+    ggplot(data = ., aes(x = receive, y = iso3)) + 
+    geom_tile(aes(fill = value), colour = "white", 
+              # na.rm = T, 
+              size = space_size, ## the space between boxes
+              show.legend = T) + 
+    scale_fill_gradientn(colours = topo.colors(100), na.value = "white") +
+    # theme_bw() +
+    theme_ns +
+    xlab('destination nation') + ylab('origin nation') +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.3))
+  dfht
+  
+  ### save plot
+  fname <-paste0(dir.fig, 'footprint_heatmap/FT_HT_', iname, '_', yr, '_0813.png'); fname
+  ggsave(filename = fname, plot = dfht, width = 16, height = 16, units = 'in', dpi = 300)
+  
+}
+
+```
+
+
+  Rename files. 
+```{r}
+# name_old <- list.files(path = paste0(dir.fig, 'footprint_heatmap/'), pattern="0812", full.names = T)
+# name_old
+# name_new <- gsub('0812', '2015_0812', name_old)
+# name_new
+# file.rename(from = name_old, to = name_new)
+```
+

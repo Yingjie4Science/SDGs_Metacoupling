@@ -1,0 +1,290 @@
+---
+title: "Untitled"
+author: "Yingjie"
+date: "8/27/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+
+### To clear your environment 
+# remove(list = ls())
+
+
+
+dir.eora_cleaned <- './Data/data_02_intermediate/dt02_flows/eora_cleaned/'
+dir.fig     <- './Data/Figure/'
+
+library(dplyr)
+library(ggplot2)
+library(cowplot)
+
+```
+
+
+
+## Data
+
+
+### SI data
+```{r}
+load('./Data/Ancillary_Data_ISO3code_shp.RData') ## iso_eora, pop, gdp, shp, grp
+
+grp_id <- grp %>%
+  dplyr::mutate(group_id = as.numeric(gsub("\\D", "", inc_group))) %>%
+  dplyr::select(iso_a3, group_id) %>%
+  dplyr::filter(!is.na(iso_a3)) %>%
+  as.data.frame()
+```
+
+
+### cepii distance
+  
+  https://pacha.dev/cepiigeodist/reference/dist_cepii.html
+  
+```{r}
+library(cepiigeodist)
+### filter countries that share borders
+# dist_cepii[dist_cepii$contig == 1, ]
+
+
+dist_cepii <- dist_cepii %>%
+  dplyr::mutate(iso_o = ifelse(iso_o == 'ZAR', 'COD', iso_o), iso_d = ifelse(iso_d == 'ZAR', 'COD', iso_d))
+
+geo_cepii  <- geo_cepii
+
+
+### corrections to the `geo` data ------------------------------------------------------------------
+s <- 'Congo'          ## --> code change
+s <- 'Romania'        ## --> code change
+s <- 'Serbia'         ## --> code change
+s <- 'Monaco'         ## not included in this data, use 'CHE' as a proxy (nearby and similar size)
+s <- 'Liechtenstein'  ## not included in this data, use 'CHE' as a proxy (nearby and similar size)
+s <- 'Cura'           ## --> to add
+s <- 'Montenegro'     ## --> to add
+s <- 'Sudan'          ## --> to add 'South Sudan', gained independence from the Republic of the Sudan in 2011
+s <- 'Gaza'
+s <- 'Palestine'      ## --> code change
+geo_cepii %>%
+  dplyr::filter(str_detect(pattern = s, country))
+
+
+geo_cuw <- geo_cepii %>% 
+  dplyr::filter(iso3== 'ANT') %>% 
+  head(1) %>%
+  dplyr::mutate(iso2 = ifelse(iso2 == 'AN', 'CU', iso2), iso3 = ifelse(iso3 == 'ANT', 'CUW', iso3))
+dist_cuw <- dist_cepii %>% 
+  dplyr::filter(iso_o == 'ANT'| iso_d == 'ANT') %>% 
+  dplyr::mutate(iso_o = ifelse(iso_o == 'ANT', 'CUW', iso_o), iso_d = ifelse(iso_d == 'ANT', 'CUW', iso_d)) %>%
+  as.data.frame()
+
+geo_mne <- geo_cepii %>% 
+  dplyr::filter(iso3== 'YUG') %>% 
+  head(1) %>%
+  dplyr::mutate(iso2 = ifelse(iso2 == 'YU', 'ME', iso2), iso3 = ifelse(iso3 == 'YUG', 'MNE', iso3))
+dist_mne <- dist_cepii %>% 
+  dplyr::filter(iso_o == 'YUG'| iso_d == 'YUG') %>% 
+  dplyr::mutate(iso_o = ifelse(iso_o == 'YUG', 'MNE', iso_o), iso_d = ifelse(iso_d == 'YUG', 'MNE', iso_d)) %>%
+  as.data.frame()
+
+geo_ssd <- geo_cepii %>% 
+  dplyr::filter(iso3== 'SDN') %>% 
+  head(1) %>%
+  dplyr::mutate(iso2 = ifelse(iso2 == 'SD', 'SS', iso2), iso3 = ifelse(iso3 == 'SDN', 'SSD', iso3))
+dist_ssd <- dist_cepii %>% 
+  dplyr::filter(iso_o == 'SDN'| iso_d == 'SDN') %>% 
+  dplyr::mutate(iso_o = ifelse(iso_o == 'SDN', 'SSD', iso_o), iso_d = ifelse(iso_d == 'SDN', 'SSD', iso_d)) %>%
+  as.data.frame()
+
+geo_sun <- geo_cepii %>% 
+  dplyr::filter(iso3== 'RUS') %>% 
+  head(1) %>%
+  dplyr::mutate(iso2 = ifelse(iso2 == 'RU', 'SU', iso2), iso3 = ifelse(iso3 == 'RUS', 'SUN', iso3))
+dist_sun <- dist_cepii %>% 
+  dplyr::filter(iso_o == 'RUS'| iso_d == 'RUS') %>% 
+  dplyr::mutate(iso_o = ifelse(iso_o == 'RUS', 'SUN', iso_o), iso_d = ifelse(iso_d == 'RUS', 'SUN', iso_d)) %>%
+  as.data.frame()
+
+
+geo_lie <- geo_cepii %>% 
+  dplyr::filter(iso3== 'CHE') %>% 
+  head(1) %>%
+  dplyr::mutate(iso2 = ifelse(iso2 == 'CH', 'LI', iso2), iso3 = ifelse(iso3 == 'CHE', 'LIE', iso3))
+dist_lie <- dist_cepii %>% 
+  dplyr::filter(iso_o == 'CHE'| iso_d == 'CHE') %>% 
+  dplyr::mutate(iso_o = ifelse(iso_o == 'CHE', 'LIE', iso_o), iso_d = ifelse(iso_d == 'CHE', 'LIE', iso_d)) %>%
+  as.data.frame()
+
+
+geo_mco <- geo_cepii %>% 
+  dplyr::filter(iso3== 'CHE') %>% 
+  head(1) %>%
+  dplyr::mutate(iso2 = ifelse(iso2 == 'CH', 'MC', iso2), iso3 = ifelse(iso3 == 'CHE', 'MCO', iso3))
+dist_mco <- dist_cepii %>% 
+  dplyr::filter(iso_o == 'CHE'| iso_d == 'CHE') %>% 
+  dplyr::mutate(iso_o = ifelse(iso_o == 'CHE', 'MCO', iso_o), iso_d = ifelse(iso_d == 'CHE', 'MCO', iso_d)) %>%
+  as.data.frame()
+
+
+
+### ---
+geo  <- geo_cepii %>%
+  dplyr::mutate(iso3 = ifelse(iso3 == 'ZAR', 'COD', iso3), iso2 = ifelse(iso2 == 'ZR', 'CD', iso2)) %>%
+  dplyr::mutate(iso3 = ifelse(iso3 == 'ROM', 'ROU', iso3)) %>%
+  dplyr::mutate(iso3 = ifelse(iso3 == 'YUG', 'SRB', iso3), iso2 = ifelse(iso2 == 'YU', 'RS', iso2)) %>%
+  dplyr::mutate(iso3 = ifelse(iso3 == 'PAL', 'PSE', iso3)) %>%
+  rbind(., geo_cuw, geo_mne, geo_ssd, geo_sun, geo_lie, geo_mco)
+
+
+
+### corrections to the `dist` data -----------------------------------------------------------------
+
+
+dist <- dist_cepii %>%
+  dplyr::mutate(iso_o = ifelse(iso_o == 'ZAR', 'COD', iso_o), iso_d = ifelse(iso_d == 'ZAR', 'COD', iso_d)) %>%
+  dplyr::mutate(iso_o = ifelse(iso_o == 'ROM', 'ROU', iso_o), iso_d = ifelse(iso_d == 'ROM', 'ROU', iso_d)) %>%
+  dplyr::mutate(iso_o = ifelse(iso_o == 'YUG', 'SRB', iso_o), iso_d = ifelse(iso_d == 'YUG', 'SRB', iso_d)) %>%
+  dplyr::mutate(iso_o = ifelse(iso_o == 'PAL', 'PSE', iso_o), iso_d = ifelse(iso_d == 'PAL', 'PSE', iso_d)) %>%
+  rbind(., dist_cuw, dist_mne, dist_ssd, dist_sun, dist_lie, dist_mco)
+
+
+
+head(dist)
+
+d <- dist$dist %>% as.numeric()
+
+ctr_list_cepii <- dist %>%
+  dplyr::select(1:2) %>%
+  gather(key = 'od', value = 'iso', 1:2) %>%
+  distinct(iso, .keep_all = T) %>%
+  arrange(iso)
+
+```
+
+
+
+### footprint
+```{r}
+
+# ind <- 'Water'
+# ind <- 'student_flow'
+ind <- 'Landuse_forest'
+# ind <- 'osh_fatal'
+xls <- paste0(dir.eora_cleaned, ind, '.xlsx'); xls
+
+
+mat <- readxl::read_excel(xls) %>% 
+  ungroup() %>%
+  dplyr::filter(year == 2015) 
+
+links <- mat %>%
+  gather(key = 'to', value = 'weight', 4:ncol(.)) %>%
+  dplyr::rename('from' = 'iso3') %>%
+  dplyr::mutate(type = ind) %>%
+  dplyr::select(-ctr, -year) %>%
+  arrange(from, to) %>%
+  distinct(from, to, .keep_all = T) %>%  
+  as.data.frame()
+
+links_dist <- merge(x = links, y = dist, by.x = c('from', 'to'), by.y = c('iso_o', 'iso_d'), all.x = T) %>%
+  merge(x = ., y = grp_id, by.x = 'from', by.y = 'iso_a3', all.x = T) %>%
+  merge(x = ., y = grp_id, by.x = 'to',   by.y = 'iso_a3', all.x = T) %>%
+  dplyr::mutate(group_od = paste0(group_id.x, group_id.y),
+                group_od = as.numeric(group_od),
+                od_direction = case_when(
+                  group_od %in% c(13, 14, 23, 24) ~ 'high on low', ## low2high
+                  group_od %in% c(41, 42, 31, 32) ~ 'low on high', ## high2low
+                  TRUE ~ 'other')
+                ) %>%
+  dplyr::select(-group_id.x, -group_id.y)
+
+links_dist_na <- links_dist %>% dplyr::filter(is.na(dist))
+
+ctr_match_check <- mat %>%
+  dplyr::select(2:3) %>%
+  distinct(iso3, .keep_all = T) %>%
+  merge(., ctr_list_cepii, by.x = 'iso3', by.y = 'iso', all.x = T) %>%
+  arrange(!is.na(od))
+
+```
+
+
+
+
+### ft distance 
+
+  For country *m*, on average, how far has its impact reached to? 
+  
+  Here we use the *footprint distance* to measure the *impact distance*.
+  
+#### - distance measure  
+```{r}
+## for a receiving country, cal its impact distance --------------------------------- 
+ft_d <- links_dist %>%
+  dplyr::mutate(ftd = weight * dist) %>%
+  dplyr::group_by(to, type, od_direction) %>%
+  dplyr::summarise(dq_sum = sum(ftd, na.rm = T),
+                   q_sum  = sum(weight, na.rm = T)) %>%
+  dplyr::mutate(d_ef = dq_sum/q_sum)
+
+
+links_dist %>% 
+  dplyr::group_by(od_direction) %>%
+  tally()
+
+## 1. mean distance between countries 
+hist(dist_cepii$dist)
+mean(dist_cepii$dist, na.rm=T) ## --> 8481.7 km
+
+## 2. mean impact distance between countries 
+hist(ft_d$d_ef)
+mean(ft_d$d_ef, na.rm=T)       ## --> 5780.7 km
+
+
+ft_d %>% 
+  ggplot() +
+  geom_histogram(aes(x = d_ef, fill = od_direction), position="identity", alpha=0.5, show.legend = F) +
+  geom_vline(aes(xintercept=mean(d_ef, na.rm=T)), color="red", linetype="dashed") +
+  ggplot2::annotate("text", x = round(mean(ft_d$d_ef, na.rm=T)*0.6, digits = 1), y = 15, colour = "red", 
+                    label = round(mean(ft_d$d_ef, na.rm=T), digits = 1)) +
+  facet_wrap(~od_direction, ncol = 1) +
+  theme_bw() +
+  # theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ylim(0,20) + xlab('Impact distance (km)') + labs(fill='Impact pair')
+
+fname <- paste0(dir.fig, '01main/impact pair_',ind, '1.jpg'); fname
+ggsave(filename = fname, plot = last_plot(), width = 7.5/2, height = 7.5/2, units = 'in', dpi = 300)
+```
+
+
+
+#### - contiguous or not
+```{r}
+
+## impact distance by group of 'contiguous or not'
+ft_FarNear <- links_dist %>%
+  dplyr::group_by(contig) %>%
+  dplyr::summarise(q_sum  = sum(weight, na.rm = T)) %>%
+  as.data.frame() %>%
+  dplyr::mutate(
+    sum = sum(links_dist$weight, na.rm = T),
+    pct = q_sum/sum
+    ) %>%
+  as.data.frame()
+
+
+## number of countries that are contiguous
+ft_FarNear_n <- links_dist %>%
+  dplyr::group_by(contig) %>%
+  dplyr::summarise(n = n()) %>%
+  as.data.frame() %>%
+  dplyr::mutate(
+    sum = sum(n, na.rm = T),
+    pct = n/sum
+    ) %>%
+  as.data.frame()
+```
+
