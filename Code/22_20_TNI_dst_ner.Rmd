@@ -22,22 +22,25 @@ editor_options:
 source('./Code/_package list.R')
 source('./Code/func_net_import_direction.R')
 
-dir.eora         <- './Data/data_02_intermediate/dt02_flows/eora/'
-dir.eora_cleaned <- './Data/data_02_intermediate/dt02_flows/eora_cleaned/'
-dir.fig          <- './Data/Figure/'
+### data path
+source('./Code/_path of data.R')
 ```
 
 
 #  Data 
 
 ## Neighbor matrix
+
 ```{r}
 ### load spatial relation: nearby or distant
 ner_dst_matrix <- './Data/_neighbor_matrix/_input_ctr_matrix_neighbor.xlsx'
 ner.matrix <- read_excel(path = ner_dst_matrix) %>% dplyr::select(-Country, -Neighbors) %>% column_to_rownames(var = "o")
 diag(ner.matrix) <- 1
-dst.matrix <- 1 - ner.matrix 
+dst.matrix <- 1 - ner.matrix               
 not.matrix <- (ner.matrix + dst.matrix)
+
+## `ner.matrix`: nearby = 1, distant = 0
+## `dst.matrix`: nearby = 0, distant = 1
 
 
 ### how many nearby and distant pairs?
@@ -45,15 +48,17 @@ ner_stat <- ner.matrix %>%
   rownames_to_column(var = 'o') %>%
   gather(key = 'd', value = 'scenario', 2:ncol(.)) %>%
   group_by(scenario) %>%
-  tally()
-
-ner_stat$n/sum(ner_stat$n) * 100 
+  tally() %>%
+  dplyr::mutate(total = sum(n),
+                percent = scales::percent(n/total, accuracy = 0.1))
+ner_stat
+# ner_stat$n/sum(ner_stat$n) * 100 
 
 ### --> 96.9% distant pairs; 3.1% nearby pairs
 
 
 
-### how many nearby or distant partners each country has? 
+### how many nearby or distant partners each country has? --------------------------------
 ner_stat_each <- ner.matrix %>%
   dplyr::mutate(n_nearby = rowSums(.),
                 n_near_pct = n_nearby/189*100) %>% ## % are nearby
@@ -62,6 +67,22 @@ ner_stat_each <- ner.matrix %>%
 
 hist(ner_stat_each$n_nearby)
 boxplot(ner_stat_each$n_nearby)
+summary(ner_stat_each$n_nearby)
+  #  Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+  # 1.000   4.000   5.000   5.852   7.000  24.000 
+
+
+### --> for distant pairs
+dst_stat_each <- dst.matrix %>%
+  dplyr::mutate(n     = rowSums(.),
+                n_pct = n/189*100) %>% ## % are nearby
+  dplyr::select(n, n_pct) %>%
+  as.data.frame()
+hist(dst_stat_each$n)
+boxplot(dst_stat_each$n)
+summary(dst_stat_each$n)
+  #  Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+  # 165.0   182.0   184.0   183.1   185.0   188.0 
 ```
 
 
@@ -83,17 +104,26 @@ spillover_name_list <- data.frame(ind = gsub('.xlsx', '', basename(xls.ls))) %>%
   as.data.frame()
 
 
-### loop the normalization based on direction ------------------------------------------------------
-xls <- paste0('./Data/data_02_intermediate/dt02_flows/', "spillover_name_list_directions.xlsx"); xls
-direction <- readxl::read_excel(path = xls) %>%
-  dplyr::filter(!is.na(ind) & !is.na(direction))
+### loop the normalization based on `direction` ------------------------------------------
+
+f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'direction.RData')
+load(f)
 ```
 
 
 
 
+**Warning !!!**
 
-```{r - nearby only}
+  * In the scenario of `only nearby` interaction, we need to use the 'burden' from `distant` interactions (Be careful here!) 
+  * `distant only` scenario = no nearby  trade: to evaluate *nearby*  impact --> use nearby  footprints data
+  * `nearby only`  scenario = no distant trade: to evaluate *distant* impact --> use distant footprints data
+  
+
+
+
+
+```{r - distant only scenario --> nearby impact}
 
 scenario <- 'fromNer'
 matrix   <- ner.matrix
@@ -106,35 +136,43 @@ net_imports <- data.frame()
 ### this for loop can be used in other scenarios 
 for (i in 1:nrow(direction)) {
   # print(i)
-  ind <- direction[i, 1] %>% unlist() %>% paste(sep = '', collapse = ''); 
-  drt <- direction[i, 2] %>% unlist() %>% paste(sep = '', collapse = '') %>% as.numeric()
+  ind <- direction[i, 'ind']       %>% unlist() %>% paste(sep = '', collapse = ''); 
+  drt <- direction[i, 'direction'] %>% unlist() %>% paste(sep = '', collapse = '') %>% as.numeric()
   print(ind)
   print(drt)
   
-  xls <- paste0(dir.eora_cleaned, ind, '.xlsx'); print(xls)
-  df  <- readxl::read_excel(path = xls)  %>% 
-    gather(key = 'd', value = 'value', 4:ncol(.)) %>%
-    as.data.frame()
   
-  df_wide <- df %>%
-    dplyr::group_by(year) %>%
-    arrange(year, iso3, d) %>%
-    spread(key = 'd', value = 'value') %>%
-    arrange(year, iso3) %>%
-    as.data.frame()
+  ### if the direction is specified, read data; if not, skip. 
+  if (!is.na(drt)) {
+    xls <- paste0(dir.eora_cleaned, ind, '.xlsx'); print(basename(xls))
+    df  <- readxl::read_excel(path = xls)  %>% 
+      gather(key = 'd', value = 'value', 4:ncol(.)) %>%
+      as.data.frame()
     
-  ### --> `df` under different scenarios
-  mat <- matrix %>%
-    rownames_to_column(var = 'o') %>%
-    gather(key = 'd', value = 'scenario', 2:ncol(.))
+    df_wide <- df %>%
+      dplyr::group_by(year) %>%
+      arrange(year, iso3, d) %>%
+      spread(key = 'd', value = 'value') %>%
+      arrange(year, iso3) %>%
+      as.data.frame()
+      
+    ### --> `df` under different scenarios
+    mat <- matrix %>%
+      rownames_to_column(var = 'o') %>%
+      gather(key = 'd', value = 'scenario', 2:ncol(.))
+    
+    df_scenario <- merge(df, mat, by.x = c('iso3', 'd'), by.y = c('o', 'd'), all.x = T) %>%
+      dplyr::mutate(value = value * scenario) %>%
+      dplyr::select(-scenario) %>%
+      spread(key = 'd', value = 'value') %>%
+      arrange(year, iso3) %>%
+      dplyr::select(year, ctr, iso3, everything()) %>%
+      as.data.frame()
   
-  df_scenario <- merge(df, mat, by.x = c('iso3', 'd'), by.y = c('o', 'd'), all.x = T) %>%
-    dplyr::mutate(value = value * scenario) %>%
-    dplyr::select(-scenario) %>%
-    spread(key = 'd', value = 'value') %>%
-    arrange(year, iso3) %>%
-    dplyr::select(year, ctr, iso3, everything()) %>%
-    as.data.frame()
+  } else {
+    cat('\t TBD... and skip ... \n\n')
+  }
+  
   
   net_in <- func_net_import_direction(df = df_scenario, direction = drt, frac = 0.025)
   net_imports <- rbind(net_imports, cbind(ind = ind, net_in))
@@ -148,7 +186,7 @@ net_imports_fromNer  <- net_imports
   
   
   
-```{r - distant only}
+```{r - nearby only scenario --> distant impact}
 
 scenario <- 'fromDst'
 matrix   <- dst.matrix
@@ -157,38 +195,44 @@ matrix   <- dst.matrix
 net_imports <- data.frame()
 
 
-### this for loop can be used in other scenarios 
+### this loop process is the same as "nearby only" scenario above
 for (i in 1:nrow(direction)) {
   # print(i)
-  ind <- direction[i, 1] %>% unlist() %>% paste(sep = '', collapse = ''); 
-  drt <- direction[i, 2] %>% unlist() %>% paste(sep = '', collapse = '') %>% as.numeric()
+  ind <- direction[i, 'ind']       %>% unlist() %>% paste(sep = '', collapse = ''); 
+  drt <- direction[i, 'direction'] %>% unlist() %>% paste(sep = '', collapse = '') %>% as.numeric()
   print(ind)
   print(drt)
   
-  xls <- paste0(dir.eora_cleaned, ind, '.xlsx'); print(xls)
-  df  <- readxl::read_excel(path = xls)  %>% 
-    gather(key = 'd', value = 'value', 4:ncol(.)) %>%
-    as.data.frame()
   
-  df_wide <- df %>%
-    dplyr::group_by(year) %>%
-    arrange(year, iso3, d) %>%
-    spread(key = 'd', value = 'value') %>%
-    arrange(year, iso3) %>%
-    as.data.frame()
+  ### if the direction is specified, read data; if not, skip. 
+  if (!is.na(drt)) {
+    xls <- paste0(dir.eora_cleaned, ind, '.xlsx'); print(xls)
+    df  <- readxl::read_excel(path = xls)  %>% 
+      gather(key = 'd', value = 'value', 4:ncol(.)) %>%
+      as.data.frame()
     
-  ### --> `df` under different scenarios
-  mat <- matrix %>%
-    rownames_to_column(var = 'o') %>%
-    gather(key = 'd', value = 'scenario', 2:ncol(.))
-  
-  df_scenario <- merge(df, mat, by.x = c('iso3', 'd'), by.y = c('o', 'd'), all.x = T) %>%
-    dplyr::mutate(value = value * scenario) %>%
-    dplyr::select(-scenario) %>%
-    spread(key = 'd', value = 'value') %>%
-    arrange(year, iso3) %>%
-    dplyr::select(year, ctr, iso3, everything()) %>%
-    as.data.frame()
+    df_wide <- df %>%
+      dplyr::group_by(year) %>%
+      arrange(year, iso3, d) %>%
+      spread(key = 'd', value = 'value') %>%
+      arrange(year, iso3) %>%
+      as.data.frame()
+      
+    ### --> `df` under different scenarios
+    mat <- matrix %>%
+      rownames_to_column(var = 'o') %>%
+      gather(key = 'd', value = 'scenario', 2:ncol(.))
+    
+    df_scenario <- merge(df, mat, by.x = c('iso3', 'd'), by.y = c('o', 'd'), all.x = T) %>%
+      dplyr::mutate(value = value * scenario) %>%
+      dplyr::select(-scenario) %>%
+      spread(key = 'd', value = 'value') %>%
+      arrange(year, iso3) %>%
+      dplyr::select(year, ctr, iso3, everything()) %>%
+      as.data.frame()
+  } else {
+    cat('\t TBD... and skip ... \n\n')
+  }    
   
   net_in <- func_net_import_direction(df = df_scenario, direction = drt, frac = 0.025)
   net_imports <- rbind(net_imports, cbind(ind = ind, net_in))
@@ -202,12 +246,6 @@ net_imports_fromDst  <- net_imports
 ``` 
 
 
-
-
-```{r - Warning !!!}
-### In the scenario of only nearby interaction, we need to consider the 'burden' from `distant` interactions (Be careful here!) 
-
-```
 
 
 
@@ -226,7 +264,7 @@ net_imports_bind_check <- net_imports_fromDst_fromNer %>%
 
 ### save the data
 n_ft_ind <- length(unique(net_imports_fromDst_fromNer$ind));  n_ft_ind
-fname <- paste0(dir.eora_cleaned, 'net_imports_fromDst_fromNer_', n_ft_ind, '.RData'); fname
+fname <- paste0(dir.flowScenario, 'net_imports_fromDst_fromNer_', n_ft_ind, '.RData'); fname
 save(net_imports_fromDst_fromNer, file = fname)
 ```
 
