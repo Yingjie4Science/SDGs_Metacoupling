@@ -48,7 +48,7 @@ library(RColorBrewer)
 library(viridis)
 # install.packages("hrbrthemes")
 # library(hrbrthemes)
-library(devtools)
+# library(devtools)
 library(circlize)  ## for circlize plot
 library(Cairo)
 
