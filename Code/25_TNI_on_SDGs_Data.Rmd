@@ -85,6 +85,10 @@ theme_map <- theme(
 ### We added one more step of this data processing than Xu and Li et al 2020 in NS. 
 source("./Code/function_norm_sdg_score_good_bad.R")
 
+
+### to plot the initial value of SDG indicator for data checking 
+source('./Code/helper_func_plot_map.R')
+
 ```
 
 
@@ -816,8 +820,10 @@ score_4_7_1s <- df_score
 
 ### SDG 5
 
-  5.5.2 Proportion of women in managerial positions
-```{r - 5.5.2 Proportion of women in managerial positions}
+
+#### - ??? 5.5.2 Proportion of women in managerial positions <need to double-check>
+  
+```{r eval=FALSE, include=FALSE}
 
 ind_sdg <- 'Proportion of women in managerial positions'
 ind_ft  <- 'SHDB15' ## Risk of Gender inequality by Sector based on representation in the workforce; or 3.B.f Female Representation in the Workforce by Sector? 
@@ -854,17 +860,18 @@ total_workers <- readxl::read_excel(path = xls) %>%
 
   
 
-### Outsourced footprints (oft) flow ---------------------------------------------------------------
+### Outsourced footprints (oft) flow -----------------------------------------------------
 oft <- net_imports_bind  %>%
   dplyr::filter(ind == ind_ft) %>%
   # dplyr::mutate(net_in = format(net_in, scientific = F)) %>%
   dplyr::select(ind, year, iso3, net_in, scenario) %>%
+  dplyr::mutate(net_in = ifelse(year == 2000, NA, net_in)) %>%  ## for SHDB data only, as no data for 2000
   spread(key = scenario, value = net_in) %>%
   arrange(ind, iso3, year)
 
 
 
-### w/o trade, and with trade together  ------------------------------------------------------------
+### w/o trade, and with trade together  --------------------------------------------------
 rel_not_merge <- rel %>%
   merge(x = ., y = total_workers, by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = oft,           by = c('iso3', 'year'), all.x = T) %>%
@@ -877,6 +884,27 @@ rel_not_merge <- rel %>%
     value_ner = (value*total_workers)/(total_workers - fromDst)*100) %>% 
   ### for easy-checking the numbers
   dplyr::select(ind, iso3, year, value, everything())
+
+
+### --> previous way to calculate this 
+# rel_not_merge0 <- rel %>%
+#   merge(x = ., y = total_workers, by = c('iso3', 'year'), all.x = T) %>%
+#   merge(x = ., y = oft,           by = c('iso3', 'year'), all.x = T) %>%
+#   dplyr::mutate(
+#     ind       = unique(oft$ind),
+#     value_rel = (value +      0), ## % of female
+#     ## 'net_in' is the risk of non-female, which can be seen as "the number of male" - the higher the worse
+#     male_rel = (1-value/100)*total_workers, 
+#     ## for an exporter, the risk of this indicator = being a male; if no trade, then less risk
+#     net_exp  = - fromAll,
+#     ## to calculate the number of male if no trade
+#     male_not = male_rel - net_exp, ## if no trade, then less risk
+#     ## to calculate the number of female under no-trade assumption
+#     value_not = (total_workers - male_not)/total_workers*100) %>% ## net_in is a risk
+#   ### for easy-checking the numbers
+#   dplyr::select(-male_rel, -male_not, -net_exp) %>%
+#   dplyr::select(ind, iso3, year, value, everything())
+
 
 rel_not <- rel_not_merge %>%
   dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
@@ -892,9 +920,103 @@ df_score <- func_norm_sdg_score_good(df = rel_not, trim = 0.025, bottom = 0.05, 
   as.data.frame()
 
 
-score_5_5_2 <- df_score
+# score_5_5_2x <- df_score
+
+
+
+### plot to compare ----------------------------------------------------------------------
+helper_func_plot_map(data = rel_not, var = 'value_rel', yr = 2015, filename_postfix = ind_sdg)
 ```
 
+
+
+#### - 5.1 Gender Equality in workforce
+
+  5.1 End all forms of discrimination against all women and girls everywhere
+
+  - For comparison, see Women's Workplace Equality Index <https://www.cfr.org/legal-barriers/country-rankings/>
+    --> see data and map in ".\Data\data_02_intermediate\dt01_ctr_profile\CFR Womens Workplace Equality Index Data.xlsx"
+
+```{r}
+ind_sdg <- 'Gender Equality in workforce'
+ind_ft  <- 'SHDB15' ## Risk of Gender inequality by Sector based on representation in the workforce; or 3.B.f Female Representation in the Workforce by Sector? 
+unit_check <- 1
+unit_sdg   <- ""
+
+### Check the Unit!!!
+### rel --> %
+### ft  --> 1 ppl
+### total workers --> 10^3 ppl
+
+
+### Resource consumption or emissions under the current trading world situation ----------
+### --> use the EORA data
+f <- paste0(dir.eora_cleaned, 'SHDB15.xlsx')
+rel <- readxl::read_excel(f) %>%
+  gather(key = 'd', value = 'value', 4:ncol(.)) %>%
+  group_by(year, iso3, ctr) %>%
+  dplyr::summarise(value = sum(value, na.rm = F)) %>%
+  # spread(key = 'year', value = 'sum') %>%
+  # gather(key = 'year', value = 'value', `2000`:ncol(.)) %>%
+  dplyr::mutate(value = as.numeric(value),
+                value = ifelse(value == 0, NA, value)) %>%
+  dplyr::mutate(value = ifelse(iso3 == 'GRL', NA, value)) %>%   ## only for data from EORA - remove "Greenland"
+  dplyr::select(-ctr) %>%
+  arrange(iso3, year) %>%
+  as.data.frame()
+
+
+### Outsourced footprints (oft) flow -----------------------------------------------------
+oft <- net_imports_bind  %>%
+  dplyr::filter(ind == ind_ft) %>%
+  # dplyr::mutate(net_in = format(net_in, scientific = F)) %>%
+  dplyr::select(ind, year, iso3, net_in, scenario) %>%
+  dplyr::mutate(net_in = ifelse(year == 2000, NA, net_in)) %>%  ## for SHDB data only, as no data for 2000
+  spread(key = scenario, value = net_in) %>%
+  arrange(ind, iso3, year)
+
+
+
+### w/o trade, and with trade together  --------------------------------------------------
+rel_not_merge <- rel %>%
+  merge(x = ., y = total_workers, by = c('iso3', 'year'), all.x = T) %>%
+  merge(x = ., y = oft,           by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::mutate(
+    ind       = unique(oft$ind),
+    value_rel = (value)/(total_workers),  
+    value_not = (value - (-fromAll))/(total_workers*40*365/7)*100, # for an exporter, if no trade, less risk would be exported. 
+    value_dst = (value - (-fromNer))/(total_workers*40*365/7)*100,
+    value_ner = (value - (-fromDst))/(total_workers*40*365/7)*100) %>% 
+  dplyr::select(ind, iso3, year, value, everything())
+
+
+check1 <- rel_not_merge %>% 
+  dplyr::filter(year == 2015) %>%
+  arrange(desc(value_rel)) %>%
+  dplyr::mutate(rank=dense_rank(desc(value_rel))) %>%
+  as.data.frame()
+
+
+rel_not <- rel_not_merge %>%
+  dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
+
+
+### normalization  -------------------------------------------------------
+### Be careful with **Data Direction!**
+### big - better? --> func_norm_sdg_score_good
+### big - bad?    --> func_norm_sdg_score_bad
+df_score <- func_norm_sdg_score_good(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+  # spread(key = 'scenario', value = c('value_norm')) %>%
+  dplyr::mutate(ind_sdg = ind_sdg) %>%
+  as.data.frame()
+
+
+score_5_5_2y <- df_score
+
+
+### plot to compare ----------------------------------------------------------------------
+helper_func_plot_map(data = rel_not, var = 'value_rel', yr = 2015, filename_postfix = ind_sdg)
+```
 
 
 
@@ -2337,21 +2459,7 @@ score_12_2_1w <- df_score
 
 
 ### plot to compare ----------------------------------------------------------------------
-# rel_not_sf  <- rel_not %>% 
-#   dplyr::filter(year == 2015) %>%
-#   merge(x = shp, y = ., by.x = "iso_a3", by.y = "iso3",  all.x = T)
-# max <- max(rel_not_sf$value_rel, na.rm = T); max # 0.025
-# min <- min(rel_not_sf$value_rel, na.rm = T); min # 0.000001094
-# 
-# p <- tm_shape(rel_not_sf) +
-#   tm_fill('value_rel', style  = "quantile", n = 10, textNA = 'NA', colorNA = 'gray90') +
-#   tm_borders(col = "grey", lwd = 0.1, lty = "solid", alpha = 0.99) +
-#   tm_layout(frame = F, frame.lwd = 0.1,
-#     legend.position = c(0,0),
-#     legend.title.size = 0.9, legend.text.size  = 0.7,
-#     legend.width = -0.5, legend.height = -0.5, outer.margins=0, inner.margins=0, 
-#     panel.show = F)
-# tmap_save(tm = p, filename = 'test2.jpg', width=7, height=2.8, units="in", dpi = 200)
+# helper_func_plot_map(data = rel_not, var = 'value_rel', yr = 2015, filename_postfix = ind_sdg)
 ```
 
 
@@ -3039,7 +3147,7 @@ check1 <- rel_not_merge %>%
 #   dplyr::mutate(rank=dense_rank(desc(value_rel)))
 
 
-### normalization  --------------------------------------------------------------------------------------
+### normalization  -----------------------------------------------------------------------
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
@@ -3054,21 +3162,7 @@ score_16_5 <- df_score
 
 
 ### plot to compare ----------------------------------------------------------------------
-# rel_not_sf  <- rel_not %>%
-#   dplyr::filter(year == 2015) %>%
-#   merge(x = shp, y = ., by.x = "iso_a3", by.y = "iso3",  all.x = T)
-# max <- max(rel_not_sf$value_rel, na.rm = T); max # 0.025
-# min <- min(rel_not_sf$value_rel, na.rm = T); min # 0.000001094
-# 
-# p <- tm_shape(rel_not_sf) +
-#   tm_fill('value_rel', style  = "quantile", n = 10, textNA = 'NA', colorNA = 'gray90') +
-#   tm_borders(col = "grey", lwd = 0.1, lty = "solid", alpha = 0.99) +
-#   tm_layout(frame = F, frame.lwd = 0.1,
-#     legend.position = c(0,0),
-#     legend.title.size = 0.9, legend.text.size  = 0.7,
-#     legend.width = -0.5, legend.height = -0.5, outer.margins=0, inner.margins=0,
-#     panel.show = F)
-# tmap_save(tm = p, filename = 'test2.jpg', width=7, height=2.8, units="in", dpi = 200)
+# helper_func_plot_map(data = rel_not, var = 'value_rel', yr = 2015, filename_postfix = ind_sdg)
 ```
 
 
