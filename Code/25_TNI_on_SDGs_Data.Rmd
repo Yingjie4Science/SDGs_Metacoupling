@@ -324,7 +324,7 @@ rel <- readxl::read_excel(path = xls) %>%
   as.data.frame()
 
 
-### --> cropland
+### --> cropland (ha)
 xls <- list.files(path = dir.input1, pattern = '^Cropland_Area', full.names = T); xls 
 cropland_area <- readxl::read_excel(path = xls) %>% 
   dplyr::select(-ctr) %>%
@@ -2178,31 +2178,38 @@ score_12_2_1 <- df_score
 
 
   12.2.1 Material footprint per GDP - NitrogenTotal
-```{r - 12.2.1z NitrogenTotal/GDP ?}
+  
+  *Two data* can be used as the "Nitrogen Total" consumption
+  
+  * use ag nitrogen -> Nutrient nitrogen N (total)_Use per area of cropland (NOT used at the moment)
+  
+  * use the "Nitrogen Total" based on row sum of EORA matrix
+  
+```{r - 12.2.1z NitrogenTotal/GDP - 1 ag, eval=FALSE, include=FALSE}
 
-ind_sdg  <- 'NitrogenTotal per GDP' ## 
+ind_sdg  <- 'NitrogenTotal per GDP' ## kg/$
 ind_ft   <- 'NitrogenTotal'
+unit_check <- 10^3
 
 ### Check the Unit!!!
-### rel            --> kg/ha
-### oft            --> ton = 1000 kg
+### rel            --> kg/ha 
+### oft            --> ton => 10^3 kg
 ### cropland_area  --> ha
 
 
 ### Resource consumption or emissions under the current trading world situation -------------------------
-### --> total land area
-xls <- list.files(path = dir.input1, pattern = '^Nutrient nitrogen N', full.names = T); xls 
+xls <- list.files(path = dir.input1, pattern = '^Nutrient nitrogen N', full.names = T); xls
 rel <- readxl::read_excel(path = xls) %>% 
   dplyr::select(-ctr) %>%
   gather(key = 'year', value = 'value', `2000`:ncol(.)) %>%
   dplyr::mutate(value = as.numeric(value)) %>%  
   as.data.frame()
-  
+
 
 ### Outsourced footprints (oft) flow --------------------------------------------------------------------
 oft <- net_imports_bind  %>%
   dplyr::filter(ind == ind_ft) %>%
-  dplyr::mutate(net_in = net_in*1000) %>%  ## 1 ton = 1000 kg
+  dplyr::mutate(net_in = net_in * unit_check) %>%  
   dplyr::select(ind, year, iso3, net_in, scenario) %>%
   spread(key = scenario, value = net_in)
 
@@ -2212,15 +2219,16 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = cropland_area, by = c('iso3', 'year'), all.x = T) %>%  
   merge(x = ., y = oft,           by = c('iso3', 'year'), all.x = T) %>% 
+  merge(x = ., y = gdp_rel_not,   by = c('iso3', 'year'), all.x = T) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
-    N_used    = value*cropland_area,
-    value_rel = (value),                            ## kg/ha -- Nutrient nitrogen N (total)_Use per area of cropland_kg_ha
-    value_not = (N_used + fromAll)/cropland_area,   ## if no trade, may need to use more N locally to produce food
-    value_dst = (N_used + fromNer)/cropland_area,
-    value_ner = (N_used + fromDst)/cropland_area
+    N_used    = value*cropland_area,         ## kg/ha * ha
+    value_rel = (N_used +       0)/gdp_rel,   
+    value_not = (N_used + fromAll)/gdp_not,  ## if no trade, may need to use more N locally
+    value_dst = (N_used + fromNer)/gdp_dst,
+    value_ner = (N_used + fromDst)/gdp_ner
     ) %>%  ## kg/ha * ha / ha
-  dplyr::select(-N_used) %>%
+  # dplyr::select(-N_used) %>%
   ### for easy-checking the numbers
   dplyr::select(ind, iso3, year, value, everything())
 
@@ -2240,8 +2248,113 @@ df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, t
   as.data.frame()
 
 
-score_14_1_1x <- df_score
+score_12_2_1z <- df_score
+
+
+### plot to compare ----------------------------------------------------------------------
+# rel_not_sf  <- rel_not %>% 
+#   dplyr::filter(year == 2015) %>%
+#   merge(x = shp, y = ., by.x = "iso_a3", by.y = "iso3",  all.x = T)
+# max <- max(rel_not_sf$value_rel, na.rm = T); max # 0.025
+# min <- min(rel_not_sf$value_rel, na.rm = T); min # 0.000001094
+# 
+# p <- tm_shape(rel_not_sf) +
+#   tm_fill('value_rel', style  = "quantile", n = 10, textNA = 'NA', colorNA = 'gray90') +
+#   tm_borders(col = "grey", lwd = 0.1, lty = "solid", alpha = 0.99) +
+#   tm_layout(frame = F, frame.lwd = 0.1,
+#     legend.position = c(0,0),
+#     legend.title.size = 0.9, legend.text.size  = 0.7,
+#     legend.width = -0.5, legend.height = -0.5, outer.margins=0, inner.margins=0, 
+#     panel.show = F)
+# tmap_save(tm = p, filename = 'test1.jpg', width=7, height=2.8, units="in", dpi = 200)
 ```
+
+
+  
+```{r - 12.2.1w NitrogenTotal/GDP - 2 EORA}
+
+ind_sdg  <- 'NitrogenTotal per GDP' ## kg/$
+ind_ft   <- 'NitrogenTotal'
+unit_check <- 1
+
+### Check the Unit!!!
+### rel            --> ton
+### oft            --> ton
+
+
+### Resource consumption or emissions under the current trading world situation -------------------------
+
+xls <- list.files(path = dir.input1, pattern = '^NitrogenTotal_ton', full.names = T); xls 
+rel <- readxl::read_excel(path = xls) %>% 
+  dplyr::select(-ctr) %>%
+  gather(key = 'year', value = 'value', `2000`:ncol(.)) %>%
+  dplyr::mutate(value = as.numeric(value)) %>%  
+  dplyr::mutate(value = ifelse(value == 0, NA, value)) %>%      ## only for data from EORA
+  dplyr::mutate(value = ifelse(iso3 == 'SOM', NA, value)) %>%   ## only for data from EORA
+  as.data.frame()
+
+  
+
+### Outsourced footprints (oft) flow --------------------------------------------------------------------
+oft <- net_imports_bind  %>%
+  dplyr::filter(ind == ind_ft) %>%
+  dplyr::mutate(net_in = net_in * unit_check) %>%  
+  dplyr::select(ind, year, iso3, net_in, scenario) %>%
+  spread(key = scenario, value = net_in)
+
+
+
+### w/o trade, and with trade together  -----------------------------------------------------------------
+rel_not_merge <- rel %>%
+  merge(x = ., y = cropland_area, by = c('iso3', 'year'), all.x = T) %>%  
+  merge(x = ., y = oft,           by = c('iso3', 'year'), all.x = T) %>% 
+  merge(x = ., y = gdp_rel_not,   by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::mutate(
+    ind       = unique(oft$ind),
+    value_rel = (value +       0)/gdp_rel*1000,   
+    value_not = (value + fromAll)/gdp_not*1000,  ## if no trade, may need to use more N locally
+    value_dst = (value + fromNer)/gdp_dst*1000,
+    value_ner = (value + fromDst)/gdp_ner*1000
+    ) %>%  
+  dplyr::select(ind, iso3, year, value, everything())
+
+rel_not <- rel_not_merge %>%
+  dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
+
+hist(rel_not$value_rel)
+
+
+### normalization  -------------------------------------------------------
+### Be careful with **Data Direction!**
+### big - better? --> func_norm_sdg_score_good
+### big - bad?    --> func_norm_sdg_score_bad
+df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+  # spread(key = 'scenario', value = c('value_norm')) %>%
+  dplyr::mutate(ind_sdg = ind_sdg) %>%
+  as.data.frame()
+
+
+score_12_2_1w <- df_score
+
+
+### plot to compare ----------------------------------------------------------------------
+# rel_not_sf  <- rel_not %>% 
+#   dplyr::filter(year == 2015) %>%
+#   merge(x = shp, y = ., by.x = "iso_a3", by.y = "iso3",  all.x = T)
+# max <- max(rel_not_sf$value_rel, na.rm = T); max # 0.025
+# min <- min(rel_not_sf$value_rel, na.rm = T); min # 0.000001094
+# 
+# p <- tm_shape(rel_not_sf) +
+#   tm_fill('value_rel', style  = "quantile", n = 10, textNA = 'NA', colorNA = 'gray90') +
+#   tm_borders(col = "grey", lwd = 0.1, lty = "solid", alpha = 0.99) +
+#   tm_layout(frame = F, frame.lwd = 0.1,
+#     legend.position = c(0,0),
+#     legend.title.size = 0.9, legend.text.size  = 0.7,
+#     legend.width = -0.5, legend.height = -0.5, outer.margins=0, inner.margins=0, 
+#     panel.show = F)
+# tmap_save(tm = p, filename = 'test2.jpg', width=7, height=2.8, units="in", dpi = 200)
+```
+
 
 
 
