@@ -19,10 +19,8 @@ setwd('..') # set directory by one folder up
 getwd()
 
 
-dir.raw          <- './Data/data_01_raw/'
-dir.process      <- './Data/data_02_intermediate/dt01_ctr_profile/xlsx/'
-dir.cleaned      <- './Data/data_02_intermediate/dt01_ctr_profile/xlsx/cleaned/'
-dir.eora_cleaned <- './Data/data_02_intermediate/dt02_flows/eora_cleaned/'
+### data path 
+source('./Code/_path of data.R')
 
 # Packages ----------------------------------------------------------------
 source('./Code/_package list.R')
@@ -334,7 +332,7 @@ write.csv(x = vars, file = fname, row.names = F)
 ### FAOSTAT
 
 ```{r FAO country code}
-dir.fao <- './Data/data_01_raw/FAOSTAT/'
+
 # ctr.fao <- read.xlsx(file = './FAOSTAT/AllTerritoriesValidCurrentYear.xlsx',
 #                      sheetIndex = 1) %>% select(1, 3:11, 38)
 # write.csv(x = ctr.fao, file = './FAOSTAT/AllTerritoriesValidCurrentYear_code.csv', row.names = F)
@@ -350,8 +348,8 @@ dir.fao <- './Data/data_01_raw/FAOSTAT/'
 #   as.data.frame()
 # str(ctr.fao)
 
-
-ctr.fao <- readxl::read_excel('./Data/data_01_raw/FAOSTAT/Country codes_names_FAO_Revised_by_Li.xlsx') %>%
+f <- paste0(dir.fao, 'Country codes_names_FAO_Revised_by_Li.xlsx')
+ctr.fao <- readxl::read_excel(f) %>%
   dplyr::select('Short name', 'ISO3', 'FAOSTAT') %>%
   # dplyr::filter(!is.na(iso_fao)) %>%
   # dplyr::filter(iso_fao != "FALSE") %>%
@@ -362,7 +360,8 @@ str(ctr.fao)
 
 
 ### This info was dlownloaded from https://www.fao.org/faostat/en/#definitions --> "Country/Region"
-ctr.faostat <- readr::read_csv("./Data/data_01_raw/FAOSTAT/FAOSTAT_Country_Region.csv") %>%
+f <- paste0(dir.fao, 'FAOSTAT_Country_Region.csv'); f
+ctr.faostat <- readr::read_csv(f) %>%
   dplyr::filter(!is.na(`ISO3 Code`)) %>%
   dplyr::select(Country, `Country Code`, `ISO3 Code`) %>%
   # dplyr::mutate(`Country Code` = as.numeric(`Country Code`)) %>%
@@ -421,14 +420,14 @@ library(FAOSTAT)
 # download_faostat_bulk
 # read_faostat_bulk
 
-# Create an object named '.LastSearch' using the FAOSearch function, which can then be called as an argument to the getFAO() or getFAOtoSYB() function.
-fao_ls <- FAOsearch()
-FAOsearch(dataset="crop", full = FALSE)
-FAOsearch(dataset="Food Balances", full = FALSE)
+### Create an object named '.LastSearch' using the FAOSearch function, which can then be called as an argument to the getFAO() or getFAOtoSYB() function.
+# fao_ls <- FAOSTAT::FAOsearch()
+# FAOsearch(dataset="crop", full = FALSE)
+# FAOsearch(dataset="Food Balances", full = FALSE)
 
 
 ### Load crop production data
-dir.fao <- paste0(dir.raw, 'FAOSTAT/'); dir.fao
+dir.fao
 
 # dt_fao_FBSH <- get_faostat_bulk(code = "FBSH", data_folder = dir.fao); ## for data before 2014
 # dt_fao_FBS  <- get_faostat_bulk(code = "FBS",  data_folder = dir.fao); ## for data after  2014
@@ -856,7 +855,8 @@ function_fill_na_wb(dfwb)
 FAOsearch(dataset="Land Use", full = FALSE)
 
 ### Load crop production data
-dir.fao <- paste0(dir.raw, 'FAOSTAT/'); dir.fao
+# dir.fao <- paste0(dir.raw, 'FAOSTAT/'); 
+dir.fao
 
 fao_dataset <- get_faostat_bulk(code = "RL",   data_folder = dir.fao); ## Fertilizers indicators
 
@@ -1045,7 +1045,8 @@ function_format_4yrData_save(iname = iname) ## "There are 15.8% NA"
 
 
 
-
+  * This data are good, but do not have bilateral trade volumn information. 
+    It would be better to use the *Cereal trade - maxtrix* data
 ```{r - Cereal trade}
 ### 2. trade balance part -----------------------------------------
 df <- dt %>%
@@ -1682,7 +1683,7 @@ print(paste0('There are ', round(sum(is.na(dfwb_fillna_4yrs))/(190*4)*100, digit
 ```
 
 
-```{r - 2. WB}
+```{r - 2. WB - NOT USED}
 # SH.DYN.NCOM.ZS	++ Mortality from CVD, cancer, diabetes or CRD between exact ages 30 and 70 (%)
 # SP.DYN.AMRT.MA	Mortality rate, adult, male (per 1,000 male adults)
 # SP.DYN.AMRT.FE	Mortality rate, adult, female (per 1,000 female adults)
@@ -3920,6 +3921,26 @@ ind <- 'EE.BOD.MTAL.ZS'
 ```
 
 
+#### - Nitrogen Total
+
+  Nitrogen footprint (Total, i.e., NOx, NH3 and N2O emissions to air, and the direct nitrogen emissions to water)
+  
+  Oita, A., Malik, A., Kanemoto, K. et al. *Substantial nitrogen pollution embedded in international trade*. Nature Geosci 9, 111–115 (2016). https://doi.org/10.1038/ngeo2635
+
+```{r }
+### or use the EORA data
+f <- paste0(dir.eora_cleaned, 'NitrogenTotal.xlsx')
+d <- readxl::read_excel(f) %>%
+  gather(key = 'd', value = 'value', 4:ncol(.)) %>%
+  group_by(year, iso3, ctr) %>%
+  dplyr::summarise(sum = sum(value, na.rm = T)) %>%
+  spread(key = 'year', value = 'sum')
+
+f <- paste0(dir.cleaned, 'NitrogenTotal_ton_4yrs.xlsx'); f
+writexl::write_xlsx(x = d, path = f)
+```
+
+
 
 
 
@@ -4432,7 +4453,8 @@ dfwb  <- wb(indicator = ind, country = "countries_only",
   spread(key = date, value = value) %>%
   left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
 unique(dfwb$indicator)
-iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+inam  <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; inam
+iname <- gsub('official development assistance', 'ODA', inam);   iname
 
 ### 2. fill NA
 function_fill_na_wb(dfwb)
