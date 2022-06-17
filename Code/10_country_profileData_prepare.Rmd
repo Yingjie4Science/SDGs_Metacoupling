@@ -4415,8 +4415,20 @@ source('./Code/11_FAO_FishStatJ.R')
 
 
 ### Goal 16	Peace, Justice, and Strong Institutions
-```{r}
 
+#### - Corruption
+
+```{r}
+### or use the EORA data
+f <- paste0(dir.eora_cleaned, 'Corruption.xlsx')
+d <- readxl::read_excel(f) %>%
+  gather(key = 'd', value = 'value', 4:ncol(.)) %>%
+  group_by(year, iso3, ctr) %>%
+  dplyr::summarise(sum = sum(value, na.rm = T)) %>%
+  spread(key = 'year', value = 'sum')
+
+fxls <- paste0(dir.cleaned, gsub('\\.xlsx', '_4yrs.xlsx', basename(f))); fxls
+writexl::write_xlsx(x = d, path = fxls)
 ```
 
 
