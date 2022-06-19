@@ -1907,6 +1907,10 @@ ind_sdg  <- 'co2_in_fossil' ## ton/ha
 
 ### SDG 10
 
+  Goal 10. Reduce inequality within and among countries
+  
+  **10.4** Adopt policies, especially fiscal, wage and social protection policies, and progressively achieve greater equality
+
   **10.4.1** is the labour share of GDP, comprising wages and social protection transfers.
   
   Labour share of Gross Domestic Product = Total compensation of employees / Gross Domestic Product * 100.
@@ -1955,11 +1959,11 @@ rel_not_merge <- rel %>%
   merge(x = ., y = oft,         by = c('iso3', 'year'), all.x = T) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
-    value_lab = (value/100)*gdp_rel,
-    value_rel = (value_lab +       0)/gdp_rel*100, # the unit of `value` is %, Labour share of GDP
-    value_not = (value_lab + fromAll)/gdp_not*100,
-    value_dst = (value_lab + fromNer)/gdp_dst*100,
-    value_ner = (value_lab + fromDst)/gdp_ner*100
+    value_lab = (value/100)*gdp_rel,               ## labor income ($)
+    value_rel = (value_lab -          0)/gdp_rel*100, ## labor share of GDP (%)
+    value_not = (value_lab - (-fromAll))/gdp_not*100, ## if no trade, for an exporter, less labor salary from exports (i.e., less `-fromAll`)
+    value_dst = (value_lab - (-fromNer))/gdp_dst*100,
+    value_ner = (value_lab - (-fromDst))/gdp_ner*100
     ) %>%
   dplyr::select(-value_lab) %>%
   ### for easy-checking the numbers
@@ -1978,6 +1982,11 @@ df_score <- func_norm_sdg_score_good(df = rel_not, trim = 0.025, bottom = 0.05, 
   as.data.frame()
 
 score_10_4_1 <- df_score
+
+
+### plot to compare ----------------------------------------------------------------------
+helper_func_plot_map(data = rel_not, var = 'value_rel', yr = 2015, filename_postfix = ind_sdg)
+helper_func_plot_map(data = rel_not, var = 'value_not', yr = 2015, filename_postfix = ind_sdg)
 ```
 
 
