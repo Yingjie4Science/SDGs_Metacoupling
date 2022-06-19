@@ -285,6 +285,7 @@ ggsave(filename = fname, plot = last_plot(), width = 7, height = 3, units = 'in'
 ```
 
 
+
 ```{r - Map of income - 2 group}
 grp_shp <- merge(
   x = shp %>% dplyr::select(iso_a3), 
@@ -303,8 +304,6 @@ grp_shp %>%
   scale_y_continuous(expand = c(0, 0)) + ## reduce the space between plot and border
   scale_x_continuous(expand = c(0, 0)) + ## reduce the space between plot and border
   theme_my
-
-  
 
 fname <- paste0(dir.fig, 'SI_Map_Income_2Group.jpg'); fname
 ggsave(filename = fname, plot = last_plot(), width = 7, height = 3, units = 'in', dpi = 300)
