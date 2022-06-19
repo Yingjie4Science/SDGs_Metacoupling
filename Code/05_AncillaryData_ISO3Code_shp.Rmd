@@ -22,8 +22,8 @@ setwd(dir)
 setwd('..') # set directory by one folder up
 getwd()
 
-dir.cleaned <- './Data/data_02_intermediate/dt01_ctr_profile/xlsx/cleaned/'
-dir.fig     <- './Data/Figure/'
+### data path 
+source('./Code/_path of data.R')
 
 ### packages
 source('./Code/_package list.R')
@@ -211,7 +211,7 @@ shp <- shp %>%
 sort(unique(shp$economy))
 sort(unique(shp$income_grp))
 
-grp <- shp %>% 
+grp0 <- shp %>% 
   st_drop_geometry() %>% 
   ### re-code ctr group
   mutate(eco_group = case_when(
@@ -236,13 +236,23 @@ grp <- shp %>%
   dplyr::select(-type, -economy,-income_grp) %>%
   dplyr::mutate(iso_a3 = ifelse(name == 'Norway', 'NOR', iso_a3)) 
 
+grp_add <- data.frame(
+  name = c('Netherlands Antilles'),
+  iso_a3 = c('ANT'),
+  eco_group = c('1. Developed'),
+  inc_group = c('1. High income'),
+  group     = c('High income')
+)
+
+
+grp <- rbind(grp0, grp_add)
 # summary(grp)
 # Hmisc::describe(grp)
 # summarytools::dfSummary(grp)
 ```
 
 
-```{r - Map of income}
+```{r - Map of income - 4 group}
 grp_shp <- merge(shp %>% dplyr::select(iso_a3), grp, by = 'iso_a3') %>%
   dplyr::mutate(group = factor(group, levels = c('High income', 'Upper middle income', 'Lower middle income', 'Low income')))
 
@@ -259,9 +269,47 @@ grp_shp %>%
         legend.position = c(0.12, 0.2), legend.margin=unit(0, "cm")) +
   theme_map
 
-fname <- paste0(dir.fig, 'SI_Map_Income_Group.jpg'); fname
+fname <- paste0(dir.fig, 'SI_Map_Income_4Group.jpg'); fname
 ggsave(filename = fname, plot = last_plot(), width = 7, height = 3, units = 'in', dpi = 300)
 ```
+
+
+```{r - Map of income - 2 group}
+grp_shp <- merge(
+  x = shp %>% dplyr::select(iso_a3), 
+  y = grp %>% dplyr::mutate(
+    group = ifelse(group %in% c("High income", "Upper middle income"), "High income", group),
+    group = ifelse(group %in% c("Lower middle income", "Low income"),  "Low income", group)), 
+  by = 'iso_a3') %>%
+  dplyr::mutate(group = factor(group, levels = c('High income', 'Low income')))
+
+color_grp <- c('#2371A6', '#F26463') ## high, low
+
+grp_shp %>%
+  ggplot() +
+  geom_sf(aes(fill = group), size = 0.1, color = 'gray50') +
+  scale_fill_manual(values = color_grp, name = 'Income group') +
+  scale_y_continuous(expand = c(0, 0)) + ## reduce the space between plot and border
+  scale_x_continuous(expand = c(0, 0)) + ## reduce the space between plot and border
+  theme_nothing() +
+  # theme_map +
+  theme(
+        text = element_text(size = 10), 
+        legend.key.size   = unit(.3, 'cm'),  #change legend key size
+        legend.key.height = unit(.3, 'cm'),  #change legend key height
+        legend.key.width  = unit(.3, 'cm'),  #change legend key width
+        legend.text = element_text(size=8),  #change legend text font size
+        legend.position = c(0.01, 0.01), 
+        legend.justification = c(0, 0), 
+        legend.box.margin = margin(r = 0, b = 0, unit = "mm"), # small margin
+        panel.border = element_blank(),
+        )
+  
+
+fname <- paste0(dir.fig, 'SI_Map_Income_2Group.jpg'); fname
+ggsave(filename = fname, plot = last_plot(), width = 7, height = 3, units = 'in', dpi = 300)
+```
+
 
 
 ```{r - Country info for SI Table}
