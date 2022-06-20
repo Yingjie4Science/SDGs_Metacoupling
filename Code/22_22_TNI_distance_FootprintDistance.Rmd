@@ -7,41 +7,69 @@ editor_options:
   chunk_output_type: console
 ---
 
+
+
 ```{r}
 knitr::opts_chunk$set(echo = TRUE)
 
 ### To clear your environment 
 # remove(list = ls())
 
-
-
-dir.eora_cleaned <- './Data/data_02_intermediate/dt02_flows/eora_cleaned/'
-dir.fig     <- './Data/Figure/'
+### data path
+source('./Code/_path of data.R')
 
 library(dplyr)
 library(ggplot2)
 library(cowplot)
 
+today <- format(Sys.time(), "%Y%m%d"); today
 ```
 
+
+
+
+```{r}
+### plot settings
+unit_ns    <- 'cm'
+width_1col <- 8.8   ## 1-column
+width_2col <- 18    ## 2-column
+font       <- 'sans'     ## "TT Arial"
+font_size  <- 8          ##  Nature Sustainability: max = 7; min = 5
+theme_ns <- 
+  theme_bw()+
+  theme(
+    panel.grid.minor = element_blank(),
+    legend.background = element_rect(fill="transparent"),
+    legend.key.height = unit(0.15,"cm"),
+    legend.key.width  = unit(0.15,"cm"),
+    text = element_text(size=font_size + 2)
+        )
+```
 
 
 ## Data
 
 
 ### SI data
-```{r}
+
+```{r - income group}
+
 load('./Data/Ancillary_Data_ISO3code_shp.RData') ## iso_eora, pop, gdp, shp, grp
 
 grp_id <- grp %>%
-  dplyr::mutate(group_id = as.numeric(gsub("\\D", "", inc_group))) %>%
+  dplyr::mutate(group_id = as.numeric(gsub("\\D", "", inc_group))) %>% 
   dplyr::select(iso_a3, group_id) %>%
   dplyr::filter(!is.na(iso_a3)) %>%
   as.data.frame()
+
+# 1: high 
+# 2: mid-upper
+# 3: mid-low
+# 4: low
 ```
 
 
-### cepii distance
+### cepii distance data prep.
   
   https://pacha.dev/cepiigeodist/reference/dist_cepii.html
   
@@ -75,7 +103,9 @@ geo_cepii %>%
 geo_cuw <- geo_cepii %>% 
   dplyr::filter(iso3== 'ANT') %>% 
   head(1) %>%
-  dplyr::mutate(iso2 = ifelse(iso2 == 'AN', 'CU', iso2), iso3 = ifelse(iso3 == 'ANT', 'CUW', iso3))
+  dplyr::mutate(iso2 = ifelse(iso2 == 'AN', 'CU', iso2), 
+                iso3 = ifelse(iso3 == 'ANT', 'CUW', iso3))
+
 dist_cuw <- dist_cepii %>% 
   dplyr::filter(iso_o == 'ANT'| iso_d == 'ANT') %>% 
   dplyr::mutate(iso_o = ifelse(iso_o == 'ANT', 'CUW', iso_o), iso_d = ifelse(iso_d == 'ANT', 'CUW', iso_d)) %>%
@@ -84,7 +114,8 @@ dist_cuw <- dist_cepii %>%
 geo_mne <- geo_cepii %>% 
   dplyr::filter(iso3== 'YUG') %>% 
   head(1) %>%
-  dplyr::mutate(iso2 = ifelse(iso2 == 'YU', 'ME', iso2), iso3 = ifelse(iso3 == 'YUG', 'MNE', iso3))
+  dplyr::mutate(iso2 = ifelse(iso2 == 'YU', 'ME', iso2), 
+                iso3 = ifelse(iso3 == 'YUG', 'MNE', iso3))
 dist_mne <- dist_cepii %>% 
   dplyr::filter(iso_o == 'YUG'| iso_d == 'YUG') %>% 
   dplyr::mutate(iso_o = ifelse(iso_o == 'YUG', 'MNE', iso_o), iso_d = ifelse(iso_d == 'YUG', 'MNE', iso_d)) %>%
@@ -142,7 +173,6 @@ geo  <- geo_cepii %>%
 
 ### corrections to the `dist` data -----------------------------------------------------------------
 
-
 dist <- dist_cepii %>%
   dplyr::mutate(iso_o = ifelse(iso_o == 'ZAR', 'COD', iso_o), iso_d = ifelse(iso_d == 'ZAR', 'COD', iso_d)) %>%
   dplyr::mutate(iso_o = ifelse(iso_o == 'ROM', 'ROU', iso_o), iso_d = ifelse(iso_d == 'ROM', 'ROU', iso_d)) %>%
@@ -169,45 +199,107 @@ ctr_list_cepii <- dist %>%
 ### footprint
 ```{r}
 
+### loop the normalization based on `direction` ------------------------------------------
+f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'direction.RData')
+load(f)
+
+ft_ind <- direction %>%
+  dplyr::select(ind, SDG_class, direction) %>%
+  dplyr::filter(!is.na(direction)) %>%
+  arrange(SDG_class)
+
+cat(length(unique(ft_ind$ind)), 'indicators were included in the analysis.')
+
+
+### !!! ** Choose how many type of flows will be used**
+n_flows <- 2
+# n_flows <- 3
+
+
+### --> pick an ft indicator as a test -----
 # ind <- 'Water'
 # ind <- 'student_flow'
-ind <- 'Landuse_forest'
+# ind <- 'Landuse_forest'
 # ind <- 'osh_fatal'
-xls <- paste0(dir.eora_cleaned, ind, '.xlsx'); xls
 
 
-mat <- readxl::read_excel(xls) %>% 
-  ungroup() %>%
-  dplyr::filter(year == 2015) 
+links_dist_type_collection <- data.frame()
 
-links <- mat %>%
-  gather(key = 'to', value = 'weight', 4:ncol(.)) %>%
-  dplyr::rename('from' = 'iso3') %>%
-  dplyr::mutate(type = ind) %>%
-  dplyr::select(-ctr, -year) %>%
-  arrange(from, to) %>%
-  distinct(from, to, .keep_all = T) %>%  
-  as.data.frame()
-
-links_dist <- merge(x = links, y = dist, by.x = c('from', 'to'), by.y = c('iso_o', 'iso_d'), all.x = T) %>%
-  merge(x = ., y = grp_id, by.x = 'from', by.y = 'iso_a3', all.x = T) %>%
-  merge(x = ., y = grp_id, by.x = 'to',   by.y = 'iso_a3', all.x = T) %>%
-  dplyr::mutate(group_od = paste0(group_id.x, group_id.y),
-                group_od = as.numeric(group_od),
-                od_direction = case_when(
-                  group_od %in% c(13, 14, 23, 24) ~ 'high on low', ## low2high
-                  group_od %in% c(41, 42, 31, 32) ~ 'low on high', ## high2low
-                  TRUE ~ 'other')
-                ) %>%
-  dplyr::select(-group_id.x, -group_id.y)
-
-links_dist_na <- links_dist %>% dplyr::filter(is.na(dist))
-
-ctr_match_check <- mat %>%
-  dplyr::select(2:3) %>%
-  distinct(iso3, .keep_all = T) %>%
-  merge(., ctr_list_cepii, by.x = 'iso3', by.y = 'iso', all.x = T) %>%
-  arrange(!is.na(od))
+for (ind in unique(ft_ind$ind)) {
+  print(ind)
+  
+  
+  xls <- paste0(dir.eora_cleaned, ind, '.xlsx'); xls
+  
+  
+  mat <- readxl::read_excel(xls) %>% 
+    ungroup() %>%
+    dplyr::filter(year == 2015) 
+  
+  links <- mat %>%
+    gather(key = 'to', value = 'weight', 4:ncol(.)) %>%
+    dplyr::rename('from' = 'iso3') %>%
+    dplyr::mutate(type = ind) %>%
+    dplyr::select(-ctr, -year) %>%
+    arrange(from, to) %>%
+    distinct(from, to, .keep_all = T) %>%  
+    as.data.frame()
+  
+  links_dist <- merge(x = links, y = dist, by.x = c('from', 'to'), by.y = c('iso_o', 'iso_d'), all.x = T) %>%
+    merge(x = ., y = grp_id, by.x = 'from', by.y = 'iso_a3', all.x = T) %>%
+    merge(x = ., y = grp_id, by.x = 'to',   by.y = 'iso_a3', all.x = T) %>%
+    dplyr::mutate(
+      group_od = paste0(group_id.x, group_id.y), ## group_od = 14, means o-1 sending; d-4 receiving 
+      group_od = as.numeric(group_od)
+      ) %>%
+    dplyr::select(-group_id.x, -group_id.y) %>%
+    arrange(to, from)
+  
+  
+  ### --> check data 
+  # links_dist_na <- links_dist %>% dplyr::filter(is.na(dist))
+  # 
+  # ctr_match_check <- mat %>%
+  #   dplyr::select(2:3) %>%
+  #   distinct(iso3, .keep_all = T) %>%
+  #   merge(., ctr_list_cepii, by.x = 'iso3', by.y = 'iso', all.x = T) %>%
+  #   arrange(!is.na(od))
+  
+  ### --> if we want to see a detailed classification of one group's impact on the other
+  links_dist_type3 <- links_dist %>%
+    dplyr::mutate(
+      od_direction = case_when(
+      group_od %in% c(14, 13, 12) ~ 'low on high', ## 'vertical flow'
+      group_od %in% c(41, 31, 21) ~ 'hign on low', ## 'horizontal flow'
+      TRUE ~ 'other') 
+    ) %>% as.data.frame()
+    
+  
+  ### --> if we want to only see if the interaction happen acorss large income difference groups
+  links_dist_type2 <- links_dist %>%
+    dplyr::mutate(
+      od_direction = case_when(
+      group_od %in% c(14, 13, 12) ~ 'Vertical flows', ## 
+      group_od %in% c(41, 31, 21) ~ 'Vertical flows', ## 
+      TRUE ~ 'Horizontal flows') 
+    ) %>% as.data.frame()
+  
+  
+  
+  ### !!! choose one for analysis
+  if (n_flows == 2) {
+    links_dist_type <- links_dist_type2
+  } else if (n_flows == 3) {
+    links_dist_type <- links_dist_type3
+  } else {
+    print('NA ...................')
+    break
+  }
+  
+  
+  links_dist_type_collection <- rbind(links_dist_type_collection, links_dist_type)
+  
+}
 
 ```
 
@@ -222,62 +314,160 @@ ctr_match_check <- mat %>%
   
 #### - distance measure  
 ```{r}
-## for a receiving country, cal its impact distance --------------------------------- 
-ft_d <- links_dist %>%
-  dplyr::mutate(ftd = weight * dist) %>%
+## for a receiving country, calculate its impact distance --------------------------------- 
+ft_d <- links_dist_type_collection %>%
+  dplyr::mutate(ftd = weight * dist) %>%                  ## flow * distance
   dplyr::group_by(to, type, od_direction) %>%
-  dplyr::summarise(dq_sum = sum(ftd, na.rm = T),
-                   q_sum  = sum(weight, na.rm = T)) %>%
-  dplyr::mutate(d_ef = dq_sum/q_sum)
+  dplyr::summarise(dq_sum = sum(ftd, na.rm = T),          ## total (flow * distance)
+                   q_sum  = sum(weight, na.rm = T)) %>%   ## total flow
+  as.data.frame() %>%
+  dplyr::mutate(d_avg_ft = dq_sum/q_sum/1000) %>%         ## average distance of each unit of flows
+  merge(x = ., 
+        y = ft_ind %>% dplyr::select(-direction), 
+        by.x = 'type', by.y = 'ind', all.x = T)
 
 
-links_dist %>% 
-  dplyr::group_by(od_direction) %>%
+links_dist_type_collection %>% 
+  dplyr::group_by(type, od_direction) %>%
   tally()
+
+
+
+od_direction_levels <- unique(links_dist_type_collection$od_direction); od_direction_levels
+od_direction_count  <- length(od_direction_levels); od_direction_count
+if (od_direction_count <= 2) {
+  od_direction_levels <-  rev(od_direction_levels)
+} else {
+  od_direction_levels <-  c("hign on low", "low on high", "other")
+}
+od_direction_labels <- str_to_sentence(od_direction_levels)
+
 
 ## 1. mean distance between countries 
 hist(dist_cepii$dist)
 mean(dist_cepii$dist, na.rm=T) ## --> 8481.7 km
 
 ## 2. mean impact distance between countries 
-hist(ft_d$d_ef)
-mean(ft_d$d_ef, na.rm=T)       ## --> 5780.7 km
+hist(ft_d$d_avg_ft)
+mean(ft_d$d_avg_ft, na.rm=T)       ## --> 5780.7 km
+d_max <- max(ft_d$d_avg_ft, na.rm=T) %>% round(., digits = 1); d_max
 
 
-ft_d %>% 
+firstup <- function(x) {
+  substr(x, 1, 1) <- toupper(substr(x, 1, 1))
+  x
+}
+
+ft_ind_ls <- unique(ft_ind$ind); ft_ind_ls
+ft_ind_ls_levels <- ft_ind_ls
+ft_ind_ls_labels <- ft_ind_ls_levels %>% 
+  gsub('_|TradeMatrix|Annual crops|irri', ' ', x = .) %>%
+  gsub('Osh', 'OSH ', x = .) %>%
+  gsub('Energy', 'Energy ', x = .) %>%
+  gsub('Landuse', 'Landuse ', x = .) %>%
+  gsub('Nitrogen', 'Nitrogen ', x = .) %>%
+  gsub('Phosphorus', 'Phosphorus ', x = .) %>%
+  trimws(.) %>%
+  firstup(.)
+```
+
+
+
+
+```{r plot - by ft indicator}
+p1 <- ft_d %>% 
+  # dplyr::filter(SDG_class != 'Soci') %>% ## subset for easy plot
+  dplyr::mutate(od_direction = factor(x = od_direction, levels = od_direction_levels, labels = od_direction_labels)) %>%
+  dplyr::mutate(type = factor(x = type, levels = ft_ind_ls_levels, labels = ft_ind_ls_labels)) %>%
   ggplot() +
-  geom_histogram(aes(x = d_ef, fill = od_direction), position="identity", alpha=0.5, show.legend = F) +
-  geom_vline(aes(xintercept=mean(d_ef, na.rm=T)), color="red", linetype="dashed") +
-  ggplot2::annotate("text", x = round(mean(ft_d$d_ef, na.rm=T)*0.6, digits = 1), y = 15, colour = "red", 
-                    label = round(mean(ft_d$d_ef, na.rm=T), digits = 1)) +
-  facet_wrap(~od_direction, ncol = 1) +
-  theme_bw() +
-  # theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  ylim(0,20) + xlab('Impact distance (km)') + labs(fill='Impact pair')
+  geom_histogram(aes(x = d_avg_ft, fill = od_direction), position="identity", alpha=0.5, show.legend = T) +
+  geom_vline(aes(xintercept=mean(d_avg_ft, na.rm=T)), color="red", size = .5) + # linetype="dashed", alpha = .5, 
+  # ggplot2::annotate(
+  #   "text", 
+  #   x = round(mean(ft_d$d_avg_ft, na.rm=T)*1, digits = 1),
+  #   y = 2, 
+  #   label = round(mean(ft_d$d_avg_ft, na.rm=T), digits = 1), 
+  #   colour = "red", size = 2) +
+  # facet_wrap(~od_direction, ncol = 1) + ## for one indicator
+  # facet_grid(type~od_direction) +
+  facet_wrap(~type, ncol = 6) +
+  theme_ns +
+  # theme_minimal() +
+  theme(
+    # axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = c(0.99, 0.01),
+    legend.justification = c(1, 0), # right bottom justification
+    legend.box.margin = margin(r = 0, b = 0, unit = "mm"), # small margin
+    axis.title.y = element_blank(), 
+    panel.grid = element_blank(),
+    ) +
+  ylim(0,20) + 
+  scale_x_continuous(breaks = c(seq(0, d_max, 8), round(mean(ft_d$d_avg_ft, na.rm=T), digits = 1))) +
+  xlab(label = bquote('Distance (10'^3~'km)')) + 
+  labs(fill='') # Impact pairs
 
-fname <- paste0(dir.fig, '01main/impact pair_',ind, '1.jpg'); fname
+
+ggarrange(p1, labels = '')
+fname <- paste0(dir.fig, '01main/', 'ImpactDistance_by_ft',
+                '_class', od_direction_count, '_', today, '.jpg'); fname
+ggsave(filename = fname, plot = last_plot(), width = 6.5+0.5, height = 9, units = 'in', dpi = 300)
+```
+
+
+
+
+
+
+```{r plot - summary across indicators}
+ind <- 'AvgAcrossFT'
+ft_d_summary <- ft_d %>%
+  Rmisc::summarySE(measurevar= "d_avg_ft", groupvars = c('to', 'od_direction'), na.rm = T) %>%
+  as.data.frame()
+  
+
+p <- ft_d_summary %>% 
+  # dplyr::filter(SDG_class != 'Soci') %>% ## subset for easy plot
+  dplyr::mutate(od_direction = factor(x = od_direction, levels = od_direction_levels, labels = od_direction_labels)) %>%
+  ggplot() +
+  geom_histogram(aes(x = d_avg_ft, fill = od_direction), position="identity", alpha=0.5, show.legend = F) +
+  geom_vline(aes(xintercept=mean(d_avg_ft, na.rm=T)), color="red", size = .5) + # linetype="dashed", alpha = .5, 
+  facet_wrap(~od_direction, ncol = 1) + ## for one indicator
+  theme_ns +
+  # theme_minimal() +
+  theme(
+    # axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.y = element_blank(), 
+    panel.grid = element_blank(),
+    ) +
+  ylim(0,20) + 
+  scale_x_continuous(breaks = c(seq(0, d_max, 8), round(mean(ft_d$d_avg_ft, na.rm=T), digits = 1))) +
+  xlab(label = bquote('Distance (10'^3~'km)')) + 
+  labs(fill='Impact pair')
+ggarrange(p, labels = 'd')
+fname <- paste0(dir.fig, '01main/', 'ImpactDistance_', ind,
+                '_class', od_direction_count, '_', today, '.jpg'); fname
 ggsave(filename = fname, plot = last_plot(), width = 7.5/2, height = 7.5/2, units = 'in', dpi = 300)
 ```
 
 
 
-#### - contiguous or not
+#### - nearby (contiguous) or not
 ```{r}
 
-## impact distance by group of 'contiguous or not'
-ft_FarNear <- links_dist %>%
+## impact distance by group of 'nearby or not'
+ft_FarNear <- links_dist_type_collection %>%
   dplyr::group_by(contig) %>%
   dplyr::summarise(q_sum  = sum(weight, na.rm = T)) %>%
   as.data.frame() %>%
   dplyr::mutate(
-    sum = sum(links_dist$weight, na.rm = T),
+    sum = sum(links_dist_type_collection$weight, na.rm = T),
     pct = q_sum/sum
     ) %>%
   as.data.frame()
 
 
-## number of countries that are contiguous
-ft_FarNear_n <- links_dist %>%
+## number of countries that are nearby
+ft_FarNear_n <- links_dist_type_collection %>%
   dplyr::group_by(contig) %>%
   dplyr::summarise(n = n()) %>%
   as.data.frame() %>%
