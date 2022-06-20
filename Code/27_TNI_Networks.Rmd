@@ -12,6 +12,11 @@ editor_options:
 
 
 ```{r}
+
+### To clear your environment  -----------------------------------------------------------
+# remove(list = ls())
+
+
 # Download the workshop materials: bit.ly/sunbelt-2021
 # Online tutorial: kateto.net/sunbelt2021
 
@@ -39,27 +44,24 @@ editor_options:
 # install.packages("maps")
 # install.packages("geosphere")
 
+### packages -----------------------------------------------------------------------------
+source('./Code/_package list.R')
+# Download an archive with the data files from http://bit.ly/sunbelt-2021
+# Load the 'igraph' library:
+library(igraph)
 
-# rm(list = ls())
 
-### set work dir
+
+
+### set work dir -------------------------------------------------------------------------
 path <- rstudioapi::getSourceEditorContext()$path
 dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
 setwd(dir)
 setwd('..') # set directory by one folder up
 getwd()
 
-dir.eora         <- './Data/data_02_intermediate/dt02_flows/eora/'
-dir.eora_cleaned <- './Data/data_02_intermediate/dt02_flows/eora_cleaned/'
-dir.fig          <- './Data/Figure/'
-
-library(tidyverse)
-
-
-# Download an archive with the data files from http://bit.ly/sunbelt-2021
-
-# Load the 'igraph' library:
-library(igraph)
+### data path
+source('./Code/_path of data.R')
 ```
 
 

@@ -20,7 +20,7 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE)
 
 ### To clear your environment 
-# remove(list = ls())
+remove(list = ls())
 
 ### set work dir
 path <- rstudioapi::getSourceEditorContext()$path
@@ -29,16 +29,15 @@ setwd(dir)
 setwd('..') # set directory by one folder up
 getwd()
 
-dir.eora         <- './Data/data_02_intermediate/dt02_flows/eora/'
-dir.eora_cleaned <- './Data/data_02_intermediate/dt02_flows/eora_cleaned/'
-dir.fig          <- './Data/Figure/'
 
-dir.arm          <- './Data/data_01_raw/Arm trade_Peacekeeping/SIPRI Arms trade/'
-dir.traffick     <- './Data/data_01_raw/Human trafficking/'
+### data path
+source('./Code/_path of data.R')
 
 ### packages
 source('./Code/_package list.R')
 library(stringr)
+
+today <- format(Sys.time(), "%Y%m%d") ## %H%M%S
 ```
 
 
@@ -83,7 +82,7 @@ load('./Data/Ancillary_Data_iso_eora_ex.RData')  ## ## iso_eora_ex
 ```{r Ancillary data 2 - Eora cleaned format}
 ### To filter countries only listed in Eora
 ### - use the Eora data as the template 
-temp <- readxl::read_excel(paste0('./Data/data_02_intermediate/dt02_flows/eora_cleaned/', 'CO2.xlsx')) 
+temp <- readxl::read_excel(paste0(dir.eora_cleaned, 'CO2.xlsx')) 
 temp_eora <- temp %>%
   gather(key = to, value = value, 4:ncol(.)) %>%
   dplyr::select(-value) %>% # -ctr, 
@@ -100,9 +99,12 @@ load(f)
 
 
 #  Data 
+
 ## Get a sense of the MRIO data
+
   Water use MRIO table as an example
-```{r}
+  
+```{r eval=FALSE, include=FALSE}
 getwd()
 xls <- paste0(dir.eora_cleaned, "Water.xlsx")
 df <- readxl::read_excel(path = xls)
@@ -199,7 +201,7 @@ source('./Code/func_net_import.R')
 
 
 
-### function 2 -------------------------------------------------------------------------------------
+### function 2 ---------------------------------------------------------------------------
 source('./Code/func_net_import_direction.R')
 
 
@@ -219,7 +221,7 @@ source('./Code/func_net_import_direction.R')
 
 ## Spillover Score 
 
-### Way 1 ----------- NOT USED
+### Way 1 ---------> NOT USED
 
   
 #### 1. Non-SHDB spillover
@@ -343,6 +345,7 @@ net_imports2_revise <- net_imports2 %>%
 
 
 #### 3. Combine all data
+
   We may call this net imports data `outsourced footprints`. (OR displaced footprints?)
   
 ```{r eval=FALSE, include=FALSE}
@@ -359,19 +362,20 @@ net_imports2_revise <- net_imports2 %>%
 
 ### Way 2 ---------> UPDATE!?
 
+
+#### - direction of impacts
+  
   Only indicators with decided *direction* were included in the calculation, while assign *NA* to those with un-decided direction. 
   - Need to update the `direction` table!
   
 ```{r }
-
 ### get the name list of all the spillovers and manually add `direction` info for further normalizing the values
 
-xls.ls <- list.files(path = dir.eora_cleaned, pattern = 'xlsx$', full.names = T); xls.ls
-
-spillover_name_list <- data.frame(ind = gsub('.xlsx', '', basename(xls.ls))) %>%
-  # dplyr::mutate(shdb = str_detect(ind, pattern="SHDB")) %>%
-  dplyr::mutate(direction = '') %>%  ## to determine if it is positive or negative impact
-  as.data.frame()
+# xls.ls <- list.files(path = dir.eora_cleaned, pattern = 'xlsx$', full.names = T); xls.ls
+# spillover_name_list <- data.frame(ind = gsub('.xlsx', '', basename(xls.ls))) %>%
+#   # dplyr::mutate(shdb = str_detect(ind, pattern="SHDB")) %>%
+#   dplyr::mutate(direction = '') %>%  ## to determine if it is positive or negative impact
+#   as.data.frame()
 # writexl::write_xlsx(x = spillover_name_list, path = './Data/data_02_intermediate/dt02_flows/spillover_name_list.xlsx')
 
 
@@ -381,23 +385,66 @@ spillover_name_list <- data.frame(ind = gsub('.xlsx', '', basename(xls.ls))) %>%
 ### ...
 
 
-### loop the normalization based on direction ------------------------------------------------------
-xls <- paste0('./Data/data_02_intermediate/dt02_flows/', "spillover_name_list_directions.xlsx"); xls
-direction <- readxl::read_excel(path = xls) %>%
-  dplyr::filter(!is.na(ind) & !is.na(direction))
+### loop the normalization based on `direction` ---------
+# xls <- paste0('./Data/data_02_intermediate/dt02_flows/', "spillover_name_list_directions.xlsx"); xls
+# direction <- readxl::read_excel(path = xls) %>%
+#   dplyr::filter(!is.na(ind) & !is.na(direction))
 
+
+
+
+### 
+### Use data from Google Doc -------------------------------------------------------------
+library(googlesheets4)
+link <- 'https://docs.google.com/spreadsheets/d/13Di8K8ObDFfdALxrf-YjlGyYf_tNrm1TZ7yMDaozfzc/edit?usp=sharing'
+
+### Footprint indicators
+direction <- googlesheets4::read_sheet(link, sheet = 'Eora_match_SDG', range = 'D:I', col_types = 'cccccc') %>%
+  dplyr::select(Filename, SDG_class, starts_with('direction')) %>%
+  dplyr::rename(ind = Filename) %>%
+  dplyr::distinct(ind, .keep_all = T) %>%
+  dplyr::filter(!is.na(ind) &              ## remove rows with NA
+                  !grepl("\\?", ind)) %>%  ## remove rows contain "?"
+  arrange(ind) %>%
+  dplyr::mutate(direction = as.numeric(direction)) %>%  ## this can remove "?" 
+  dplyr::mutate(ind = gsub('SHDB0', 'SHDB', ind)) %>%   ## remove "0" in the ind names to match the actual file name
+  as.data.frame()
+# str(direction)
+f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'direction.RData')
+save(direction, file = f)
+
+
+direction_clean <- direction %>%
+  dplyr::filter(!is.na(direction)) %>%
+  dplyr::select(ind, SDG_class, direction) %>%
+  as.data.frame()
+
+# str(direction_clean)
+```
+
+
+
+#### - put all spillover indicators in one table 
+```{r }
 ### put all spillover indicators in one table 
 net_imports <- data.frame()
 
 for (i in 1:nrow(direction)) {
   # print(i)
-  ind <- direction[i, 1] %>% unlist() %>% paste(sep = '', collapse = ''); 
-  drt <- direction[i, 2] %>% unlist() %>% paste(sep = '', collapse = '') %>% as.numeric()
+  ind <- direction[i, 'ind']       %>% unlist() %>% paste(sep = '', collapse = ''); 
+  drt <- direction[i, 'direction'] %>% unlist() %>% paste(sep = '', collapse = '') %>% as.numeric()
   print(ind)
   print(drt)
   
-  xls <- paste0(dir.eora_cleaned, ind, '.xlsx'); print(xls)
-  df  <- readxl::read_excel(path = xls)
+  
+  ### if the direction is specified, read data; if not, skip. 
+  if (!is.na(drt)) {  ## abs(drt) == 1
+    xls <- paste0(dir.eora_cleaned, ind, '.xlsx'); print(xls)
+    df  <- readxl::read_excel(path = xls)
+  } else {
+    cat('\t\t TBD... and skip ... \n\n\n')
+  }
+    
 
   ### check rows and columns
   # print(nrow(df)); print(ncol(df))
@@ -408,8 +455,9 @@ for (i in 1:nrow(direction)) {
   # max <- max(df_l$value, na.rm = TRUE); max
   # min <- min(df_l$value, na.rm = TRUE); min
   
-  net_in <- func_net_import_direction(df = df, direction = drt, frac = 0.025)
-  net_imports <- rbind(net_imports, cbind(ind = ind, net_in))
+  net_in      <- func_net_import_direction(df = df, direction = drt, frac = 0.025)
+  net_imports <- rbind(net_imports, 
+                       cbind(ind = ind, net_in))
   
 }
 
@@ -424,6 +472,7 @@ net_imports_fromAll <- net_imports
 net_imports_fromAll$scenario <- 'fromAll'
 
 dfSummary(net_imports_fromAll)
+skimr::skim(net_imports_fromAll)
 
 length(unique(net_imports_fromAll$iso3))
 unique(net_imports_fromAll$year)
@@ -435,7 +484,7 @@ net_imports_fromAll_check <- net_imports_fromAll %>%
 
 ### save the data
 n_ft_ind <- length(unique(net_imports_fromAll$ind)); n_ft_ind
-fname <- paste0(dir.eora_cleaned, 'net_imports_fromAll_', n_ft_ind, '.RData'); fname
+fname <- paste0(dir.flowScenario, 'net_imports_fromAll_', n_ft_ind, '.RData'); fname
 save(net_imports_fromAll, file = fname)
 ```
 
@@ -447,7 +496,7 @@ save(net_imports_fromAll, file = fname)
 ```{r}
 
 ### load data
-ls_f <- list.files(path = dir.eora_cleaned, pattern = '^net_imports_fromAll_', full.names = T); ls_f
+ls_f <- list.files(path = dir.flowScenario, pattern = '^net_imports_fromAll_', full.names = T); ls_f
 tail(ls_f, n = 1)
 load(tail(ls_f, n = 1)) ## load the latest data
 
@@ -494,13 +543,14 @@ hist(spillover_index_se$index)
 
 
 ### Map
-```{r - index}
+
+```{r - fig2b - TNI Index}
 ### map of spillover Index score ---------------------------------------------------------
 ### 
 spillover_index_shp <- shp %>%
   merge(x = ., y = spillover_index, by.x = 'iso_a3', by.y = 'iso3', all.x = T) %>%
   arrange(!is.na(year))
-# str(score_index_shp)
+# str(spillover_index_shp)
 
 ### to check if all the spillover data has been matched with the shp
 spillover_index_shp_match_check <- spillover_index %>%
@@ -509,7 +559,45 @@ spillover_index_shp_match_check <- spillover_index %>%
 nrow(spillover_index_shp_match_check) ## ROW was not included here. 
 
 
-### 4 years map
+
+### 1 year map for 2015 only -------------------------------------------------------------
+map1 <- spillover_index_shp %>%
+  dplyr::filter(!is.na(year)) %>%
+  dplyr::filter(year == 2015) %>%
+  ggplot()+
+  geom_sf(aes(fill = index), color='gray80', size = 0.1) +
+  scale_fill_distiller(palette = "Reds", direction = 1, na.value = 'black', name = 'Impact\nIndex') +
+  # scale_fill_viridis(direction = -1, option = 'C', discrete = F, name = 'Impact\nIndex') +
+  
+  scale_y_continuous(expand = c(0, 0)) + ## reduce the space between plot and border
+  scale_x_continuous(expand = c(0, 0)) + ## reduce the space between plot and border
+  theme_nothing() +
+  theme(
+    legend.position = c(0.01, 0.01),
+    legend.justification = c(0, 0), # right bottom justification
+    legend.box.margin = margin(r = 0, b = 0, unit = "mm"), # small margin
+    
+    axis.text.x=element_blank(), 
+    text = element_text(size=font_size),
+    panel.grid = element_blank(),
+    panel.border = element_blank(),
+    # plot.margin = margin(t = 0, r = 0, b = 0, l = -0.1), #unit(c(0,0,0,0), "pt"), ## 0,0,0,0
+    axis.ticks.x=element_blank()) 
+
+fig <- ggarrange(map1, labels = "b", font.label = list(size = 12), vjust = 1, hjust = 0); fig
+fignm <- paste0('fig2b_map_spillover_index_2015_', today, '.jpg')
+fname <- paste0(dir.fig, 'spillover/', fignm);
+ggsave(filename = fname, plot = fig, width = width_2col, height = width_2col*2.8/7, units = unit_ns, dpi = 300)
+
+fname <- paste0(dir.fig, '01main/',    fignm);
+ggsave(filename = fname, plot = fig, width = width_2col, height = width_2col*2.8/7, units = unit_ns, dpi = 300)
+
+
+
+
+
+
+### 4 years map --------------------------------------------------------------------------
 map4 <- spillover_index_shp %>%
   dplyr::filter(!is.na(year)) %>%
   ggplot()+
@@ -518,37 +606,20 @@ map4 <- spillover_index_shp %>%
   # theme(legend.position = c(0.05, 0.3)) +
   facet_wrap(.~year) +
   theme(axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
-map4
-timestamp <- format(Sys.time(), "%Y%m%d") ## %H%M%S
-fname <- paste0(dir.fig, 'spillover/', 'map_spillover_index', '_', timestamp, '.jpg'); fname
-ggsave(filename = fname, plot = map4, width = width_2col, height = width_2col/2, units = unit_ns, dpi = 300)
-
-
-
-### 1 year map for 2015 only -----------------------------
-map1 <- spillover_index_shp %>%
-  dplyr::filter(!is.na(year)) %>%
-  dplyr::filter(year == 2015) %>%
-  ggplot()+
-  geom_sf(aes(fill = index), color='gray80', size = 0.1) +
-  scale_fill_distiller(palette = "Oranges", direction = 1, na.value = 'black', name = 'Impact\nIndex') +
-  # scale_fill_viridis(direction = -1, option = 'C', discrete = F, name = 'Impact\nIndex') +
-  theme(legend.position = c(0.1, 0.35)) +
-  theme(axis.text.x=element_blank(), panel.grid = element_blank(),
-        panel.border = element_blank(),
+        axis.ticks.x=element_blank(),
         plot.margin = unit(c(0,0,0,0), "pt"), ## 0,0,0,0
-        axis.ticks.x=element_blank())
-map1
-fname <- paste0(dir.fig, 'spillover/', 'map_spillover_index_2015.jpg'); fname
-ggsave(filename = fname, plot = map1, width = width_2col, height = width_2col*2.8/7, units = unit_ns, dpi = 300)
+        )
+# map4
 
+fname <- paste0(dir.fig, 'spillover/', 'fig_map_spillover_index_4yrs_', today, '.jpg'); fname
+ggsave(filename = fname, plot = map4, width = width_2col, height = width_2col/2, units = unit_ns, dpi = 300)
+gc()
 ```
 
 
 
-
-```{r - index rank}
+  Index rank county-shape [NOT used] 
+```{r eval=FALSE, include=FALSE}
 
 ### which generate the most impacts and which were most impacted? 
 spillover_index_top_bottom <- spillover_index_shp %>%
@@ -602,7 +673,7 @@ spillover_index_top_bottom %>%
    shape = guide_legend(order = 2, title = NULL, override.aes = list(fill  = c(NA, NA)), reverse = F),
    fill  = guide_legend(order = 1, title = NULL, override.aes = list(shape = c(NA, NA)), reverse = T)) 
 
-fname <- paste0(dir.fig, 'spillover/', 'spillover_index_top_bottom_shape', timestamp, '.jpg'); fname
+fname <- paste0(dir.fig, 'spillover/', 'spillover_index_top_bottom_shape', today, '.jpg'); fname
 ggsave(filename = fname, plot = last_plot(), width = width_1col, height = 8, units = 'cm', dpi = 600)
 
 ## https://www.r-bloggers.com/2020/07/controlling-legend-appearance-in-ggplot2-with-override-aes/
@@ -612,7 +683,9 @@ ggsave(filename = fname, plot = last_plot(), width = width_1col, height = 8, uni
 
   Label country group by `color`. 
   
-```{r}
+  - index rank county-color-4-group [NOT used]
+  
+```{r eval=FALSE, include=FALSE}
 spillover_index_top_bottom %>%
   dplyr::mutate(rank = case_when(
     index > 50 ~ "top 10", 
@@ -636,16 +709,50 @@ spillover_index_top_bottom %>%
    color = guide_legend(order = 2, title = NULL, override.aes = list(fill  = c(NA, NA)), reverse = F),
    fill  = guide_legend(order = 1, title = NULL, override.aes = list(shape = c(NA, NA)), reverse = T)) 
 
-fname <- paste0(dir.fig, 'spillover/', 'spillover_index_top_bottom_color_', timestamp, '.jpg'); fname
+fname <- paste0(dir.fig, 'spillover/', 'spillover_index_top_bottom_color_', today, '.jpg'); fname
 ggsave(filename = fname, plot = last_plot(), width = width_2col/3*2, height = width_2col/2, units = 'cm', dpi = 600)
 ```
+
+
+```{r - fig2a - index rank county-color-2-group}
+p <- spillover_index_top_bottom %>%
+  dplyr::mutate(rank = case_when(
+    index > 50 ~ "top 10", 
+    TRUE ~ 'bottom 10')) %>%
+  dplyr::mutate(group = ifelse(group %in% c("High income", "Upper middle income"), "High income", "Low income")) %>%
+  ggplot(aes(x = reorder(name, index))) +
+  geom_col(aes(y = index, fill = (rank)), show.legend = T) + 
+  geom_point(aes(y = -2, color = group), show.legend = T, size = 3) + # size = 1.2, 
+  # scale_fill_manual(values=c('#fee6ce', '#f16913'))+
+  scale_fill_brewer(palette = "Reds") +
+  # scale_fill_manual(values = brewer.pal(n = 5, "Reds")[c(2,4)]) +
+  scale_color_manual(values=c('#2371A6', '#F26463'))+
+  ylab('Impact Index') +
+  coord_flip() +
+  theme(axis.title.y=element_blank(), 
+        text = element_text(size = 10),
+        legend.key.size   = unit(.3, 'cm'),  #change legend key size
+        legend.key.height = unit(.3, 'cm'),  #change legend key height
+        legend.key.width  = unit(.3, 'cm'),  #change legend key width
+        legend.text = element_text(size=8),  #change legend text font size
+        legend.position = c(0.8, 0.2), legend.margin=unit(0, "cm")) +
+  guides(
+   color = guide_legend(order = 2, title = NULL, override.aes = list(fill  = c(NA, NA)), reverse = F),
+   fill  = guide_legend(order = 1, title = NULL, override.aes = list(shape = c(NA, NA)), reverse = T)) 
+
+fig <- ggarrange(p, labels = "a", font.label = list(size = 12), vjust = 1, hjust = 0); fig
+fname <- paste0(dir.fig, 'spillover/', 'fig2a_spillover_index_top_bottom_color_country2group_', today ,'.jpg'); fname
+ggsave(filename = fname, plot = fig, width = width_2col/3*2, height = width_2col/2, units = 'cm', dpi = 600)
+```
+
+
 
 
   It can be interesting to see the contribution of each spillover to the overall impact. 
   
   *To do*: order the list based on characters or property (social vs. environmental vs. economic vs. security ...)
 
-```{r - Index rank with MC categories}
+```{r - fig3ex - Index rank with MC categories}
 n_type <- length(unique(net_imports_fromAll$ind)); n_type
 list20 <- unique(spillover_index_top_bottom$iso_a3); list20
 
@@ -666,9 +773,11 @@ spillover_index_type <- spillover_norm %>%
 str(spillover_index_type)  
 unique(spillover_index_type$indicator)
 levels(spillover_index_type$SDG_class)
+type_levels <- c("Envi", "Soci", "Econ",  "Secu")
+type_labels <- c("Environmental", "Social", "Economic",  "Security")
 
 spillover_index_type_SDGtype <- spillover_index_type %>%
-  dplyr::mutate(SDG_class = factor(SDG_class, levels = c("Envi", "Soci", "Econ",  "Secu")))
+  dplyr::mutate(SDG_class = factor(SDG_class, levels = type_levels, labels = type_labels))
   
 
 # Stacked
@@ -679,10 +788,16 @@ ggplot(spillover_index_type_SDGtype,
   scale_fill_manual(values = c('#33a02c', '#fdbf6f', '#ff7f00', '#6a3d9a') %>% rev(), name = '') +
   geom_bar(position="stack", stat="identity", alpha = 0.8) +
   coord_flip() +
-  theme(legend.position = c(0.8, 0.2), legend.margin=unit(0, "cm")) +
+  theme(
+    legend.position = c(0.99, 0.01), 
+    legend.justification = c(1, 0), 
+    legend.box.margin = margin(r = 0, b = 0, unit = "mm"), # small margin
+    legend.key.size = unit(0.4,"cm"),
+    panel.grid.major.y = element_blank(),
+    legend.margin=unit(0, "cm")) +
   ylab('Impact Index') + xlab('Country')
 
-fname <- paste0(dir.fig, 'spillover/', 'spillover_index_top_bottom_ByType_', timestamp, '.jpg'); fname
+fname <- paste0(dir.fig, 'spillover/', 'spillover_index_top_bottom_ByType_', today, '.jpg'); fname
 ggsave(filename = fname, plot = last_plot(), width = width_2col/3*2, height = width_2col/2, units = 'cm', dpi = 600)
 ```
 
@@ -719,9 +834,9 @@ spillover_index_se_shp %>%
   facet_grid(year~se)
 
 
-timestamp <- format(Sys.time(), "%Y%m%d") ## %H%M%S
-fname <- paste0(dir.fig, 'spillover/', 'map_spillover_index_se', '_', timestamp, '.jpg'); fname
-ggsave(filename = fname, plot = map, width = width_2col, height = width_2col/2, units = unit_ns, dpi = 300)
+today <- format(Sys.time(), "%Y%m%d") ## %H%M%S
+fname <- paste0(dir.fig, 'spillover/', 'map_spillover_index_se', '_', today, '.jpg'); fname
+# ggsave(filename = fname, plot = map, width = width_2col, height = width_2col/2, units = unit_ns, dpi = 300)
 
 ```
 
@@ -731,10 +846,14 @@ ggsave(filename = fname, plot = map, width = width_2col, height = width_2col/2, 
 
 ```{r - score of each}
 # install.packages("devtools")
+# library(devtools)
 # devtools::install_github("tidyverse/googlesheets4")
 
 ## 1. which to be chosen for mapping -------------
 library(googlesheets4)
+# gs4_deauth()
+# gs4_auth()
+
 link <- 'https://docs.google.com/spreadsheets/d/13Di8K8ObDFfdALxrf-YjlGyYf_tNrm1TZ7yMDaozfzc/edit?usp=sharing'
 
 ### Footprint indicators
@@ -783,9 +902,9 @@ map_each_p <- map_each %>%
   ggplot()+
   geom_sf(aes(fill = spillover_norm), color='gray80', size = 0.1) +
   scale_fill_distiller(palette = "Spectral", direction = -1, na.value = 'gray70', name= 'Impact Score') +
-  facet_wrap(~ShortName, ncol = 5) +
+  facet_wrap(~ShortName, ncol = 6) +
   # ggtitle(yr)+
-  theme(legend.position = c(0.85, 0.07)) +
+  theme(legend.position = c(0.9, 0.08)) +
   theme(panel.grid = element_blank(),
         axis.ticks = element_blank(),
         axis.text  = element_blank(),
@@ -794,15 +913,14 @@ map_each_p <- map_each %>%
         strip.text.x = element_text(size = 7)
         ) 
 # map_each_p
-fname <- paste0(dir.fig, 'spillover/', 'map_spillover_norm_each_', yr, '_long_', timestamp, '.jpg'); fname
-ggsave(filename = fname, plot = map_each_p, width = 7, height = 7, units = 'in', dpi = 300)
+fname <- paste0(dir.fig, 'spillover/', 'map_spillover_norm_each_', yr, '_long_', today, '.jpg'); fname
+ggsave(filename = fname, plot = map_each_p, width = 8, height = 4.5, units = 'in', dpi = 300)
 ```
 
 
 
 
 **THE END** 
-
 
   This chuck aims to zoom in to EU region, which is small on the world map. 
   One can ignore this at this stage. 
