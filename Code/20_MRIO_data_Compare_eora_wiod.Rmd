@@ -15,17 +15,14 @@ editor_options:
 # set work dir
 path <- rstudioapi::getSourceEditorContext()$path
 dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
-setwd(dir)
-setwd('../Data/')
+setwd(dirname(dir))
+# setwd('../Data/')
 getwd()
 
-dir.eora    <- './data_02_intermediate/dt02_flows/eora/'
-dir.fig     <- './Figure/'
+source('./Code/_path of data.R')
 
 ### packages
 library(readxl)
-library(XLConnect)
-library(xlsx)
 library(tidyverse)
 library(reshape2) # expand long table to wide one
 
@@ -37,7 +34,7 @@ library(RColorBrewer)
 ## Color Brewer palette
 library(viridis)
 library(hrbrthemes)
-library(devtools)
+# library(devtools)
 library(circlize)  ## for circlize plot
 library(Cairo)
 
@@ -80,14 +77,14 @@ theme_ns <-
 # xls.name.wiod <- '9_co2.xlsx';       unit_conv <- 1000    ## 1000 tonnes in raw data; convert to the same unit
 
 ### water use
-indicator.name<- 'water'
-xls.name.eora <- 'YJ_Water_2005.xlsx'; unit_name <- 'm3'  ## m3
-xls.name.wiod <- '6_wat.xlsx';         unit_conv <- 1000  ## 1000 cubic meters in raw data
+# indicator.name<- 'water'
+# xls.name.eora <- 'YJ_Water_2005.xlsx'; unit_name <- 'm3'  ## m3
+# xls.name.wiod <- '6_wat.xlsx';         unit_conv <- 1000  ## 1000 cubic meters in raw data
 
 # ### energy
-# indicator.name<- 'energy_total'
-# xls.name.eora <- 'YJ_Energytotal_2005.xlsx'; unit_name <- 'PJ'         ## PJ = 1000 TJ
-# xls.name.wiod <- '7_ene.xlsx';               unit_conv <- 1/10^3  ## in TJ in the raw data
+indicator.name<- 'energy_total'
+xls.name.eora <- 'YJ_Energytotal_2005.xlsx'; unit_name <- 'PJ'         ## PJ = 1000 TJ
+xls.name.wiod <- '7_ene.xlsx';               unit_conv <- 1/10^3       ## in TJ in the raw data
 
 
 # ### forest
@@ -98,7 +95,7 @@ xls.name.wiod <- '6_wat.xlsx';         unit_conv <- 1000  ## 1000 cubic meters i
 
 ### create file names with path ---------------------
 path_dt_eora <- dir.eora
-path_dt_wiod <- 'G:/My Drive/_paper/SDGs/SDGs_Global_Trade/data/update_0503_SUM_dist/'
+path_dt_wiod <- 'D:/_papers/SDGs/SDGs_Global_Trade/data/update_0503_SUM_dist/'
 xls_eora <- paste0(path_dt_eora, xls.name.eora); xls_eora
 xls_wiod <- paste0(path_dt_wiod, xls.name.wiod); xls_wiod
 
@@ -112,8 +109,8 @@ xls_wiod <- paste0(path_dt_wiod, xls.name.wiod); xls_wiod
 #   left_join(., iso, by = c('Row' = 'country_eora')) %>%
 #   arrange(!is.na(iso3_eora))
 # writexl::write_xlsx(x = iso_match, path = './_eora_190country_iso3_match.xlsx')
-xls_iso_eora <- "./_eora_190country_iso3_match_update.xlsx"
-xls_iso_wiod <- "./_wiod_41country_iso3.xlsx"
+xls_iso_eora <- "./Data/_eora_190country_iso3_match_update.xlsx"
+xls_iso_wiod <- "./Data/_wiod_41country_iso3.xlsx"
 iso_eora <- readxl::read_excel(path = xls_iso_eora)
 iso_wiod <- readxl::read_excel(path = xls_iso_wiod)
 ```
