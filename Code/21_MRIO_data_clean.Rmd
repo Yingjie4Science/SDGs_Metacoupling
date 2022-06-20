@@ -30,9 +30,8 @@ setwd(dir)
 setwd('..') # set directory by one folder up
 getwd()
 
-dir.eora         <- './Data/data_02_intermediate/dt02_flows/eora/'
-dir.eora_cleaned <- './Data/data_02_intermediate/dt02_flows/eora_cleaned/'
-dir.fig          <- './Data/Figure/'
+### data path 
+source('./Code/_path of data.R')
 
 
 ### packages
@@ -381,7 +380,9 @@ writexl::write_xlsx(x = df_formatted, path = fname)
 ### get the indicator name
 ind <- 'student_flow'
 
-dir.student_flow <- './Data/data_01_raw/International Student flows/'
+# dir.student_flow <- './Data/data_01_raw/International Student flows/' ## have pre-setted
+dir.student_flow
+
 xls <- list.files(path = dir.student_flow, pattern = 'output_student_flows_ALL_wide_', full.names = T); xls
 df <- readxl::read_excel(path = xls) %>%
   ### format as the same as EORA data
@@ -445,10 +446,12 @@ writexl::write_xlsx(x = df_formatted, path = fname)
 ### get the indicator name
 ind <- 'TradeMatrix_marine_capture'
 
-dir <- './Data/data_01_raw/FAOSTAT/Jessica Gephart/'
+# dir.fish <- './Data/data_01_raw/FAOSTAT/Jessica Gephart/' ## pre-set 
+dir.fish
+
 # f <- 'marine_capture_trade_20211214.csv'        ## 1st version 2021-12-14
 f <- 'marine_capture_trade_5yrave_20220107.csv'   ## 2nd version 2022-01-07
-file <- paste0(dir, f)
+file <- paste0(dir.fish, f)
 
 
 df0 <- readr::read_csv(file = file) %>%
