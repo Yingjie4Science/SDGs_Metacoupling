@@ -168,6 +168,11 @@ min <- min(df_l$value, na.rm = TRUE); min
 df_l_norm <- df_l %>%
   dplyr::mutate(value_norm = (value - min)/(max - min))
 
+
+
+### for 2015
+df_l_15 <- df_l %>%
+  dplyr::filter(year == 2015)
 ```
 
 
@@ -176,12 +181,13 @@ df_l_norm <- df_l %>%
 
 
 # Analysis
-  Here, we use the approach by Sachs et al (SDSN) Reports. That is, looking at the spillovers only, but not the impacts on SDG scores. They took `footprint flows per capita` as the indicator, here, we use the actual amount of `footprint flows` as the spillover indicator.
+
+  Here, we use the approach by Sachs et al (SDSN) Reports. That is, looking at the spillovers only, but not the impacts on SDG scores. They took `footprint flows per capita` as the indicator. Here, we use the actual amount of `footprint flows` as the spillover indicator.
   
   **Spillover Score**: the normalized score of each spillover, which measured by "net imports". 
   Scores should be interpreted in the same way as the SDG Index score: from 
-    - `0   (poor performance`, i.e., significant negative spillovers) to 
-    - `100 (good performance`, i.e., no significant negative spillovers). 
+    - `0   (poor performance)`, i.e., significant negative spillovers 
+    - `100 (good performance)`, i.e., no significant negative spillovers
     
   **Spillover Index**: a consolidated (or composite) score of multiple spillovers (Sachs et al, 2020) 
     - Sachs et al only measured the Index, but did not report the score by Goal.
@@ -291,7 +297,7 @@ df_flow <- df %>%
   arrange(desc(Weight)) %>%
   
   ## look at the top 10 flows
-  head(10) %>%
+  head(20) %>%
   as.data.frame()
 ```
 
@@ -439,7 +445,7 @@ for (i in 1:nrow(direction)) {
   
   ### if the direction is specified, read data; if not, skip. 
   if (!is.na(drt)) {  ## abs(drt) == 1
-    xls <- paste0(dir.eora_cleaned, ind, '.xlsx'); print(xls)
+    xls <- paste0(dir.eora_cleaned, ind, '.xlsx'); #print(xls)
     df  <- readxl::read_excel(path = xls)
   } else {
     cat('\t\t TBD... and skip ... \n\n\n')
@@ -493,6 +499,9 @@ save(net_imports_fromAll, file = fname)
 
 
 ## Spillover Index
+
+### Index 
+
 ```{r}
 
 ### load data
@@ -539,6 +548,55 @@ hist(spillover_index_se$index)
 ```
 
 
+
+
+  To check on each country's TNI impact (spillover impact)
+  
+  https://www.datanovia.com/en/lessons/heatmap-in-r-static-and-interactive-visualization/
+```{r - heat map of each indicator}
+
+data <- spillover_norm %>%
+  dplyr::filter(year == 2015) %>%
+  dplyr::select(-year) %>%
+  column_to_rownames(var="iso3") %>%
+  as.matrix() 
+
+data2 <- t(data)
+# Default Heatmap
+heatmap(data)
+heatmap(data2)
+
+
+# library("plotly")  
+# plot_ly(data = data, type = "heatmap")  
+# 
+# ggp <- spillover_norm %>%
+#   gather(key = 'ind', value = 'score', 3:ncol(.)) %>%
+#   dplyr::select(ind, iso3, year, score) %>%
+#   dplyr::filter(year == 2015) %>%
+#   ggplot(., aes(y = iso3, x = ind)) +                           # Create heatmap with ggplot2
+#   geom_tile(aes(fill = score))
+# ggp      
+
+
+library(pheatmap)
+f <- paste0(dir.fig, 'spillover score by TNI by country.png')
+png(filename = f, width = 25, height = 10, units = 'in', res = 300)
+pheatmap::pheatmap(data2, treeheight_row = 0, treeheight_col = 0)
+dev.off()
+
+
+
+if (!require("devtools")) install.packages("devtools")
+devtools::install_github("talgalili/d3heatmap")
+library("d3heatmap")
+d3heatmap((data), colors = "RdYlBu", 
+          # dendrogram = 'none', 
+          # Rowv = 'none',
+          k_row = 4, # Number of groups in rows
+          k_col = 1 # Number of groups in columns
+          )
+```
 
 
 
