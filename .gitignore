@@ -1,3 +1,27 @@
+
+
+MS/
+!Data/
+Data/*
+!Data/Figure
+Refs/
+
+test_*
+Code/_deleted
+Code/global_nutrient_trade_Wood
+Code/network
+
+
+
+
+
+
+
+
+*.Rproj
+*.gitignore
+
+
 # History files
 .Rhistory
 .Rapp.history
@@ -37,3 +61,7 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+
+
+
+

@@ -1,5 +1,7 @@
 
-
+#' df:        trade matrix
+#' direction: positive impact or negative
+#' frac:      take the top `0.025` as the upper bound
 
 func_net_import_direction <- function(df, direction, frac){
   
@@ -14,7 +16,7 @@ func_net_import_direction <- function(df, direction, frac){
     as.data.frame() %>%
     dplyr::select(-iso3, -ctr) %>%
     group_by(year) %>%
-    summarise_all(sum, na.rm = TRUE) %>%
+    dplyr::summarise_all(sum, na.rm = TRUE) %>%
     column_to_rownames("year") %>% 
     t() %>%
     as.data.frame() %>%

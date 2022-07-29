@@ -1,0 +1,332 @@
+Classification,Year,Period,Period Desc.,Aggregate Level,Is Leaf Code,Trade Flow Code,Trade Flow,Reporter Code,Reporter,Reporter ISO,Partner Code,Partner,Partner ISO,2nd Partner Code,2nd Partner,2nd Partner ISO,Customs Proc. Code,Customs,Mode of Transport Code,Mode of Transport,Commodity Code,Commodity,Qty Unit Code,Qty Unit,Qty,Alt Qty Unit Code,Alt Qty Unit,Alt Qty,Netweight (kg),Gross weight (kg),Trade Value (US$),CIF Trade Value (US$),FOB Trade Value (US$),Flag
+S4,2015,2015,2015,1,0,1,Import,8,Albania,ALB,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,414576832,,,0
+S4,2015,2015,2015,1,0,2,Export,8,Albania,ALB,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,169937919,,,0
+S4,2015,2015,2015,1,0,1,Import,12,Algeria,DZA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,2339109404,,,0
+S4,2015,2015,2015,1,0,2,Export,12,Algeria,DZA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,33348366568,,,0
+S4,2015,2015,2015,1,0,1,Import,20,Andorra,AND,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,114209985,,,0
+S4,2015,2015,2015,1,0,2,Export,20,Andorra,AND,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,39820,,,0
+S4,2015,2015,2015,1,0,1,Import,24,Angola,AGO,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,1411153367,,,4
+S4,2015,2015,2015,1,0,2,Export,24,Angola,AGO,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,31894838588,,,0
+S4,2015,2015,2015,1,0,1,Import,28,Antigua and Barbuda,ATG,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,77143361,,,0
+S4,2015,2015,2015,1,0,2,Export,28,Antigua and Barbuda,ATG,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,287452,,,0
+S4,2015,2015,2015,1,0,1,Import,31,Azerbaijan,AZE,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,150094863,,,4
+S4,2015,2015,2015,1,0,2,Export,31,Azerbaijan,AZE,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,11187119539,,,4
+S4,2015,2015,2015,1,0,1,Import,32,Argentina,ARG,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,6580862206,,,4
+S4,2015,2015,2015,1,0,2,Export,32,Argentina,ARG,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,1441514405,,,4
+S4,2015,2015,2015,1,0,1,Import,36,Australia,AUS,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,21747499765,,,0
+S4,2015,2015,2015,1,0,2,Export,36,Australia,AUS,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,47494162199,,,0
+S4,2015,2015,2015,1,0,1,Import,40,Austria,AUT,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,11672156965,,,4
+S4,2015,2015,2015,1,0,2,Export,40,Austria,AUT,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,2849124659,,,4
+S4,2015,2015,2015,1,0,1,Import,44,Bahamas,BHS,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,535306194,,,0
+S4,2015,2015,2015,1,0,2,Export,44,Bahamas,BHS,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,70349936,,,0
+S4,2015,2015,2015,1,0,1,Import,48,Bahrain,BHR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,4194361159,,,4
+S4,2015,2015,2015,1,0,2,Export,48,Bahrain,BHR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,5165237123,,,4
+S4,2015,2015,2015,1,0,1,Import,50,Bangladesh,BGD,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,5219937884,,,0
+S4,2015,2015,2015,1,0,2,Export,50,Bangladesh,BGD,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,178120909,,,0
+S4,2015,2015,2015,1,0,1,Import,51,Armenia,ARM,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,673716410,,,0
+S4,2015,2015,2015,1,0,2,Export,51,Armenia,ARM,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,92391607,,,0
+S4,2015,2015,2015,1,0,1,Import,56,Belgium,BEL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,36216694128,,,4
+S4,2015,2015,2015,1,0,2,Export,56,Belgium,BEL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,22277497858,,,4
+S4,2015,2015,2015,1,0,1,Import,60,Bermuda,BMU,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,91723895,,,0
+S4,2015,2015,2015,1,0,2,Export,60,Bermuda,BMU,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,4110,,,0
+S4,2015,2015,2015,1,0,1,Import,68,Bolivia (Plurinational State of),BOL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,1149785015,,,4
+S4,2015,2015,2015,1,0,2,Export,68,Bolivia (Plurinational State of),BOL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,4032670535,,,0
+S4,2015,2015,2015,1,0,1,Import,70,Bosnia Herzegovina,BIH,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1215579273,,,0
+S4,2015,2015,2015,1,0,2,Export,70,Bosnia Herzegovina,BIH,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,357452966,,,0
+S4,2015,2015,2015,1,0,1,Import,72,Botswana,BWA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,1671891683,,,4
+S4,2015,2015,2015,1,0,2,Export,72,Botswana,BWA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,30441604,,,4
+S4,2015,2015,2015,1,0,1,Import,76,Brazil,BRA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,28077709448,,,0
+S4,2015,2015,2015,1,0,2,Export,76,Brazil,BRA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,13747800536,,,0
+S4,2015,2015,2015,1,0,1,Import,84,Belize,BLZ,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,110886114,,,0
+S4,2015,2015,2015,1,0,2,Export,84,Belize,BLZ,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,26905481,,,0
+S4,2015,2015,2015,1,0,1,Import,90,Solomon Isds,SLB,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,74630350,,,0
+S4,2015,2015,2015,1,0,2,Export,90,Solomon Isds,SLB,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,7314,,,0
+S4,2015,2015,2015,1,0,1,Import,96,Brunei Darussalam,BRN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,195863592,,,0
+S4,2015,2015,2015,1,0,2,Export,96,Brunei Darussalam,BRN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,5906673413,,,0
+S4,2015,2015,2015,1,0,1,Import,100,Bulgaria,BGR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,4555887353,,,0
+S4,2015,2015,2015,1,0,2,Export,100,Bulgaria,BGR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,2736574057,,,0
+S4,2015,2015,2015,1,0,1,Import,104,Myanmar,MMR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,1988492900,,,4
+S4,2015,2015,2015,1,0,2,Export,104,Myanmar,MMR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,4837482287,,,4
+S4,2015,2015,2015,1,0,1,Import,108,Burundi,BDI,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,115145097,,,0
+S4,2015,2015,2015,1,0,2,Export,108,Burundi,BDI,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,437789,,,0
+S4,2015,2015,2015,1,0,1,Import,112,Belarus,BLR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,9211040200,,,0
+S4,2015,2015,2015,1,0,2,Export,112,Belarus,BLR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,7768494200,,,0
+S4,2015,2015,2015,1,0,1,Import,116,Cambodia,KHM,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,84550672,,,0
+S4,2015,2015,2015,1,0,2,Export,116,Cambodia,KHM,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,2513,,,0
+S4,2015,2015,2015,1,0,1,Import,120,Cameroon,CMR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1220613243,,,0
+S4,2015,2015,2015,1,0,2,Export,120,Cameroon,CMR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1839291992,,,0
+S4,2015,2015,2015,1,0,1,Import,124,Canada,CAN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,29391219980,,,0
+S4,2015,2015,2015,1,0,2,Export,124,Canada,CAN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,77438284564,,,4
+S4,2015,2015,2015,1,0,1,Import,132,Cabo Verde,CPV,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,77488680,,,0
+S4,2015,2015,2015,1,0,1,Import,140,Central African Rep.,CAF,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1968915,,,0
+S4,2015,2015,2015,1,0,2,Export,140,Central African Rep.,CAF,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,10934,,,0
+S4,2015,2015,2015,1,0,1,Import,144,Sri Lanka,LKA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,2652869457,,,0
+S4,2015,2015,2015,1,0,2,Export,144,Sri Lanka,LKA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,184497207,,,0
+S4,2015,2015,2015,1,0,1,Import,152,Chile,CHL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,8753605240,,,4
+S4,2015,2015,2015,1,0,2,Export,152,Chile,CHL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,473733530,,,4
+S4,2015,2015,2015,1,0,1,Import,156,China,CHN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,198589034868,,,0
+S4,2015,2015,2015,1,0,2,Export,156,China,CHN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,27901511433,,,0
+S4,2015,2015,2015,1,0,1,Import,170,Colombia,COL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,5132630223,,,0
+S4,2015,2015,2015,1,0,2,Export,170,Colombia,COL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,18839854677,,,0
+S4,2015,2015,2015,1,0,1,Import,174,Comoros,COM,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,8497938,,,0
+S4,2015,2015,2015,1,0,2,Export,174,Comoros,COM,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,9,,,0
+S4,2015,2015,2015,1,0,1,Import,178,Congo,COG,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,507589356,,,4
+S4,2015,2015,2015,1,0,2,Export,178,Congo,COG,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,2695400414,,,0
+S4,2015,2015,2015,1,0,1,Import,180,Dem. Rep. of the Congo,COD,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,517230087,,,4
+S4,2015,2015,2015,1,0,2,Export,180,Dem. Rep. of the Congo,COD,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,1591454,,,0
+S4,2015,2015,2015,1,0,1,Import,188,Costa Rica,CRI,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1312251944,,,0
+S4,2015,2015,2015,1,0,2,Export,188,Costa Rica,CRI,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,3666143,,,0
+S4,2015,2015,2015,1,0,1,Import,191,Croatia,HRV,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,3127353601,,,0
+S4,2015,2015,2015,1,0,2,Export,191,Croatia,HRV,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1400585352,,,0
+S4,2015,2015,2015,1,0,1,Import,196,Cyprus,CYP,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,1240729329,,,4
+S4,2015,2015,2015,1,0,2,Export,196,Cyprus,CYP,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,320751643,,,0
+S4,2015,2015,2015,1,0,1,Import,203,Czechia,CZE,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,9027581879,,,0
+S4,2015,2015,2015,1,0,2,Export,203,Czechia,CZE,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,4622485343,,,0
+S4,2015,2015,2015,1,0,1,Import,204,Benin,BEN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,446171613,,,4
+S4,2015,2015,2015,1,0,2,Export,204,Benin,BEN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,22710871,,,0
+S4,2015,2015,2015,1,0,1,Import,208,Denmark,DNK,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,5474561615,,,0
+S4,2015,2015,2015,1,0,2,Export,208,Denmark,DNK,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,4566288609,,,0
+S4,2015,2015,2015,1,0,1,Import,214,Dominican Rep.,DOM,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,3004827857,,,4
+S4,2015,2015,2015,1,0,2,Export,214,Dominican Rep.,DOM,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,413704184,,,4
+S4,2015,2015,2015,1,0,1,Import,218,Ecuador,ECU,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,4195748996,,,0
+S4,2015,2015,2015,1,0,2,Export,218,Ecuador,ECU,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,6661855684,,,0
+S4,2015,2015,2015,1,0,1,Import,222,El Salvador,SLV,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,1396672116,,,4
+S4,2015,2015,2015,1,0,2,Export,222,El Salvador,SLV,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,107990380,,,0
+S4,2015,2015,2015,1,0,1,Import,231,Ethiopia,ETH,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,2109547973,,,4
+S4,2015,2015,2015,1,0,2,Export,231,Ethiopia,ETH,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,18,,,0
+S4,2015,2015,2015,1,0,1,Import,233,Estonia,EST,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,2078418263,,,0
+S4,2015,2015,2015,1,0,2,Export,233,Estonia,EST,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1524553774,,,0
+S4,2015,2015,2015,1,0,1,Import,242,Fiji,FJI,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,475260206,,,0
+S4,2015,2015,2015,1,0,2,Export,242,Fiji,FJI,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,197153986,,,0
+S4,2015,2015,2015,1,0,1,Import,246,Finland,FIN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,7689931126,,,0
+S4,2015,2015,2015,1,0,2,Export,246,Finland,FIN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,4036386941,,,0
+S4,2015,2015,2015,1,0,1,Import,251,France,FRA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,59603622058,,,0
+S4,2015,2015,2015,1,0,2,Export,251,France,FRA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,14597350569,,,0
+S4,2015,2015,2015,1,0,1,Import,258,French Polynesia,PYF,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,187166819,,,0
+S4,2015,2015,2015,1,0,2,Export,258,French Polynesia,PYF,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,6504,,,0
+S4,2015,2015,2015,1,0,1,Import,268,Georgia,GEO,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,1241285640,,,4
+S4,2015,2015,2015,1,0,2,Export,268,Georgia,GEO,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,136431058,,,4
+S4,2015,2015,2015,1,0,1,Import,270,Gambia,GMB,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,72940388,,,4
+S4,2015,2015,2015,1,0,2,Export,270,Gambia,GMB,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,79782,,,0
+S4,2015,2015,2015,1,0,1,Import,275,State of Palestine,PSE,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1132258038,,,0
+S4,2015,2015,2015,1,0,2,Export,275,State of Palestine,PSE,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1574370,,,0
+S4,2015,2015,2015,1,0,1,Import,276,Germany,DEU,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,97913791052,,,4
+S4,2015,2015,2015,1,0,2,Export,276,Germany,DEU,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,28355771036,,,4
+S4,2015,2015,2015,1,0,1,Import,288,Ghana,GHA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,1700044859,,,4
+S4,2015,2015,2015,1,0,2,Export,288,Ghana,GHA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,2985227593,,,4
+S4,2015,2015,2015,1,0,1,Import,296,Kiribati,KIR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,8085048,,,4
+S4,2015,2015,2015,1,0,2,Export,296,Kiribati,KIR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,967443,,,4
+S4,2015,2015,2015,1,0,1,Import,300,Greece,GRC,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,12600500209,,,0
+S4,2015,2015,2015,1,0,2,Export,300,Greece,GRC,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,8430900716,,,0
+S4,2015,2015,2015,1,0,1,Import,304,Greenland,GRL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,104441218,,,0
+S4,2015,2015,2015,1,0,2,Export,304,Greenland,GRL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,870,,,0
+S4,2015,2015,2015,1,0,1,Import,308,Grenada,GRD,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,66122532,,,4
+S4,2015,2015,2015,1,0,2,Export,308,Grenada,GRD,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,71381,,,0
+S4,2015,2015,2015,1,0,1,Import,320,Guatemala,GTM,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,2510891330,,,0
+S4,2015,2015,2015,1,0,2,Export,320,Guatemala,GTM,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,439750512,,,0
+S4,2015,2015,2015,1,0,1,Import,324,Guinea,GIN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,322699635,,,0
+S4,2015,2015,2015,1,0,2,Export,324,Guinea,GIN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,3365598,,,0
+S4,2015,2015,2015,1,0,1,Import,328,Guyana,GUY,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,371624696,,,4
+S4,2015,2015,2015,1,0,2,Export,328,Guyana,GUY,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,96233,,,0
+S4,2015,2015,2015,1,0,1,Import,340,Honduras,HND,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1320178196,,,0
+S4,2015,2015,2015,1,0,2,Export,340,Honduras,HND,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,781635,,,0
+S4,2015,2015,2015,1,0,1,Import,344,"China, Hong Kong SAR",HKG,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,12122609794,,,0
+S4,2015,2015,2015,1,0,2,Export,344,"China, Hong Kong SAR",HKG,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,726451158,,,0
+S4,2015,2015,2015,1,0,1,Import,348,Hungary,HUN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,7415141178,,,0
+S4,2015,2015,2015,1,0,2,Export,348,Hungary,HUN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,2302094755,,,0
+S4,2015,2015,2015,1,0,1,Import,352,Iceland,ISL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,660014905,,,0
+S4,2015,2015,2015,1,0,2,Export,352,Iceland,ISL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,76057572,,,0
+S4,2015,2015,2015,1,0,1,Import,360,Indonesia,IDN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,25028022726,,,0
+S4,2015,2015,2015,1,0,2,Export,360,Indonesia,IDN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,34648563985,,,0
+S4,2015,2015,2015,1,0,1,Import,364,Iran,IRN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,307153587,,,4
+S4,2015,2015,2015,1,0,2,Export,364,Iran,IRN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,34699341336,,,0
+S4,2015,2015,2015,1,0,1,Import,372,Ireland,IRL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,5663850775,,,4
+S4,2015,2015,2015,1,0,2,Export,372,Ireland,IRL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,857660094,,,4
+S4,2015,2015,2015,1,0,1,Import,376,Israel,ISR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,7390540000,,,0
+S4,2015,2015,2015,1,0,2,Export,376,Israel,ISR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,507272000,,,0
+S4,2015,2015,2015,1,0,1,Import,381,Italy,ITA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,52278618014,,,4
+S4,2015,2015,2015,1,0,2,Export,381,Italy,ITA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,14622719973,,,4
+S4,2015,2015,2015,1,0,1,Import,384,Côte d'Ivoire,CIV,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,1739499342,,,4
+S4,2015,2015,2015,1,0,2,Export,384,Côte d'Ivoire,CIV,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,1626330335,,,0
+S4,2015,2015,2015,1,0,1,Import,388,Jamaica,JAM,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1147001949,,,0
+S4,2015,2015,2015,1,0,2,Export,388,Jamaica,JAM,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,194436191,,,0
+S4,2015,2015,2015,1,0,1,Import,392,Japan,JPN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,128284860703,,,0
+S4,2015,2015,2015,1,0,2,Export,392,Japan,JPN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,11379701990,,,0
+S4,2015,2015,2015,1,0,1,Import,398,Kazakhstan,KAZ,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1680167538,,,0
+S4,2015,2015,2015,1,0,2,Export,398,Kazakhstan,KAZ,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,31119493395,,,0
+S4,2015,2015,2015,1,0,1,Import,400,Jordan,JOR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,3532661186,,,0
+S4,2015,2015,2015,1,0,2,Export,400,Jordan,JOR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,10169315,,,0
+S4,2015,2015,2015,1,0,1,Import,404,Kenya,KEN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,2480485689,,,4
+S4,2015,2015,2015,1,0,2,Export,404,Kenya,KEN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,614321535,,,0
+S4,2015,2015,2015,1,0,1,Import,410,Rep. of Korea,KOR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,103400935307,,,0
+S4,2015,2015,2015,1,0,2,Export,410,Rep. of Korea,KOR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,33123684378,,,0
+S4,2015,2015,2015,1,0,1,Import,414,Kuwait,KWT,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,194276195,,,4
+S4,2015,2015,2015,1,0,2,Export,414,Kuwait,KWT,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,48483598869,,,0
+S4,2015,2015,2015,1,0,1,Import,417,Kyrgyzstan,KGZ,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,778131764,,,0
+S4,2015,2015,2015,1,0,2,Export,417,Kyrgyzstan,KGZ,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,75215720,,,0
+S4,2015,2015,2015,1,0,1,Import,418,Lao People's Dem. Rep.,LAO,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,759581891,,,0
+S4,2015,2015,2015,1,0,2,Export,418,Lao People's Dem. Rep.,LAO,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,5256410,,,0
+S4,2015,2015,2015,1,0,1,Import,422,Lebanon,LBN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,3846679416,,,4
+S4,2015,2015,2015,1,0,2,Export,422,Lebanon,LBN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,24002603,,,0
+S4,2015,2015,2015,1,0,1,Import,426,Lesotho,LSO,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,189792958,,,4
+S4,2015,2015,2015,1,0,2,Export,426,Lesotho,LSO,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,426507,,,4
+S4,2015,2015,2015,1,0,1,Import,428,Latvia,LVA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,1824248635,,,4
+S4,2015,2015,2015,1,0,2,Export,428,Latvia,LVA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,868724147,,,4
+S4,2015,2015,2015,1,0,1,Import,440,Lithuania,LTU,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,5677329188,,,0
+S4,2015,2015,2015,1,0,2,Export,440,Lithuania,LTU,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,4143366016,,,0
+S4,2015,2015,2015,1,0,1,Import,442,Luxembourg,LUX,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1363374971,,,0
+S4,2015,2015,2015,1,0,2,Export,442,Luxembourg,LUX,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,60650395,,,0
+S4,2015,2015,2015,1,0,1,Import,446,"China, Macao SAR",MAC,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,735752217,,,0
+S4,2015,2015,2015,1,0,2,Export,446,"China, Macao SAR",MAC,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,48144,,,0
+S4,2015,2015,2015,1,0,1,Import,450,Madagascar,MDG,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,496903651,,,0
+S4,2015,2015,2015,1,0,2,Export,450,Madagascar,MDG,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,64240415,,,0
+S4,2015,2015,2015,1,0,1,Import,454,Malawi,MWI,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,249353669,,,0
+S4,2015,2015,2015,1,0,2,Export,454,Malawi,MWI,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,217717,,,0
+S4,2015,2015,2015,1,0,1,Import,458,Malaysia,MYS,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,21758080310,,,0
+S4,2015,2015,2015,1,0,2,Export,458,Malaysia,MYS,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,32962210874,,,0
+S4,2015,2015,2015,1,0,1,Import,462,Maldives,MDV,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,288698595,,,0
+S4,2015,2015,2015,1,0,2,Export,462,Maldives,MDV,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,36762,,,0
+S4,2015,2015,2015,1,0,1,Import,470,Malta,MLT,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1877332008,,,0
+S4,2015,2015,2015,1,0,2,Export,470,Malta,MLT,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1505463385,,,0
+S4,2015,2015,2015,1,0,1,Import,478,Mauritania,MRT,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,591646906,,,0
+S4,2015,2015,2015,1,0,2,Export,478,Mauritania,MRT,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,79879311,,,0
+S4,2015,2015,2015,1,0,1,Import,480,Mauritius,MUS,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,674761730,,,0
+S4,2015,2015,2015,1,0,2,Export,480,Mauritius,MUS,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,6134179,,,0
+S4,2015,2015,2015,1,0,1,Import,484,Mexico,MEX,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,25042500525,,,0
+S4,2015,2015,2015,1,0,2,Export,484,Mexico,MEX,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,22417744751,,,4
+S4,2015,2015,2015,1,0,1,Import,490,"Other Asia, nes",,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,37563079420,,,0
+S4,2015,2015,2015,1,0,2,Export,490,"Other Asia, nes",,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,11570774908,,,0
+S4,2015,2015,2015,1,0,1,Import,496,Mongolia,MNG,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,874470121,,,0
+S4,2015,2015,2015,1,0,2,Export,496,Mongolia,MNG,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,949731897,,,0
+S4,2015,2015,2015,1,0,1,Import,498,Rep. of Moldova,MDA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,458367000,,,0
+S4,2015,2015,2015,1,0,2,Export,498,Rep. of Moldova,MDA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,10058404,,,0
+S4,2015,2015,2015,1,0,1,Import,499,Montenegro,MNE,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,221714996,,,0
+S4,2015,2015,2015,1,0,2,Export,499,Montenegro,MNE,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,52304726,,,0
+S4,2015,2015,2015,1,0,1,Import,500,Montserrat,MSR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,228761,,,0
+S4,2015,2015,2015,1,0,2,Export,500,Montserrat,MSR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,56,,,0
+S4,2015,2015,2015,1,0,1,Import,504,Morocco,MAR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,6790110663,,,4
+S4,2015,2015,2015,1,0,2,Export,504,Morocco,MAR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,431388392,,,4
+S4,2015,2015,2015,1,0,1,Import,508,Mozambique,MOZ,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,1026727024,,,4
+S4,2015,2015,2015,1,0,2,Export,508,Mozambique,MOZ,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,1001762710,,,4
+S4,2015,2015,2015,1,0,1,Import,512,Oman,OMN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,3355570072,,,4
+S4,2015,2015,2015,1,0,2,Export,512,Oman,OMN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,23553749807,,,4
+S4,2015,2015,2015,1,0,1,Import,516,Namibia,NAM,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1133353232,,,0
+S4,2015,2015,2015,1,0,2,Export,516,Namibia,NAM,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,103041534,,,0
+S4,2015,2015,2015,1,0,1,Import,524,Nepal,NPL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,880954534,,,0
+S4,2015,2015,2015,1,0,2,Export,524,Nepal,NPL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,10327,,,0
+S4,2015,2015,2015,1,0,1,Import,528,Netherlands,NLD,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,58750637174,,,4
+S4,2015,2015,2015,1,0,2,Export,528,Netherlands,NLD,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,47634927890,,,4
+S4,2015,2015,2015,1,0,1,Import,533,Aruba,ABW,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,60271547,,,0
+S4,2015,2015,2015,1,0,2,Export,533,Aruba,ABW,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,157607,,,0
+S4,2015,2015,2015,1,0,1,Import,540,New Caledonia,NCL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,563920591,,,0
+S4,2015,2015,2015,1,0,2,Export,540,New Caledonia,NCL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,197164,,,0
+S4,2015,2015,2015,1,0,1,Import,554,New Zealand,NZL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,3640444401,,,4
+S4,2015,2015,2015,1,0,2,Export,554,New Zealand,NZL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,626415216,,,4
+S4,2015,2015,2015,1,0,1,Import,558,Nicaragua,NIC,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,742380453,,,0
+S4,2015,2015,2015,1,0,2,Export,558,Nicaragua,NIC,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,13068020,,,0
+S4,2015,2015,2015,1,0,1,Import,562,Niger,NER,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,111969597,,,0
+S4,2015,2015,2015,1,0,2,Export,562,Niger,NER,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,148348623,,,0
+S4,2015,2015,2015,1,0,1,Import,566,Nigeria,NGA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,6259831614,,,4
+S4,2015,2015,2015,1,0,2,Export,566,Nigeria,NGA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,42559983433,,,4
+S4,2015,2015,2015,1,0,1,Import,579,Norway,NOR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,3306467926,,,4
+S4,2015,2015,2015,1,0,2,Export,579,Norway,NOR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,59870440335,,,4
+S4,2015,2015,2015,1,0,1,Import,585,Palau,PLW,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,27643664,,,0
+S4,2015,2015,2015,1,0,1,Import,586,Pakistan,PAK,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,10030208772,,,0
+S4,2015,2015,2015,1,0,2,Export,586,Pakistan,PAK,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,265117805,,,0
+S4,2015,2015,2015,1,0,1,Import,591,Panama,PAN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1083465,,,0
+S4,2015,2015,2015,1,0,2,Export,591,Panama,PAN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,664587,,,0
+S4,2015,2015,2015,1,0,1,Import,600,Paraguay,PRY,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,1409122713,,,4
+S4,2015,2015,2015,1,0,2,Export,600,Paraguay,PRY,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,2086409589,,,4
+S4,2015,2015,2015,1,0,1,Import,604,Peru,PER,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,3919518252,,,4
+S4,2015,2015,2015,1,0,2,Export,604,Peru,PER,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,2412247499,,,4
+S4,2015,2015,2015,1,0,1,Import,616,Poland,POL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,14269724873,,,0
+S4,2015,2015,2015,1,0,2,Export,616,Poland,POL,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,6434167691,,,0
+S4,2015,2015,2015,1,0,1,Import,620,Portugal,PRT,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,8838073940,,,4
+S4,2015,2015,2015,1,0,2,Export,620,Portugal,PRT,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,4214489133,,,4
+S4,2015,2015,2015,1,0,1,Import,634,Qatar,QAT,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,378672297,,,4
+S4,2015,2015,2015,1,0,2,Export,634,Qatar,QAT,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,64492461762,,,0
+S4,2015,2015,2015,1,0,1,Import,642,Romania,ROU,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,4454108179,,,0
+S4,2015,2015,2015,1,0,2,Export,642,Romania,ROU,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,2703935207,,,0
+S4,2015,2015,2015,1,0,1,Import,643,Russian Federation,RUS,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,2990182171,,,0
+S4,2015,2015,2015,1,0,2,Export,643,Russian Federation,RUS,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,216101065740,,,0
+S4,2015,2015,2015,1,0,1,Import,646,Rwanda,RWA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,423662181,,,4
+S4,2015,2015,2015,1,0,2,Export,646,Rwanda,RWA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,89822501,,,4
+S4,2015,2015,2015,1,0,1,Import,659,Saint Kitts and Nevis,KNA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,9587626,,,4
+S4,2015,2015,2015,1,0,2,Export,659,Saint Kitts and Nevis,KNA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,14092,,,0
+S4,2015,2015,2015,1,0,1,Import,662,Saint Lucia,LCA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,94284370,,,0
+S4,2015,2015,2015,1,0,2,Export,662,Saint Lucia,LCA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,38651938,,,0
+S4,2015,2015,2015,1,0,1,Import,670,Saint Vincent and the Grenadines,VCT,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,40107696,,,0
+S4,2015,2015,2015,1,0,2,Export,670,Saint Vincent and the Grenadines,VCT,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,9562,,,0
+S4,2015,2015,2015,1,0,1,Import,678,Sao Tome and Principe,STP,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,620806,,,0
+S4,2015,2015,2015,1,0,1,Import,682,Saudi Arabia,SAU,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,1222426026,,,4
+S4,2015,2015,2015,1,0,2,Export,682,Saudi Arabia,SAU,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,153058929584,,,0
+S4,2015,2015,2015,1,0,1,Import,686,Senegal,SEN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1315715915,,,0
+S4,2015,2015,2015,1,0,2,Export,686,Senegal,SEN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,362449093,,,0
+S4,2015,2015,2015,1,0,1,Import,688,Serbia,SRB,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,2096969144,,,0
+S4,2015,2015,2015,1,0,2,Export,688,Serbia,SRB,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,380549561,,,0
+S4,2015,2015,2015,1,0,1,Import,690,Seychelles,SYC,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,173153476,,,0
+S4,2015,2015,2015,1,0,2,Export,690,Seychelles,SYC,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,140784628,,,0
+S4,2015,2015,2015,1,0,1,Import,694,Sierra Leone,SLE,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,478209957,,,0
+S4,2015,2015,2015,1,0,2,Export,694,Sierra Leone,SLE,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,201950,,,0
+S4,2015,2015,2015,1,0,1,Import,699,India,IND,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,104631089403,,,0
+S4,2015,2015,2015,1,0,2,Export,699,India,IND,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,31387082476,,,0
+S4,2015,2015,2015,1,0,1,Import,702,Singapore,SGP,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,64575317861,,,4
+S4,2015,2015,2015,1,0,2,Export,702,Singapore,SGP,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,43636133131,,,4
+S4,2015,2015,2015,1,0,1,Import,703,Slovakia,SVK,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,5981936031,,,4
+S4,2015,2015,2015,1,0,2,Export,703,Slovakia,SVK,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,2674726634,,,4
+S4,2015,2015,2015,1,0,1,Import,704,Viet Nam,VNM,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,7845046918,,,0
+S4,2015,2015,2015,1,0,2,Export,704,Viet Nam,VNM,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,4995834449,,,0
+S4,2015,2015,2015,1,0,1,Import,705,Slovenia,SVN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,2754623952,,,0
+S4,2015,2015,2015,1,0,2,Export,705,Slovenia,SVN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1410472939,,,0
+S4,2015,2015,2015,1,0,1,Import,710,South Africa,ZAF,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,13390039876,,,0
+S4,2015,2015,2015,1,0,2,Export,710,South Africa,ZAF,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,7790917142,,,4
+S4,2015,2015,2015,1,0,1,Import,716,Zimbabwe,ZWE,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,1581703035,,,4
+S4,2015,2015,2015,1,0,2,Export,716,Zimbabwe,ZWE,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,65015784,,,4
+S4,2015,2015,2015,1,0,1,Import,724,Spain,ESP,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,42631720343,,,4
+S4,2015,2015,2015,1,0,2,Export,724,Spain,ESP,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,13980078920,,,4
+S4,2015,2015,2015,1,0,1,Import,729,Sudan,SDN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,203630751,,,0
+S4,2015,2015,2015,1,0,2,Export,729,Sudan,SDN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,3000499379,,,0
+S4,2015,2015,2015,1,0,1,Import,740,Suriname,SUR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,234098142,,,4
+S4,2015,2015,2015,1,0,2,Export,740,Suriname,SUR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,13769,,,0
+S4,2015,2015,2015,1,0,1,Import,748,Eswatini,SWZ,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,177194684,,,4
+S4,2015,2015,2015,1,0,2,Export,748,Eswatini,SWZ,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,14103034,,,4
+S4,2015,2015,2015,1,0,1,Import,752,Sweden,SWE,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,13516164848,,,4
+S4,2015,2015,2015,1,0,2,Export,752,Sweden,SWE,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,8648369920,,,4
+S4,2015,2015,2015,1,0,1,Import,757,Switzerland,CHE,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,8853583813,,,4
+S4,2015,2015,2015,1,0,2,Export,757,Switzerland,CHE,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,2749738061,,,4
+S4,2015,2015,2015,1,0,1,Import,764,Thailand,THA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,30288005485,,,4
+S4,2015,2015,2015,1,0,2,Export,764,Thailand,THA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,8440877279,,,4
+S4,2015,2015,2015,1,0,1,Import,768,Togo,TGO,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,313795653,,,4
+S4,2015,2015,2015,1,0,2,Export,768,Togo,TGO,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,36762337,,,0
+S4,2015,2015,2015,1,0,1,Import,780,Trinidad and Tobago,TTO,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,2630493145,,,4
+S4,2015,2015,2015,1,0,2,Export,780,Trinidad and Tobago,TTO,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,4697262810,,,4
+S4,2015,2015,2015,1,0,1,Import,784,United Arab Emirates,ARE,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,1946492978,,,4
+S4,2015,2015,2015,1,0,2,Export,784,United Arab Emirates,ARE,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,62483710281,,,4
+S4,2015,2015,2015,1,0,1,Import,788,Tunisia,TUN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,2874479713,,,0
+S4,2015,2015,2015,1,0,2,Export,788,Tunisia,TUN,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1014655872,,,0
+S4,2015,2015,2015,1,0,1,Import,792,Turkey,TUR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,15226022332,,,4
+S4,2015,2015,2015,1,0,2,Export,792,Turkey,TUR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,4928329607,,,4
+S4,2015,2015,2015,1,0,1,Import,800,Uganda,UGA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1029452666,,,0
+S4,2015,2015,2015,1,0,2,Export,800,Uganda,UGA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,149025121,,,0
+S4,2015,2015,2015,1,0,1,Import,804,Ukraine,UKR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,10882423616,,,0
+S4,2015,2015,2015,1,0,2,Export,804,Ukraine,UKR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,488015617,,,0
+S4,2015,2015,2015,1,0,1,Import,807,North Macedonia,MKD,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,703388110,,,4
+S4,2015,2015,2015,1,0,2,Export,807,North Macedonia,MKD,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,61568945,,,4
+S4,2015,2015,2015,1,0,1,Import,818,Egypt,EGY,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,11613205321,,,4
+S4,2015,2015,2015,1,0,2,Export,818,Egypt,EGY,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,3906465186,,,4
+S4,2015,2015,2015,1,0,1,Import,826,United Kingdom,GBR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,50949018636,,,0
+S4,2015,2015,2015,1,0,2,Export,826,United Kingdom,GBR,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,32743893075,,,0
+S4,2015,2015,2015,1,0,1,Import,834,United Rep. of Tanzania,TZA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,7444965865,,,0
+S4,2015,2015,2015,1,0,2,Export,834,United Rep. of Tanzania,TZA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,128545435,,,0
+S4,2015,2015,2015,1,0,1,Import,842,USA,USA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,200458048460,,,0
+S4,2015,2015,2015,1,0,2,Export,842,USA,USA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,103971812103,,,0
+S4,2015,2015,2015,1,0,1,Import,854,Burkina Faso,BFA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,802907264,,,4
+S4,2015,2015,2015,1,0,2,Export,854,Burkina Faso,BFA,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,0,,33842505,,,0
+S4,2015,2015,2015,1,0,1,Import,858,Uruguay,URY,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,1123871774,,,0
+S4,2015,2015,2015,1,0,2,Export,858,Uruguay,URY,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,21910759,,,0
+S4,2015,2015,2015,1,0,1,Import,882,Samoa,WSM,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,55019105,,,0
+S4,2015,2015,2015,1,0,2,Export,882,Samoa,WSM,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,14901313,,,0
+S4,2015,2015,2015,1,0,1,Import,887,Yemen,YEM,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,647678157,,,0
+S4,2015,2015,2015,1,0,2,Export,887,Yemen,YEM,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,,,,,,,996530,,,0
+S4,2015,2015,2015,1,0,1,Import,894,Zambia,ZMB,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,1654555163,,,4
+S4,2015,2015,2015,1,0,2,Export,894,Zambia,ZMB,0,World,WLD,,,,,,,,3,"Mineral fuels, lubricants and related materials",1,No Quantity,0,,,,,,111231863,,,4

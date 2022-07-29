@@ -11,7 +11,7 @@ editor_options:
 # Set up
 
 ## packages
-```{r}
+```{r include=FALSE}
 ### set work dir
 path <- rstudioapi::getSourceEditorContext()$path
 dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
@@ -122,7 +122,7 @@ ind <- 'TradeMatrix_Pesticides_Hzd'
 # f <- paste0(dir.baci, 'BACI_HS92.RData')          ## there is no data for 380850 and 380859
 f <- paste0(dir.baci, 'BACI_HS07_07_10_15.RData')
 
-load(file = f)
+load(file = f) # `bacis`
 
 head(bacis)
 ks <- bacis %>% distinct(k, .keep_all = F) %>%
