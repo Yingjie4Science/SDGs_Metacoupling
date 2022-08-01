@@ -93,8 +93,10 @@ load(f) # `temp_eora`
 ### to match country full_name and abbr 
 xls_iso_eora <- "./Data/_eora_190country_iso3_match_update.xlsx"
 iso_eora <- readxl::read_excel(path = xls_iso_eora)
+```
 
 
+```{r - data list}
 ### to list all the input data files
 library(stringr)
 pattern <- '^YJ_'
@@ -103,15 +105,31 @@ xls.ls <- basename(xls.eora.ls); xls.ls
 
 
 ### to obtain the unique list of all the footprint indicator names
-inds <- substr(x = xls.ls, start = 4, stop = max(nchar(xls.ls))); inds
-inds <- str_sub(string = inds, end = -10); inds
-inds <- gsub(pattern = '_$', '', x = inds); inds
+### - old list
+xls.eora.ls.old <- list.files(path = paste0(dir.eora, '2021-08-05'), pattern = pattern, full.names = T);
+xls.ls.old <- basename(xls.eora.ls.old);
+inds <- substr(x = xls.ls.old, start = 4, stop = max(nchar(xls.ls.old))); inds
+inds <- str_sub(string = inds, end = -10);
+inds <- gsub(pattern = '_$', '', x = inds);
+inds <- unique(inds); 
+inds.old <- inds
+print(paste0('The total number of Eora indicators: ', length(inds.old)))
+
+### - new list (update on 2022-08-01)
+inds <- substr(x = xls.ls, start = 4, stop = max(nchar(xls.ls))); 
+inds <- str_sub(string = inds, end = -10); 
+inds <- gsub(pattern = '_$', '', x = inds); 
 inds <- unique(inds); inds
 print(paste0('The total number of Eora indicators: ', length(inds)))
 
+### - difference
+setdiff(inds.old, inds)
+setdiff(inds, inds.old)
+
+
 ### save this indicator list as a file
 inds_df <- data.frame(indicator = inds)
-writexl::write_xlsx(x = inds_df, path = './Data/_indicators_io_list.xlsx')
+writexl::write_xlsx(x = inds_df, path = './Data/_eora_indicators_io_list.xlsx')
 ```
   
 
@@ -133,8 +151,8 @@ writexl::write_xlsx(x = inds_df, path = './Data/_indicators_io_list.xlsx')
 for (i in inds) {
   # print(i)
   iname = i
-  pattern <- paste0('^YJ_', i, '_20'); print(pattern)
-  xls.eora.ls <- list.files(path = dir.eora, pattern = pattern, full.names = T); print(xls.eora.ls)
+  pattern <- paste0('^YJ_', i, '_20'); #print(pattern)
+  xls.eora.ls <- list.files(path = dir.eora, pattern = pattern, full.names = T); #print(xls.eora.ls)
   
   ### in case the pattern would match too many files, we use this `if else` function to pop out a warning message if anything goes wrong. 
   if(length(xls.eora.ls) > 4 | length(xls.eora.ls) < 3) {
@@ -175,7 +193,7 @@ for (i in inds) {
     print(paste0('Total number of rows for the combine data set: ', nrow(df.eora.x.all)))
   
     ### save as xlsx
-    fname <- paste0(dir.eora_cleaned, iname, '.xlsx'); print(fname)
+    fname <- paste0(dir.eora_cleaned, iname, '.xlsx'); print(fname); cat('\n\n')
     writexl::write_xlsx(x = df.eora.x.all, path = fname)
   }
 }
@@ -543,7 +561,7 @@ xls.ls <- list.files(path = dir.eora_cleaned, pattern = 'xlsx$', full.names = T)
 yr <- 2015
 
 for (xls in xls.ls) {
-  print(xls)
+  # print(xls)
   df <- readxl::read_excel(path = xls) %>%
     dplyr::filter(year == yr) %>%
     as.data.frame()
@@ -573,7 +591,7 @@ for (xls in xls.ls) {
   dfht
   
   ### save plot
-  fname <-paste0(dir.fig, 'footprint_heatmap/FT_HT_', iname, '_', yr, '_0813.png'); fname
+  fname <-paste0(dir.fig, 'footprint_heatmap/FT_HT_', iname, '_', yr, '_20220801.png'); print(fname)
   ggsave(filename = fname, plot = dfht, width = 16, height = 16, units = 'in', dpi = 300)
   
 }
