@@ -77,26 +77,28 @@ load('./Data/Ancillary_Data_iso_eora_ex.RData')  ## ## iso_eora_ex
 ### use the Eora data as the template 
 f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'template_eora.RData')
 load(f) # `temp_eora`
-```
 
 
-
-
-#  Data
-## Eora data Batch 
-
-  Batch read in and format as trade matrix among countries, for 2000, 2005, 2010, and 2015.
-  
-  Combine the 4-year data for each ft indicator into one single file, and save to `eora_cleaned` folder. 
-  
-```{r - ctr info}
 ### to match country full_name and abbr 
 xls_iso_eora <- "./Data/_eora_190country_iso3_match_update.xlsx"
 iso_eora <- readxl::read_excel(path = xls_iso_eora)
 ```
 
 
-```{r - data list}
+
+
+#  Data
+
+## Eora data Batch 
+
+  Batch read in and format as trade matrix among countries, for 2000, 2005, 2010, and 2015.
+  
+  Combine the 4-year data for each ft indicator into one single file, and save to `eora_cleaned` folder. 
+  
+
+```{r - data version}
+### to choose data version by modifying `dir.eora` in `_path of data.R`
+
 ### to list all the input data files
 library(stringr)
 pattern <- '^YJ_'
@@ -106,19 +108,21 @@ xls.ls <- basename(xls.eora.ls); xls.ls
 
 ### to obtain the unique list of all the footprint indicator names
 ### - old list
-xls.eora.ls.old <- list.files(path = paste0(dir.eora, '2021-08-05'), pattern = pattern, full.names = T);
+xls.eora.ls.old <- list.files(path = paste0(dirname(dir.eora), '/2021-08-05'), pattern = pattern, full.names = T);
 xls.ls.old <- basename(xls.eora.ls.old);
 inds <- substr(x = xls.ls.old, start = 4, stop = max(nchar(xls.ls.old))); inds
 inds <- str_sub(string = inds, end = -10);
 inds <- gsub(pattern = '_$', '', x = inds);
 inds <- unique(inds); 
 inds.old <- inds
-print(paste0('The total number of Eora indicators: ', length(inds.old)))
+print(paste0('The total number of Eora indicators: ', length(inds.old))) ## 54
+
 
 ### - new list (update on 2022-08-01)
 inds <- substr(x = xls.ls, start = 4, stop = max(nchar(xls.ls))); 
-inds <- str_sub(string = inds, end = -10); 
-inds <- gsub(pattern = '_$', '', x = inds); 
+inds <- str_sub(string = inds, end = -10);           ## remove "_YYYY.xlsx"
+inds <- gsub(pattern = '_$|20220801', '', x = inds); ## fix format issue in SHDB' names
+inds <- gsub(pattern = 'SHDB_', 'SHDB', x = inds);   ## fix format issue in SHDB' names
 inds <- unique(inds); inds
 print(paste0('The total number of Eora indicators: ', length(inds)))
 
@@ -135,27 +139,53 @@ writexl::write_xlsx(x = inds_df, path = './Data/_eora_indicators_io_list.xlsx')
 
 
   **Rename files** - in case the name system is not consistent. 
-```{r}
-# name_old <- list.files(path = dir.eora, pattern="Water_scare", full.names = T)
-# name_old
-# name_new <- gsub('scare', 'scare_', name_old)
-# name_new <- gsub('__', '_', name_new)
-# name_new
-# file.rename(from = name_old, to = name_new)
+```{r eval=FALSE, include=FALSE}
+
+## 1. fix `Water_scare` file
+name_old <- list.files(path = dir.eora, pattern="Water_scare", full.names = T)
+name_old
+name_new <- gsub('scare', 'scare_', name_old)
+name_new <- gsub('__', '_', name_new)
+name_new
+file.rename(from = name_old, to = name_new)
+
+
+## 2. fix SHDB files
+xls.ls.rename <- subset(xls.ls, grepl(pattern = 'SHDB', x = xls.ls))
+for (file in xls.ls.rename) {
+  ## new name
+  file_new <- file %>%
+    gsub(pattern = '20220801', '',  x = .) %>%
+    gsub(pattern = 'SHDB_', 'SHDB', x = .)
+  name_dir <- paste0(dirname(xls.eora.ls[1]), '/')
+  name_old <- paste0(name_dir, file)
+  name_new <- paste0(name_dir, file_new)
+  if (file.exists(name_old)) {
+    ## rename
+    file.rename(name_old, name_new)
+  } else {
+    cat("The file does not exist\n")
+  }
+}
 ```
   
   
 
 ```{r - loop read and combine xlsx}
 # pattern <- '^YJ_CO2'
+n_year_check <- 4 ## if 4 years data, to make sure no more files will be matched. 
+n_year_check <- 1
+f <- paste0(dir.flowScenario, 'para_n_year_check.RData'); f
+save(n_year_check, file = f)
+
 for (i in inds) {
   # print(i)
   iname = i
   pattern <- paste0('^YJ_', i, '_20'); #print(pattern)
-  xls.eora.ls <- list.files(path = dir.eora, pattern = pattern, full.names = T); #print(xls.eora.ls)
+  xls.eora.ls <- list.files(path = dir.eora, pattern = pattern, full.names = T); xls.eora.ls
   
   ### in case the pattern would match too many files, we use this `if else` function to pop out a warning message if anything goes wrong. 
-  if(length(xls.eora.ls) > 4 | length(xls.eora.ls) < 3) {
+  if(length(xls.eora.ls) > n_year_check | length(xls.eora.ls) < (n_year_check-1) ) {
     # print('Match error!') 
     stop('Match error!')
   } else {
@@ -205,38 +235,47 @@ for (i in inds) {
 
   SHDB data has only 3 years (i.e., 2014, 2015, and 2019). To make all the data files have the same number of rows for easy data processing, we need to list `NA` data for 2000. 
   
-```{r - format data}
+```{r - format SHDB data}
 
-### to create NA data for 2000 
 xls  <- paste0(dir.eora_cleaned, "SHDB1.xlsx"); xls
-temp <- readxl::read_excel(path = xls) %>%
-  dplyr::filter(year == '2015') 
-
-add_na_2000 <- temp %>%
-  dplyr::mutate_if(is.numeric, funs(ifelse(!is.na(.), NA, .))) %>%
-  dplyr::mutate(year = '2000')
-# str(add_na_2000)
 
 
-### format all the SHDB data
-xls.ls <- list.files(path = dir.eora_cleaned, pattern = 'xlsx$', full.names = T); #xls.ls
-xls.ls.SHDB <- str_subset(xls.ls, pattern="SHDB"); xls.ls.SHDB
-
-for (xls in xls.ls.SHDB) {
-  print(xls)
-  df <- readxl::read_excel(path = xls)
-  yrs <- unique(df$year); yrs
+### if use 4 years of data, we need to add year 2000 with NA values
+if (n_year_check == 4) {
+  
+  ### 1. to create NA data for 2000 
+  temp <- readxl::read_excel(path = xls) %>%
+    dplyr::filter(year == '2015') 
+  add_na_2000 <- temp %>%
+    dplyr::mutate_if(is.numeric, funs(ifelse(!is.na(.), NA, .))) %>%
+    dplyr::mutate(year = '2000')
+  # str(add_na_2000)
   
   
-  ## if it does not have data for 2000, then add NA data; if includes, then skip and do nothing
-  if(!is.element('2000', yrs)) {           ## !'2000' %in% yrs
-    print('to add NA values to the year of 2000') 
-    df_new <- rbind(add_na_2000, df)
-    writexl::write_xlsx(x = df_new, path = xls)
-  } else{
-    print('skip')
+  ### 2. format all the SHDB data by adding SHDB in 2000 with NA 
+  xls.ls <- list.files(path = dir.eora_cleaned, pattern = 'xlsx$', full.names = T); #xls.ls
+  xls.ls.SHDB <- str_subset(xls.ls, pattern="SHDB"); xls.ls.SHDB
+  
+  for (xls in xls.ls.SHDB) {
+    print(xls)
+    df  <- readxl::read_excel(path = xls)
+    yrs <- unique(df$year); yrs
+    
+    ## if it does not have data for 2000, then add NA data; if includes, then skip and do nothing
+    if(!is.element('2000', yrs)) {           ## !'2000' %in% yrs
+      print('to add NA values to the year of 2000') 
+      df_new <- rbind(add_na_2000, df)
+      writexl::write_xlsx(x = df_new, path = xls)
+    } else{
+      print('skip')
+    }
   }
-  
+
+
+  ### if we only use 1 year data, then skip this formatting step
+} else {
+  temp <- readxl::read_excel(path = xls) 
+  cat('Only', length(unique(temp$year)), 'year data is included here:\t', unique(temp$year), '\n')
 }
 
 ```
@@ -247,7 +286,7 @@ for (xls in xls.ls.SHDB) {
 
 ## Other data sources
 
-```{r - arms trade}
+```{r - arms trade, eval=FALSE, include=FALSE}
 xls <- list.files(path = dir.arm, pattern = '_TIV_arms_trade_', full.names = T); xls
 df <- readxl::read_excel(path = xls) #%>%
   ### format as the same as EORA data
@@ -300,7 +339,7 @@ writexl::write_xlsx(x = df_formatted, path = fname)
 
 
 
-```{r - human_trafficking}
+```{r - human_trafficking, eval=FALSE, include=FALSE}
 
 xls <- list.files(path = dir.traffick, pattern = '_human_trafficking', full.names = T); xls
 df <- readxl::read_excel(path = xls) %>%
@@ -394,7 +433,7 @@ writexl::write_xlsx(x = df_formatted, path = fname)
 
 
 
-```{r - student_flow}
+```{r - student_flow, eval=FALSE, include=FALSE}
 ### get the indicator name
 ind <- 'student_flow'
 
@@ -460,7 +499,7 @@ writexl::write_xlsx(x = df_formatted, path = fname)
 
 
   Refer to the report "OECD FishPEM Model Capture Fisheries Trade Data" by Dr. Jessica Gephart. 
-```{r - TradeMatrix_marine_capture}
+```{r - TradeMatrix_marine_capture, eval=FALSE, include=FALSE}
 ### get the indicator name
 ind <- 'TradeMatrix_marine_capture'
 
@@ -583,28 +622,27 @@ for (xls in xls.ls) {
               # na.rm = T, 
               size = space_size, ## the space between boxes
               show.legend = T) + 
-    scale_fill_gradientn(colours = topo.colors(100), na.value = "white") +
+    scale_fill_gradientn(colours = topo.colors(100), na.value = "gray50") +
     # theme_bw() +
     theme_ns +
     xlab('destination nation') + ylab('origin nation') +
     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.3))
-  dfht
+  # dfht
   
   ### save plot
-  fname <-paste0(dir.fig, 'footprint_heatmap/FT_HT_', iname, '_', yr, '_20220801.png'); print(fname)
+  fname <-paste0(dir.fig, 'footprint_heatmap/FT_HT_', iname, '_', yr, '_', postfix, '.png'); print(fname)
   ggsave(filename = fname, plot = dfht, width = 16, height = 16, units = 'in', dpi = 300)
   
 }
-
 ```
 
 
   Rename files. 
-```{r}
-# name_old <- list.files(path = paste0(dir.fig, 'footprint_heatmap/'), pattern="0812", full.names = T)
-# name_old
-# name_new <- gsub('0812', '2015_0812', name_old)
-# name_new
+```{r eval=FALSE, include=FALSE}
+name_old <- list.files(path = paste0(dir.fig, 'footprint_heatmap/'), pattern="20220812.png", full.names = T)
+name_old
+name_new <- gsub('20220812.png', '20220812con.png', name_old)
+name_new
 # file.rename(from = name_old, to = name_new)
 ```
 
