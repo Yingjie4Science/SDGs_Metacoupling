@@ -27,18 +27,21 @@ dir.fish  <- paste0('D:/data/', 'FAOSTAT/Jessica Gephart/')
 
 
 
-## intermediate data ---------------------------------------------------------------------
+## intermediate data ❗❗ ------------------------------------------------------------------
 dir.process      <- './Data/data_02_intermediate/dt01_ctr_profile/xlsx/'
 dir.cleaned      <- './Data/data_02_intermediate/dt01_ctr_profile/xlsx/cleaned/'
 
 ### EORA data by Mengyu, 
-  # dir.eora         <- './Data/data_02_intermediate/dt02_flows/eora/'
   
-  #### - consumption-based calculation, ## updated on 8/12/2022
+  #### 🟡 - updated on 8/5/2021; used in YSSP and dissertation 
+  # postfix  <- '20210805yssp'
+  # dir.eora         <- './Data/data_02_intermediate/dt02_flows/eora/2021-08-05/'
+  
+  #### 🟡 - updated on 8/12/2022; consumption-based calculation; 
   # postfix  <- '20220812con' 
   # dir.eora <- './Data/data_02_intermediate/dt02_flows/eora/2022-08-05con/' 
   
-  #### - production-based calculation
+  #### 🟡 - updated on 8/12/2022; production-based calculation;  updated on 8/12/2022
   postfix  <- '20220812pro'
   dir.eora <- './Data/data_02_intermediate/dt02_flows/eora/2022-08-05pro/' ## updated on 8/12/2022
 

@@ -2,7 +2,7 @@
 title: "Untitled"
 output: pdf_document
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 
@@ -85,10 +85,10 @@ iso_eora_ex <- iso_eora
 ctr_eora_compare <- merge(x = ctr_eora, y = iso_eora_ex, by = 'iso3_eora', all.x = T) %>%
   group_by(iso3_eora) %>%
   tally() %>%
-  arrange(desc(n))
+  dplyr::arrange(desc(n))
 ```
-  
-  
+
+
 
 ## Population by country
 ```{r }
@@ -186,7 +186,7 @@ writexl::write_xlsx(x = gdp, path = paste0(dir.cleaned, 'GDP (constant 2010 US$)
 
 
 
-## Shapefile,Income Group
+## Shapefile
 ```{r }
 # library(rnaturalearthdata)
 # library(rnaturalearth)
@@ -206,7 +206,18 @@ shp <- shp %>%
   dplyr::mutate(iso_a3 = ifelse(name == "Norway", 'NOR', iso_a3),
                 iso_a3 = ifelse(name == "N. Cyprus", 'CYP', iso_a3)) %>%
   filter(name != 'Antarctica')
+```
 
+
+
+## Country classifications
+
+This script aims to 
+  * compile the existing country classification systems 
+  * clean the data for analysis
+  
+### - based on rnaturalearthdata  
+```{r}
 ### group info from the shp data
 sort(unique(shp$economy))
 sort(unique(shp$income_grp))
@@ -214,7 +225,7 @@ sort(unique(shp$income_grp))
 grp0 <- shp %>% 
   st_drop_geometry() %>% 
   ### re-code ctr group
-  mutate(eco_group = case_when(
+  dplyr::mutate(eco_group = case_when(
     str_detect(economy, "Developed") ~ "1. Developed",
     str_detect(economy, "Emerging")  ~ "2. Developing",
     str_detect(economy, "eveloping|Least") ~ "2. Developing",
@@ -232,9 +243,10 @@ grp0 <- shp %>%
     group = gsub(":.*", "", group),
     group = gsub("(?!\\:)[[:punct:]]", "", group, perl=TRUE),
     group = stringr::str_squish(group)) %>%
-  arrange(!is.na(iso_a3)) %>% ### check missing info and fill the data gap
+  dplyr::arrange(!is.na(iso_a3)) %>% ### check missing info and fill the data gap
   dplyr::select(-type, -economy,-income_grp) %>%
-  dplyr::mutate(iso_a3 = ifelse(name == 'Norway', 'NOR', iso_a3)) 
+  dplyr::mutate(iso_a3 = ifelse(name == 'Norway', 'NOR', iso_a3),
+                iso_a3 = ifelse(name == 'Kosovo', 'XXK', iso_a3)) 
 
 grp_add <- data.frame(
   name = c('Netherlands Antilles'),
@@ -245,13 +257,259 @@ grp_add <- data.frame(
 )
 
 
-grp <- rbind(grp0, grp_add)
+grp <- rbind(grp0, grp_add) %>%
+  dplyr::mutate(
+    eco_group = tm::removeNumbers(eco_group),
+    eco_group = gsub("\\.", "", eco_group),
+    eco_group = stringr::str_squish(eco_group)) %>%
+  dplyr::filter(!is.na(iso_a3)) %>%
+  as.data.frame()
 # summary(grp)
 # Hmisc::describe(grp)
 # summarytools::dfSummary(grp)
+rm(grp_add)
+
+
+## to get a list of developing countries 
+ctr1 <- grp
+ctr2 <- readxl::read_xlsx('./Data/_ctr_iso2_iso3.xlsx', sheet = 'iso')
+ctr <- merge(ctr1, ctr2, by.x = 'iso_a3', by.y = 'Alpha-3 code', all = T) %>%
+  dplyr::filter(eco_group != '1. Developed')
+writexl::write_xlsx(x = ctr, path = './Data/country classification/processed/developing country list.xlsx')
+```
+  
+  
+### - World Bank
+
+  Income classifications set on 1 July 2022 remain in effect until 1 July 2023. 
+  
+  - [Data link](https://datahelpdesk.worldbank.org/knowledgebase/articles/906519-world-bank-country-and-lending-groups)
+  - [Map summary](https://blogs.worldbank.org/opendata/new-world-bank-country-classifications-income-level-2022-2023)
+
+```{r}
+file <- "./Data/country classification/world bank classification by income/CLASS.xlsx"
+ctr_wb <- readxl::read_xlsx(path = file, sheet = 'List of economies') %>%
+  dplyr::rename('country' = "Economy",
+                'iso_a3' = "Code",
+                'class_wb' = "Income group"
+                ) %>%
+  dplyr::select(country, iso_a3, class_wb) %>%
+  ## some rows are not country names
+  dplyr::filter(!is.na(class_wb)) %>%
+  dplyr::mutate(source = 'wb',
+                class_wb = factor(x = class_wb, levels = c("High income", "Upper middle income", "Lower middle income", "Low income"))) 
+
+ctr_wb %>%
+  dplyr::rename(class = class_wb) %>%
+  group_by(class) %>%
+  tally() %>% as.data.frame() %>%
+  ggplot(data = .) +
+  geom_col(aes(x = class, y = n)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 
+
+### - UNSD developed regions and developing regions
+
+  Classifications maintained by the United Nations Statistics Division (UNSD)
+  
+  Following its removal from M49, several users expressed the need to maintain the distinction of developed and developing regions based on the understanding that being part of either developed or developing region is through sovereign decision of a state. Therefore, a file was created that contains *an updated classification of developed and developing regions as of May 2022*, in addition to the historical classification of December 2021. See answer to question “Where do I find the classification of “Developed regions” and “Developing regions”?” The updated classification reflects a recent action by the Republic of Korea to be considered part of developed regions.
+
+  Users may continue to use these historical and updated groupings if needed and in their specific contexts. They can also refer to the similar grouping of "developing countries" associated with specific SDG indicators where the exact composition of the group may vary, depending on the mandate, membership or analytical interest of the custodian agency responsible for the particular indicator or use other available groupings such as by income-level. Users can also construct their own groupings based on the current list of geographical regions or country codes maintained in the M49 pages.
+
+  See more in the section `Questions & Answers` https://unstats.un.org/unsd/methodology/m49/ 
+  Other related links 
+    - [link1](https://www.un.org/development/desa/dpad/wp-content/uploads/sites/45/WESP2022_ANNEX.pdf)
+    - [link2](https://unctadstat.unctad.org/en/classifications.html), recommended by Min Gon. 
+  
+  The *table* is downloaded from the subsection - Q: Where do I find the classification of “Developed regions” and “Developing regions”?
+  
+```{r}
+file <- './Data/country classification/UNSD/historical-classification-of-developed-and-developing-regions.xlsx'
+
+## -> 'Distinction as of December 2021', 'Distinction as of May 2022'
+ctr_unsd <- readxl::read_excel(path = file, sheet = 'Distinction as of May 2022') %>%
+# ctr_unsd <- readxl::read_excel(path = file, sheet = 'Distinction as of December 2021') %>%
+  dplyr::rename('country' = "Country or Area",
+                'iso_a3'  = "ISO-alpha3 Code",
+                'iso_a2'  = "ISO-alpha2 Code",
+                'class_unsd' = "Developed / Developing regions") %>%
+  dplyr::select(-`M49 Code`, -iso_a2) %>%
+  ## some rows are not country names, e.g., Antarctica
+  dplyr::filter(!is.na(class_unsd)) %>%
+  dplyr::filter(!is.na(iso_a3)) %>%
+  dplyr::mutate(source = 'unsd',
+                class_unsd = factor(x = class_unsd, levels = c("Developed", "Developing")))
+
+ctr_unsd %>%
+  dplyr::rename(class = class_unsd) %>%
+  group_by(class) %>%
+  tally() %>% as.data.frame() %>%
+  ggplot(data = .) +
+  geom_col(aes(x = class, y = n)) +
+  geom_text(aes(x = class, y = n, label = n), vjust = -0.2) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+```
+  
+
+
+### - UNCTAD 
+  https://unctadstat.unctad.org/en/classifications.html
+  
+  All target economies are also categorized into *developing (1400) or developed (1500)* economies. This categorization is made on the basis of the distinction between developing and developed regions, until recently embodied in the M49 standard (see above). In the composition applied by UNCTAD, the Republic of Korea is part of the developed country group (in accordance with the UNCTAD Trade and Development Board decision TD/B/68/3).
+
+  The classification of economies by development status is intended for statistical convenience and does not express a judgement about the stage reached by a particular country or area in the development process. Since December 2021, the UNSD no longer maintains the categorization of developing and developed regions in M49, but considers that *this categorization can continue to be applied*.
+
+```{r}
+not_all_na <- function(x) any(!is.na(x))
+not_any_na <- function(x) all(!is.na(x))
+
+## 
+file <- './Data/country classification/UNCTAD/DimCountries_Transcode_Iso3166-1_UnctadStat.xls'
+ctr_unctad_transcode <- readxl::read_excel(path = file, range = 'A4:G253') %>%
+  janitor::clean_names() %>%
+  dplyr::rename('country_unctad' = "english_short_name_6",
+                'iso_a3'   = 'alpha_3',
+                'num_code' = 'num_5') %>%
+  dplyr::select(-alpha_2, -english_short_name_4) %>%
+  dplyr::distinct(country_unctad, .keep_all = T) %>%
+  as.data.frame()
+
+
+file <- './Data/country classification/UNCTAD/Dim_Countries_Hierarchy_UnctadStat_All_Flat_editedYL.xlsx'
+ctr_unctad <- readxl::read_excel(path = file) %>%
+  dplyr::select(where(not_all_na)) %>%
+  dplyr::rename('country' = "Child_LabelEN",
+                # 'iso_a3'  = "ISO-alpha3 Code",
+                'class_unctad' = "Parent_LabelEN") %>%
+  dplyr::select(-Parent_LabelFR, -Child_LabelFR) %>%
+  # dplyr::filter(str_detect(class_unctad, "Develop|develop")) %>%
+  # dplyr::filter(!str_detect(class_unctad, "Development")) %>%
+  dplyr::filter(Parent_Code %in% c(1400, 1500)) %>%
+  
+  ## some rows are not country names, e.g., Antarctica
+  # dplyr::filter(!is.na(class_unsd)) %>%
+  dplyr::mutate(
+    source = 'unctad',
+    class_unctad = gsub('economies', '', class_unctad),
+    class_unctad = stringr::str_squish(class_unctad),
+    num_code = str_pad(Child_Code, 3, pad = "0")) %>%
+  #               class_unsd = factor(x = class_unsd, levels = c("Developed", "Developing"))) %>%
+  dplyr::select(-Child_Code) %>%
+  
+  # ## fix data error
+  # dplyr::mutate(num_3 = ifelse(num_3 == 579, 578, num_3),
+  #               num_3 = ifelse(num_3 == 251, 250, num_3))
+  as.data.frame()
+
+ctr_unctad_code <- ctr_unctad %>%
+  ## join the country code
+  left_join(., y= ctr_unctad_transcode, by = 'num_code') %>%
+  dplyr::filter(!is.na(iso_a3)) %>%
+  as.data.frame()
+
+```
+
+
+### - compare and plot
+```{r}
+grp_update <- grp %>%
+  dplyr::filter(!is.na(iso_a3)) %>%
+  merge(x = ., y = ctr_wb,   by = 'iso_a3', all = T) %>%
+  merge(x = .,   y = ctr_unsd, by = 'iso_a3', all = T) %>%
+  merge(x = .,   y = ctr_unctad_code, by = 'iso_a3', all = T) %>%
+  dplyr::mutate(check1 = ifelse(eco_group == class_unsd, NA, 1),
+                check2 = ifelse(class_unctad == class_unsd, NA, 1),
+                check3 = ifelse(class_unctad == eco_group, NA, 1)) %>%
+  dplyr::arrange(inc_group) %>%
+  as.data.frame() %>%
+  dplyr::mutate_if(is.factor, as.character) %>%
+  
+  dplyr::mutate(group_economies = ifelse(!is.na(class_unsd), class_unsd, class_unctad),
+                group_economies = ifelse(!is.na(group_economies),  group_economies, eco_group)) %>%
+  
+  dplyr::mutate(group_income4 = ifelse(!is.na(class_wb), class_wb, group)) %>%
+  
+  ### re-code income group into 2 categories
+  dplyr::mutate(group_income2 = case_when(
+    str_detect(group_income4, "High")       ~ "High income",
+    str_detect(group_income4, "Upper")      ~ "Low income",
+    str_detect(group_income4, "Lower")      ~ "Low income",
+    str_detect(group_income4, "Low income") ~ "Low income",
+    TRUE                                    ~ .$group_income4)) %>%
+  ### --> to fix RUS, given it is a Developed country, and in the Year of 2014, it is a high-income 
+  dplyr::mutate(group_income2 = ifelse(iso_a3 == 'RUS', "High income", group_income2)) %>%
+  
+  ### remove NA to keep the same number of countries as in `grp`
+  dplyr::filter(!is.na(name)) %>%
+  
+  dplyr::select(iso_a3, 
+                inc_group, group, class_wb, 
+                group_income4, group_income2,
+                eco_group, class_unsd, class_unctad, 
+                group_economies,
+                check1, check2, check3,
+                everything())
+
+sum(grp_update$check1, na.rm = T) 
+sum(grp_update$check2, na.rm = T) 
+sum(grp_update$check3, na.rm = T) 
+## if year of UNSD = 2021, n = 18, 3, 21
+## if year of UNSD = 2022, n = 19, 2, 21
+
+
+## remove the not-sueful cilumns and save for analysis use
+grp_update <- grp_update %>%
+  dplyr::select(name, iso_a3, group_income4, group_income2, group_economies)
+
+## - 2 classes  
+grp_update %>%
+  dplyr::rename(class = group_economies) %>%
+  group_by(class) %>%
+  tally() %>% as.data.frame() %>%
+  ggplot(data = .) +
+  geom_col(aes(x = class, y = n)) +
+  geom_text(aes(x = class, y = n, label = n), vjust = -0.2) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+grp_update %>%
+  dplyr::rename(class = group_income2) %>%
+  group_by(class) %>%
+  tally() %>% as.data.frame() %>%
+  ggplot(data = .) +
+  geom_col(aes(x = class, y = n)) +
+  geom_text(aes(x = class, y = n, label = n), vjust = -0.2) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+## - 4 classes
+grp_update %>%
+  dplyr::rename(class = group_income4) %>%
+  group_by(class) %>%
+  tally() %>% as.data.frame() %>%
+  ggplot(data = .) +
+  geom_col(aes(x = class, y = n)) +
+  geom_text(aes(x = class, y = n, label = n), vjust = -0.2) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+  
+  
+
+
+## Save as Rdata
+```{r}
+fname <- './Data/Ancillary_Data_ISO3code_shp.RData'
+save(iso_eora, pop, gdp, shp, grp, grp_update, file = fname)
+
+fname <- './Data/Ancillary_Data_iso_eora_ex.RData'
+save(iso_eora_ex, file = fname)
+```
+
+
+
+## Plot Map 
 ```{r - Map of income - 4 group}
 grp_shp <- merge(shp %>% dplyr::select(iso_a3), grp, by = 'iso_a3') %>%
   dplyr::mutate(group = factor(group, levels = c('High income', 'Upper middle income', 'Lower middle income', 'Low income')))
@@ -289,9 +547,28 @@ ggsave(filename = fname, plot = last_plot(), width = 7, height = 3, units = 'in'
 ```{r - Map of income - 2 group}
 grp_shp <- merge(
   x = shp %>% dplyr::select(iso_a3), 
-  y = grp %>% dplyr::mutate(
-    group = ifelse(group %in% c("High income", "Upper middle income"), "High income", group),
-    group = ifelse(group %in% c("Lower middle income", "Low income"),  "Low income", group)), 
+  y = grp %>%
+    dplyr::mutate(
+      group = ifelse(group %in% c("High income", "Upper middle income"), "High income", group),
+      group = ifelse(group %in% c("Lower middle income", "Low income"),  "Low income", group)),
+  by = 'iso_a3') %>%
+  dplyr::mutate(group = factor(group, levels = c('High income', 'Low income')))
+
+grp_shp %>%
+  ggplot() +
+  geom_sf(aes(fill = group), size = 0.1, color = 'gray50') +
+  scale_fill_manual(values = color_grp, name = 'Income group') +
+  scale_y_continuous(expand = c(0, 0)) + ## reduce the space between plot and border
+  scale_x_continuous(expand = c(0, 0)) + ## reduce the space between plot and border
+  theme_my
+
+
+
+## based on income group - update
+grp_shp <- merge(
+  x = shp %>% dplyr::select(iso_a3), 
+  y = grp_update %>%
+    dplyr::rename(group = group_income2), 
   by = 'iso_a3') %>%
   dplyr::mutate(group = factor(group, levels = c('High income', 'Low income')))
 
@@ -307,28 +584,62 @@ grp_shp %>%
 
 fname <- paste0(dir.fig, 'SI_Map_Income_2Group.jpg'); fname
 ggsave(filename = fname, plot = last_plot(), width = 7, height = 3, units = 'in', dpi = 300)
+
+
+
+## based on development status 
+grp_shp <- merge(
+  x = shp %>% dplyr::select(iso_a3), 
+  y = grp_update %>%
+    dplyr::rename(group = group_economies), 
+  by = 'iso_a3') %>%
+  dplyr::mutate(group = factor(group, levels = c('Developed', 'Developing')))
+
+color_grp <- c('#2371A6', '#F26463') ## high, low
+
+grp_shp %>%
+  ggplot() +
+  geom_sf(aes(fill = group), size = 0.1, color = 'gray50') +
+  scale_fill_manual(values = color_grp, name = 'Development status') +
+  scale_y_continuous(expand = c(0, 0)) + ## reduce the space between plot and border
+  scale_x_continuous(expand = c(0, 0)) + ## reduce the space between plot and border
+  theme_my
+
+fname <- paste0(dir.fig, 'SI_Map_Development_2Group.jpg'); fname
+ggsave(filename = fname, plot = last_plot(), width = 7, height = 3, units = 'in', dpi = 300)
 ```
 
 
 
 ```{r - Country info for SI Table}
 
-ctr_SI <- merge(x = ctr_eora, y = grp, 
+ctr_SI <- merge(x = ctr_eora, 
+                y = grp_update, 
                 by.x = 'iso3_eora', by.y = 'iso_a3', all.x = T) %>%
-  dplyr::select(country_eora, iso3_eora, group) %>%
-  distinct(country_eora, iso3_eora, .keep_all = T) %>%
-  dplyr::mutate(group = ifelse(iso3_eora == 'SUN' & is.na(group), 'Low income', group),
-                group = ifelse(iso3_eora == 'ANT' & is.na(group), 'High income', group)) %>%
+  dplyr::select(-name) %>%
+  dplyr::distinct(country_eora, iso3_eora, .keep_all = T) %>%
+  dplyr::mutate(group_income4 = ifelse(iso3_eora == 'SUN' & is.na(group_income4), 'Low income', group_income4),
+                group_income4 = ifelse(iso3_eora == 'ROW' & is.na(group_income4), 'Low income', group_income4),
+                
+                group_income2 = ifelse(iso3_eora == 'SUN' & is.na(group_income2), 'Low income', group_income2),
+                group_income2 = ifelse(iso3_eora == 'ROW' & is.na(group_income2), 'Low income', group_income2),
+                
+                group_economies = ifelse(iso3_eora == 'SUN' & is.na(group_economies), 'Low income', group_economies),
+                group_economies = ifelse(iso3_eora == 'ROW' & is.na(group_economies), 'Low income', group_economies),
+                
+                ) %>%
   dplyr::filter(str_detect(string = country_eora, pattern = '^Statistical', negate = T))
 names(ctr_SI)
-names(ctr_SI) <- c("Country Name", "Country ISO3 Code", "Income Group")
+names(ctr_SI) <- c("Country ISO3 Code", 
+                   "Country Name", 
+                   "Income Group 4 categories", "Income Group 2 categories",
+                   "Development status")
 
 ```
 
 
  
 ```{r - A fancy table}
-
 
 ## 1. to add flag icon, we need 'iso2c'
 ### match iso3c and iso2c
@@ -367,7 +678,8 @@ tbl_s1
 
 
 ## 4. save as html
-save_kable(x = tbl_s1, file = paste0(dir.fig, 'SI_table_countryGroup.html'), latex_header_includes = T, self_contained = T)
+# save_kable(x = tbl_s1, file = paste0(dir.fig, 'SI_table_countryGroup.html'), latex_header_includes = T, self_contained = T)
+
 
 ### then go to find the html and open it in Browser --> copy and paste it into a Word doc --> adjust font size 8 and bold the title
 ### and title font size is 8.5 --> adjust to single-space, no space before and after --> fix table border on the top --> Done!
@@ -382,14 +694,6 @@ writexl::write_xlsx(x = table.s1, path = fname)
 
 
 
-## Save as Rdata
-```{r}
-fname <- './Data/Ancillary_Data_ISO3code_shp.RData'
-save(iso_eora, pop, gdp, shp, grp, file = fname)
-
-fname <- './Data/Ancillary_Data_iso_eora_ex.RData'
-save(iso_eora_ex, file = fname)
-```
 
 
 
