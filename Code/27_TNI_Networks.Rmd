@@ -4,14 +4,14 @@ author: "Yingjie"
 date: "6/30/2021"
 output: html_document
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 
 # 1. Introduction 
 
 
-```{r}
+```{r include=FALSE}
 
 ### To clear your environment  -----------------------------------------------------------
 # remove(list = ls())
@@ -62,6 +62,8 @@ getwd()
 
 ### data path
 source('./Code/_path of data.R')
+
+today <- format(Sys.time(), "%Y%m%d"); today
 ```
 
 
@@ -80,11 +82,22 @@ not_any_na <- function(x) all(!is.na(x)) ## temp %>% select(where(not_any_na)) -
 
 ## Ancillary data
 ```{r }
-load('./Data/Ancillary_Data_ISO3code_shp.RData') ## iso_eora, pop, gdp, shp, grp
+load('./Data/Ancillary_Data_ISO3code_shp.RData') ## iso_eora, pop, gdp, shp, grp, grp_update
 
-grp <- rbind(grp, 
-             data.frame(name='SUN',iso_a3 = 'SUN', eco_group = '2.Developing', 
-                        inc_group = '4. Low income', group = 'Low income'))
+grp <- rbind(
+  grp, 
+  data.frame(name='SUN', iso_a3 = 'SUN', 
+             eco_group = '2.Developing', 
+             inc_group = '4. Low income', 
+             group = 'Low income'))
+
+grp_update_net <- rbind(
+  grp_update, 
+  data.frame(name='ROW', iso_a3 = 'ROW', group_income4 = 'Low income', 
+             group_income2 = 'Low income', group_economies = 'Developing'),
+  data.frame(name='SUN', iso_a3 = 'SUN', group_income4 = 'Low income', 
+             group_income2 = 'Low income', group_economies = 'Developing')
+)
 
 ### extended country-iso3 pair list for matching
 load('./Data/Ancillary_Data_iso_eora_ex.RData')  ## ## iso_eora_ex
@@ -156,23 +169,21 @@ nodes <-
   
   data.frame(iso3 = c(links$from, links$to)) %>%
   dplyr::mutate(iso3 = as.character(iso3)) %>%
-  distinct(iso3, .keep_all = T) %>%
+  dplyr::distinct(iso3, .keep_all = T) %>%
   
-  merge(x = ., y = grp, by.x = 'iso3', by.y = 'iso_a3', all.x = T) %>%
+  merge(x = ., 
+        y = grp_update_net, 
+        by.x = 'iso3', by.y = 'iso_a3', all.x = T) %>%
   # dplyr::filter(name != 'N. Cyprus') %>%
-  distinct(iso3, .keep_all = T) %>%
-  dplyr::mutate(#inc_group = ifelse(Id == 'ANT' & is.na(inc_group), '1. High income', inc_group),
-                # inc_group = ifelse(Id == 'GIB' & is.na(inc_group), '1. High income', inc_group),
-                inc_group = ifelse(iso3 == 'ROW' & is.na(inc_group), '4. Low income', inc_group),
-                inc_group = ifelse(iso3 == 'SUN' & is.na(inc_group), '4. Low income', inc_group),
-                # inc_group = ifelse(Id == 'TKL' & is.na(inc_group), '4. Low income', inc_group),
-                # inc_group = ifelse(Id == 'TUV' & is.na(inc_group), '2. Upper middle income', inc_group),
-                ) %>%
-  # dplyr::select(-inc_group) #%>%
-  dplyr::mutate(inc_group = as.factor(inc_group)) %>%
-  merge(., pop %>% dplyr::select(iso3, `2015`), by.x = 'iso3', by.y = 'iso3', all.x = T) %>%
+  dplyr::distinct(iso3, .keep_all = T) %>%
+  # dplyr::select(-group_income2) #%>%
+  dplyr::mutate(group = as.factor(group_income2)) %>%
+  merge(x = ., 
+        y = pop %>% dplyr::select(iso3, `2015`), 
+        by.x = 'iso3', by.y = 'iso3', all.x = T) %>%
   arrange(iso3) %>%
-  separate(col = eco_group, into = c('node_type', 'type.label')) %>%
+  dplyr::mutate(node_type  = ifelse(group == 'High income', 1, 0), 
+                type.label = group) %>%
   dplyr::rename('id' = 'iso3', 'audience.size' = '2015', 'label' = 'name') %>%
   dplyr::mutate(label = id) %>%
   as.data.frame()
@@ -254,7 +265,7 @@ for (i in 1:nrow(direction)) {
     dplyr::mutate(type = ind) %>%
     dplyr::select(-ctr, -year) %>%
     arrange(from, to) %>%
-    distinct(from, to, .keep_all = T) %>%  
+    dplyr::distinct(from, to, .keep_all = T) %>%  
     ## remove domestic flows -------------------
     dplyr::filter(from != to) %>%
     as.data.frame()
@@ -333,16 +344,17 @@ links <- links_scaled_all_Net %>%
 nodes <-
   data.frame(iso3 = c(links$from, links$to)) %>%
   dplyr::mutate(iso3 = as.character(iso3)) %>%
-  distinct(iso3, .keep_all = T) %>%
+  dplyr::distinct(iso3, .keep_all = T) %>%
 
-  merge(x = ., y = grp, by.x = 'iso3', by.y = 'iso_a3', all.x = T) %>%
-  distinct(iso3, .keep_all = T) %>%
-  dplyr::mutate(inc_group = ifelse(iso3 == 'ROW' & is.na(inc_group), '4. Low income', inc_group),
-                inc_group = ifelse(iso3 == 'SUN' & is.na(inc_group), '4. Low income', inc_group)) %>%
-  dplyr::mutate(inc_group = as.factor(inc_group)) %>%
+  merge(x = ., 
+        y = grp_update_net, 
+        by.x = 'iso3', by.y = 'iso_a3', all.x = T) %>%
+  dplyr::distinct(iso3, .keep_all = T) %>%
+  dplyr::mutate(group = as.factor(group_income2)) %>%
   merge(., pop %>% dplyr::select(iso3, `2015`), by.x = 'iso3', by.y = 'iso3', all.x = T) %>%
   arrange(iso3) %>%
-  separate(col = eco_group, into = c('node_type', 'type.label')) %>%
+  dplyr::mutate(node_type  = ifelse(group == 'High income', 1, 0), 
+                type.label = group) %>%
   dplyr::rename('id' = 'iso3', 'audience.size' = '2015', 'label' = 'name') %>%
   dplyr::mutate(label = id) %>%
   as.data.frame()
@@ -367,7 +379,7 @@ V(net)$label
 # Or find specific nodes and edges by attribute:
 # (that returns objects of type vertex sequence / edge sequence)
 V(net)[label=="USA"]
-E(net)[type==ind]
+# E(net)[type==ind]
 
 
 ### If you need them, you can extract an edge list 
@@ -429,7 +441,7 @@ plot(net,
 
 ### Set node color to orange and the border color to hex #555555
 ### Replace the vertex label with the node names stored in "label"
-dev.off()
+# dev.off()
 plot(net, 
      edge.arrow.size=.2, 
      edge.curved = 0.2,
@@ -582,7 +594,7 @@ plot(net, vertex.label=V(net)$label)
   F-R is nice but *slow*, most often used in graphs smaller than ~1000 vertices.
   
 ```{r - Fruchterman-Reingold}
-dev.off()
+# dev.off()
 l <- layout_with_fr(net)
 plot(net, layout=l)
 
@@ -821,16 +833,19 @@ for (i in 1:length(ind_selected)) {
   nodes <-
     data.frame(iso3 = c(links$from, links$to)) %>%
     dplyr::mutate(iso3 = as.character(iso3)) %>%
-    distinct(iso3, .keep_all = T) %>%
+    dplyr::distinct(iso3, .keep_all = T) %>%
   
-    merge(x = ., y = grp, by.x = 'iso3', by.y = 'iso_a3', all.x = T) %>%
-    distinct(iso3, .keep_all = T) %>%
-    dplyr::mutate(inc_group = ifelse(iso3 == 'ROW' & is.na(inc_group), '4. Low income', inc_group),
-                  inc_group = ifelse(iso3 == 'SUN' & is.na(inc_group), '4. Low income', inc_group)) %>%
-    dplyr::mutate(inc_group = as.factor(inc_group)) %>%
-    merge(., pop %>% dplyr::select(iso3, `2015`), by.x = 'iso3', by.y = 'iso3', all.x = T) %>%
+    merge(x = ., 
+          y = grp_update_net, 
+          by.x = 'iso3', by.y = 'iso_a3', all.x = T) %>%
+    dplyr::distinct(iso3, .keep_all = T) %>%
+    dplyr::mutate(group = as.factor(group_income2)) %>%
+    merge(x = ., 
+          y = pop %>% dplyr::select(iso3, `2015`), 
+          by.x = 'iso3', by.y = 'iso3', all.x = T) %>%
     arrange(iso3) %>%
-    separate(col = eco_group, into = c('node_type', 'type.label')) %>%
+    dplyr::mutate(node_type  = ifelse(group == 'High income', 1, 0), 
+                  type.label = group) %>%
     dplyr::rename('id' = 'iso3', 'audience.size' = '2015', 'label' = 'name') %>%
     dplyr::mutate(label = id) %>%
     as.data.frame()
@@ -847,13 +862,19 @@ for (i in 1:length(ind_selected)) {
   ### Parameters for Nodes -------------------------------------------------------------------------
   
   ## (1) node colors 
-  unique(nodes$inc_group)
-  length(unique(nodes$inc_group))
-  colrs <- c("#2c7bb6", "#abd9e9", "#fdae61", '#d7191c')
-  colrs <- adjustcolor(colrs, alpha.f = 0.7)
+  unique(nodes$group)
+  length(unique(nodes$group))
+  ### --> color scheme depends on the number of country categories
+  if (length(unique(nodes$group)) == 2) {
+    colrs <- c('#2371A6', '#F26463') 
+    colrs <- adjustcolor(colrs, alpha.f = 0.7)
+  } else {
+    colrs <- c("#2c7bb6", "#abd9e9", "#fdae61", '#d7191c')
+    colrs <- adjustcolor(colrs, alpha.f = 0.7)
+  }
   
-  V(net)$inc_group
-  V(net)$color <- colrs[V(net)$inc_group %>% as.factor()]
+  V(net)$group
+  V(net)$color <- colrs[V(net)$group %>% as.factor()]
   
   ## (2) Node size 
   deg <- igraph::degree(net, mode="in") ## 'out' for out-degree; 'in' for in-degree; 'total'/'all' for the sum of the two
@@ -897,7 +918,7 @@ for (i in 1:length(ind_selected)) {
   library(extrafont)
   loadfonts(device = "win")
 
-  fname <- paste0(dir.fig, 'Network/Network_top_', ind, '_lgl.png'); print(fname)
+  fname <- paste0(dir.fig, 'Network/Network_top_', ind, '_lgl_', today, '.png'); print(fname)
   png(filename = fname, width=3.1, height=3.1, units="in", res=300, bg = 'transparent') # , family = "A"
   
   par(mfrow=c(1,1), mar=c(0,0,0,0))
@@ -937,8 +958,9 @@ for (i in 1:length(ind_selected)) {
 
 
 
+## ---
+## --- END ---------------------------------
 
-## ------------------------------------
 ## Highlighting aspects of the network
 ```{r}
 # plot(net)

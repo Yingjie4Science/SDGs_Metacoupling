@@ -496,6 +496,19 @@ grp_update %>%
 ```
   
   
+### - Update the country group in the shapefile
+```{r}
+shp <- shp %>%
+  # st_drop_geometry() %>%
+  dplyr::left_join(
+    x = ., 
+    y = grp_update %>% 
+      dplyr::filter(name != 'N. Cyprus') %>%
+      dplyr::select(-name), 
+    by = "iso_a3")
+```
+
+
 
 
 ## Save as Rdata
@@ -545,6 +558,8 @@ ggsave(filename = fname, plot = last_plot(), width = 7, height = 3, units = 'in'
 
 
 ```{r - Map of income - 2 group}
+color_grp <- c('#2371A6', '#F26463') ## high, low
+
 grp_shp <- merge(
   x = shp %>% dplyr::select(iso_a3), 
   y = grp %>%
@@ -572,8 +587,6 @@ grp_shp <- merge(
   by = 'iso_a3') %>%
   dplyr::mutate(group = factor(group, levels = c('High income', 'Low income')))
 
-color_grp <- c('#2371A6', '#F26463') ## high, low
-
 grp_shp %>%
   ggplot() +
   geom_sf(aes(fill = group), size = 0.1, color = 'gray50') +
@@ -594,8 +607,6 @@ grp_shp <- merge(
     dplyr::rename(group = group_economies), 
   by = 'iso_a3') %>%
   dplyr::mutate(group = factor(group, levels = c('Developed', 'Developing')))
-
-color_grp <- c('#2371A6', '#F26463') ## high, low
 
 grp_shp %>%
   ggplot() +
