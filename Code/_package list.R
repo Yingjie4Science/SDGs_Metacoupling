@@ -21,6 +21,7 @@ library(writexl)
 library(tidyverse)
 library(reshape2)  ## expand long table to wide one
 library(stringr)
+library(scales)
 library(tm)        ## clean text
 library(lubridate)
 library(viridis)
@@ -51,5 +52,13 @@ library(viridis)
 # library(devtools)
 library(circlize)  ## for circlize plot
 library(Cairo)
+
+library(conflicted)
+conflict_prefer("filter", "dplyr")
+conflict_prefer("arrange", "dplyr")
+conflict_prefer("mutate", "dplyr")
+conflict_prefer("print", "base")
+conflict_prefer("save", "base")
+
 
 
