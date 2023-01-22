@@ -4,12 +4,12 @@ author: "Yingjie Li"
 date: "2021-03-01 (Updated: 2021-03-04)"
 output: pdf_document
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 
 # Set up
-```{r Dirs and packages}
+```{r Dirs and packages, include=FALSE}
 
 ### To clear your environment 
 remove(list = ls())
@@ -117,7 +117,7 @@ source("./Code/function_norm_sdg_score_good_bad.R")
 
 ## Ancillary data
 ```{r}
-load('./Data/Ancillary_Data_ISO3code_shp.RData') ## `iso_eora`, `pop`, `gdp` (USD), `shp`, `grp`
+load('./Data/Ancillary_Data_ISO3code_shp.RData') ## `iso_eora`, `pop`, `gdp` (USD), `shp`, `grp`, `grp_update`
 pop_l <- pop %>% as.data.frame() %>%
   gather(key = 'year', value = 'pop', `2000`:ncol(.)) %>%
   dplyr::select(-ctr) %>%
@@ -154,15 +154,14 @@ dfs_score <- dfs %>%
   dplyr::mutate(score = as.numeric(score)) %>%
   dplyr::mutate(goal     = factor(x = goal, levels = seq(1, 17, 1)),
                 scenario = factor(x = scenario, levels = snr_levels)) %>%
-  ### add country group info
+  ### add country group info (updated on 2023-01-17)
   merge(x = .,
-        y = grp %>% 
+        y = grp_update %>% 
           dplyr::rename(iso3=iso_a3) %>% 
-          dplyr::select(iso3, group) %>%
+          dplyr::select(iso3, group_income2) %>%
+          dplyr::rename(group = group_income2) %>% 
           dplyr::distinct(iso3, .keep_all = T),
         by = 'iso3', all.x = T) %>%
-  dplyr::mutate(group = ifelse(group %in% c("High income", "Upper middle income"),
-                               "High income", "Low income")) %>%
   as.data.frame()
 str(dfs_score)
 cat('The final data include', length(unique(dfs_score$iso3)), 'countries.') ## 189
@@ -309,14 +308,11 @@ ggsave(filename = fname, plot = fig, width = 6, height = 8, units = 'in', dpi = 
 
 
 ```{r - bar - change by Goal by 4 county group - fig 1c}
-df_shp <- shp %>%
+df_shp <- grp_update %>%
   merge(x = ., y = dfs_score_chg, by.x = 'iso_a3', by.y = 'iso3', all.x = T) %>%
-  st_drop_geometry() %>% 
+  # st_drop_geometry() %>% 
   dplyr::mutate(
-    group = tm::removeNumbers(income_grp),
-    group = gsub(":.*", "", group),
-    group = gsub("(?!\\:)[[:punct:]]", "", group, perl=TRUE),
-    group = stringr::str_squish(group),
+    group = tm::removeNumbers(group_income4),
     group = factor(x = group, levels = c("High income", "Upper middle income", "Lower middle income", "Low income")),
     group = fct_rev(group)) %>%
   as.data.frame()
@@ -359,19 +355,37 @@ ggplot(data = chg_err_group,
 
 
 
-```{r - bar - change by Goal by 2 county group - fig 1c}
-df_shp <- shp %>%
-  merge(x = ., y = dfs_score_chg, by.x = 'iso_a3', by.y = 'iso3', all.x = T) %>%
-  st_drop_geometry() %>% 
+```{r - bar - change by Goal by 2 county group - fig 1c - !!?}
+## classify the country list into 2 groups
+## -- option 1: high = high + upper middle; low = low + lower middle
+mark <- 'option1'
+shp_ctr_list <- grp_update %>% 
   dplyr::mutate(
-    group = tm::removeNumbers(income_grp),
-    group = gsub(":.*", "", group),
-    group = gsub("(?!\\:)[[:punct:]]", "", group, perl=TRUE),
-    group = stringr::str_squish(group),
+    group = tm::removeNumbers(group_income4),
     group = ifelse(group %in% c("High income", "Upper middle income"), "High income", "Low income"),
     group = factor(x = group, levels = c("High income", "Low income")),
     group = fct_rev(group)
     ) %>%
+  as.data.frame()
+
+## -- option 2: high = high; low = low + lower middle + upper middle (Min Gon, Nature Food)
+mark <- 'option2Chung'
+shp_ctr_list <- grp_update %>% 
+  dplyr::mutate(
+    group = tm::removeNumbers(group_income2),
+    group = factor(x = group, levels = c("High income", "Low income")),
+    group = fct_rev(group)
+    ) %>%
+  as.data.frame()
+```
+
+
+```{r}
+## merge the two data for plot
+df_shp <- shp_ctr_list %>%
+  merge(x = ., 
+        y = dfs_score_chg %>% dplyr::select(-group), 
+        by.x = 'iso_a3', by.y = 'iso3', all.x = T) %>%
   as.data.frame()
 
 
@@ -382,7 +396,7 @@ chg_err_group  <- df_shp %>%
 color_grp <- c('#2371A6', '#F26463') ## high, low
 color_grp <- rev(color_grp)
 
-p<-
+p <-
 ggplot(data = chg_err_group, 
        aes(x=factor(goal, levels = rev(vars)),
            y = value_chg,
@@ -408,8 +422,60 @@ ggplot(data = chg_err_group,
     panel.grid.minor = element_blank())
 
 ggarrange(p, labels = "c", font.label = list(size = 20), vjust = 1)
-fname <- paste0(dir.fig, '01main/fig1c_SDG_score_chg_Bar_byGroup2grp_', today, '.jpg'); fname
+fname <- paste0(dir.fig, '01main/fig1c_SDG_score_chg_Bar_byGroup2grp_', today, '_', mark, '.jpg'); fname
 ggsave(filename = fname, plot = last_plot(), width = 6, height = 8, units = 'in', dpi = 300)
+```
+
+
+
+```{r - bar - fig1bc combined}
+chg_err_groups <- rbind(
+  chg_err %>% dplyr::mutate(group = 'Global') %>% dplyr::select(names(chg_err_group)),
+  chg_err_group
+) %>%
+  dplyr::mutate(group = factor(x = group, levels = c("Global", "High income", "Low income")),
+                group = fct_rev(group))
+  
+
+# str(chg_err_groups)
+
+color_grp <- c('gray80', '#2371A6', '#F26463') ## global, high, low
+color_grp <- rev(color_grp)
+
+p <- chg_err_groups %>%
+  ggplot(data = ., 
+         aes(x = factor(goal, levels = rev(vars)),
+             y = value_chg,
+             fill = group)) +
+  geom_bar(position = position_dodge(0.8), stat="identity", width = 0.8, show.legend = T)+
+  geom_errorbar(aes(ymin=value_chg-se, ymax=value_chg+se), 
+                width=.3, 
+                position=position_dodge(.8)) +
+  ylab("Impact on SDG score") + xlab('SDGs') + labs(fill = "Group")+
+  # scale_fill_brewer(palette = "Blues", direction = -1) +
+  scale_fill_manual(values = color_grp, guide = guide_legend(reverse = TRUE)) +
+  scale_y_continuous(n.breaks = 6) +
+  coord_flip()+
+  
+  theme_bar_my +
+  theme(
+    legend.position = c(0.87, 0.065),    ## 0.15, 0.06
+    # legend.key.size = unit(0.2,"cm"), 
+    legend.box.background = element_rect(colour = "black"),
+    legend.key.width  = unit(0.4,"cm"), 
+    legend.key.height = unit(0.4,"cm"), 
+    legend.text=element_text(size=rel(.9)),
+    panel.grid.minor = element_blank())
+p
+
+
+### insert the image strip into the bar plot and draw  
+p_icon <- ggdraw(insert_yaxis_grob(plot = p, grob = icons, grid::unit(.1, "null"), position = "left"))
+# p_icon
+
+fig <- ggarrange(p_icon, labels = "b", font.label = list(size = 20), vjust = 1, hjust = 0)
+fname <- paste0(dir.fig, '01main/fig1Combined_bc_SDG_score_chg_Bar_Icon_', today, '.jpg'); fname
+ggsave(filename = fname, plot = fig, width = 6, height = 8, units = 'in', dpi = 600)
 ```
 
 
@@ -435,12 +501,13 @@ fname <- paste0(dir.fig, '01main/SDG_score_chg_Map_byGoal_', today, '.jpg'); fna
 tm_shape(df_chg_sf) +
   tm_fill(vars, 
     # 'value_chg',
-          palette = col_tmap, #col1,
-          style = "fixed",
-          breaks=c(-Inf, -20, -10, -5, 0, 5, 10, 20, Inf),
-          labels = c("< -20", "[-20, -10)", "[-10, -5]", "(-5, 0)", "[0, 5)", "[5, 10]", "(10, 20]", "> 20"), 
-          title = title_ls, textNA = 'NA', colorNA = 'gray95',
-          legend.reverse = T) +
+    palette = col_tmap, #col1,
+    style = "fixed",
+    breaks=c(-Inf, -20, -10, -5, 0, 5, 10, 20, Inf), 
+    midpoint = 0,
+    labels = c("< -20", "[-20, -10)", "[-10, -5]", "(-5, 0)", "[0, 5)", "[5, 10]", "(10, 20]", "> 20"), 
+    title = title_ls, textNA = 'NA', colorNA = 'gray95',
+    legend.reverse = T) +
   tm_borders(col = "grey", lwd = 0.1, lty = "solid", alpha = 0.99) +
   tm_layout(frame = T, frame.lwd = 0.1, 
     legend.position = c(0,0),
@@ -483,7 +550,7 @@ tm_shape(df_chg_sf) +
           textNA = 'NA', colorNA = 'gray90',
           legend.reverse = T) +
   tm_borders(col = "grey", lwd = 0.1, lty = "solid", alpha = 0.99) +
-  tm_credits(text = "d", fontface = "bold", size = 1.2, position = c(0, 0.9)) +
+  tm_credits(text = "c", fontface = "bold", size = 1.2, position = c(0, 0.9)) +
   tm_layout(
     frame = F, frame.lwd = 0.1, 
     legend.position = c(0,0),
@@ -510,8 +577,7 @@ tmap_save(tm = tmap_last(), filename = fname, width=7, height=2.8, units="in", d
 dfs_score_goal_snr <- dfs_score %>%
   summarySE(measurevar= "score", groupvars = c("year", 'scenario', "goal"), na.rm = T) 
 
-p<-
-dfs_score_goal_snr %>%
+p <- dfs_score_goal_snr %>%
   ggplot(data = ., 
          aes(
            # x = goal, 
