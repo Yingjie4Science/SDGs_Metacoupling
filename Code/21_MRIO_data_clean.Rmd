@@ -96,8 +96,11 @@ iso_eora <- readxl::read_excel(path = xls_iso_eora)
   Combine the 4-year data for each ft indicator into one single file, and save to `eora_cleaned` folder. 
   
 
-```{r - data version}
+```{r - data version ❗❗}
 ### to choose data version by modifying `dir.eora` in `_path of data.R`
+
+
+
 
 ### to list all the input data files
 library(stringr)
@@ -171,7 +174,7 @@ for (file in xls.ls.rename) {
   
   
 
-```{r - loop read and combine xlsx}
+```{r - loop read and combine xlsx ❗}
 # pattern <- '^YJ_CO2'
 n_year_check <- 4 ## if 4 years data, to make sure no more files will be matched. 
 n_year_check <- 1

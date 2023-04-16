@@ -8,8 +8,7 @@ editor_options:
 ---
 
 
-
-
+This script is not used, we turned to `11_FAO_FishStatJ.R` as the data from *FAO FishStatJ* is more completed. 
 
 
 # Set up

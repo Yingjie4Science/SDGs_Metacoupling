@@ -9,7 +9,7 @@ editor_options:
 
 
 # Set up
-```{r Dirs and packages}
+```{r Dirs and packages, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
 ### To clear your environment 
@@ -497,7 +497,7 @@ grp_update %>%
   
   
 ### - Update the country group in the shapefile
-```{r}
+```{r include=FALSE}
 shp <- shp %>%
   # st_drop_geometry() %>%
   dplyr::left_join(
@@ -506,6 +506,10 @@ shp <- shp %>%
       dplyr::filter(name != 'N. Cyprus') %>%
       dplyr::select(-name), 
     by = "iso_a3")
+
+shp$area <- sf::st_area(x = shp) #Take care of units
+fname <- './Data/country classification/shp_prj.shp'
+sf::st_write(shp, dsn = fname, delete_layer = T)
 ```
 
 

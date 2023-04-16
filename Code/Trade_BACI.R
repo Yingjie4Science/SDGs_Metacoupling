@@ -1,6 +1,8 @@
 
 
-
+#' this script aims to examine each country's rank on net imports 
+#' 
+#' 
 # t	Year
 # k	Product category (HS 6-digit code)
 # i	Exporter (ISO 3-digit country code)
@@ -20,7 +22,7 @@ json <- 'https://comtrade.un.org/data/cache/classificationH0.json'
 library(rjson)
 k_code <- fromJSON(file=json)
 k_code <- as.data.frame(t(sapply(k_code$results,rbind))) 
-names(k_code) <- c('id', 'text', 'parrent')
+names(k_code) <- c('id', 'desc', 'parrent')
 k_code_flattened <- apply(k_code,2,as.character) %>%
   as_tibble() %>%
   as.data.frame()
@@ -109,6 +111,22 @@ df3 <- df2dgt %>%
 # df3 %>% distinct(k2)
 
 
-## net imports ---------------------------------------------------------------------------
 
 
+f <- paste0('./Data/trade_test/', 'tradereport_2021.txt')
+dt <- read.delim(f, header = T, sep = "\t", dec = ".", stringsAsFactors = F) 
+unique(dt$Record)
+unique(dt$Indicator.Code)
+
+dt1 <- dt %>%
+  filter(Indicator.Code == 'I-GHG-CO2') %>%
+  # filter(Record %in% c('Imports', 'Exports')) %>%
+  spread(key = Record, value = Value) %>%
+  mutate(Imports.net = Imports - Exports) %>%
+  arrange(desc(Imports.net))
+
+
+# library(R.matlab)
+# # read in our data
+# f <- paste0('./Data/trade_test/', 'bilateraltrade.mat') ## too large to open
+# mat <- readMat(f)
