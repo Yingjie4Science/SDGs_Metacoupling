@@ -4,13 +4,13 @@ author: "Yingjie"
 date: "10/25/2021"
 output: html_document
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 
 
 # Set up
-```{r}
+```{r include=FALSE}
 ### set work dir
 path <- rstudioapi::getSourceEditorContext()$path
 dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
@@ -37,7 +37,7 @@ library(comtradr)
 # Data
 
 ## Country code
-```{r}
+```{r include=FALSE}
 
 ### Countries that included in UN Comtrade ----------------------------------------------------------
 ## -> see https://comtrade.un.org/Data/cache/reporterAreas.json
@@ -210,6 +210,7 @@ ct_get_reset_time() ##will return the date/time in which the current hourly time
 ```
 
 
+### - Clean data
 ```{r}
 ## Put data from each country together
 ls_xlsx <- list.files(path = paste0(dir.raw, 'UN_Comtrade/Insecticides/'), pattern = 'xlsx$', full.names = T); 
@@ -261,8 +262,11 @@ dfs_c <- dfs %>%
 ```
 
 
+
+
+## Manual download from web
+
 ```{r}
-### Manual downloads ################################################################################
 ## - This dataset is not complete 
 csv <- paste0(dir.raw, 'UN_Comtrade/comtrade_Insecticides.csv')
 # dt0 <- read_csv(file = csv) 
@@ -283,5 +287,16 @@ csv <- paste0(dir.raw, 'UN_Comtrade/comtrade_Insecticides.csv')
 # unique(dt1$trade_flow)
 # unique(dt1$mode_of_transport)
 
+```
+
+
+```{r}
+f <- paste0('./Data/trade_test/', 'comtrade_SITC3.csv')
+
+
+df <- readr::read_csv(f) %>%
+  dplyr::select(Year, `Trade Flow`, Reporter, `Reporter ISO`, Partner, Commodity, `Trade Value (US$)`) %>%
+  spread(key = `Trade Flow`, value = `Trade Value (US$)`) %>%
+  dplyr::mutate(netin = Import - Export)
 ```
 
