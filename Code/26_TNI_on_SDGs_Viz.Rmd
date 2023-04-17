@@ -12,7 +12,7 @@ editor_options:
 ```{r Dirs and packages, include=FALSE}
 
 ### To clear your environment 
-remove(list = ls())
+# remove(list = ls())
 
 ### set work dir
 path <- rstudioapi::getSourceEditorContext()$path
@@ -131,8 +131,7 @@ pop_l <- pop %>% as.data.frame() %>%
 ## SDG Score & Index
 
 ### Score
-```{r - bar - change by Goal - fig 1b}
-
+```{r - load data}
 ### load data
 ls_f <- list.files(path = './Data/data_03_results', pattern = '^SDGs_all', full.names = T); ls_f
 tail(ls_f, n = 1)
@@ -197,11 +196,10 @@ dfs_score_chg_count <- dfs_score_chg %>%
   dplyr::filter(counts_na < 17/2) %>%  ## remove countries with too many NA
   dplyr::mutate(percent_increase = counts/17*100) %>%
   as.data.frame()
+```
 
 
-
-
-
+```{r - bar - change by Goal - fig 1b}
 ### Bar plot - Goal score change - by goal ---------------------------------------------------------
 
 chg_err  <- dfs_score_chg %>% 
@@ -440,6 +438,7 @@ chg_err_groups <- rbind(
 # str(chg_err_groups)
 
 color_grp <- c('gray80', '#2371A6', '#F26463') ## global, high, low
+color_grp2 <- c('#2371A6', '#F26463') ## high, low
 color_grp <- rev(color_grp)
 
 p <- chg_err_groups %>%
@@ -790,17 +789,17 @@ summary(dfs_index_chg_pct$value_chg)
 ### numbers for writing ------------------------------------------------------------------
 cat('SDG Index of countries would improve', 
     mean(dfs_index_chg_pct$value_chg, na.rm = T) %>% round(., digits = 1),      ## 9.2
-    'on average.')
+    'on average.\n')
 cat('SDG Index of countries would improve', 
     mean(dfs_index_chg_pct$value_chg_pct, na.rm = T) %>% round(., digits = 1),  ## 20.2% --> 19.4%
-    '% on average.')
+    '% on average.\n')
 
 cat('SDG Index of countries in 2015:', 
-    ', mean =', 
+    'mean =', 
     mean(dfs_index_chg_pct$value_rel, na.rm = T) %>% round(., digits = 1),  ## 20.2% --> 19.4%
     ', sd =', 
     sd(dfs_index_chg_pct$value_rel, na.rm = T) %>% round(., digits = 1),  ## 20.2% --> 19.4%
-    '')
+    '.\n')
 
 
 
@@ -816,17 +815,17 @@ dfs_index_chg_count <- dfs_index_chg %>%
 
 ## 1. number and % of country improved SDG index?
 sum(dfs_index_chg_count$increase, na.rm = T) %>%                    ## 181
-  cat(., 'countries improved their SDG Index')
+  cat(., 'countries improved their SDG Index.\n')
 (sum(dfs_index_chg_count$increase)/nrow(dfs_index_chg_count)) %>%   ## 96.8%
   scales::percent(accuracy = .1) %>% 
-  cat(., '% of the world countries improved their SDG Index')
+  cat(., '% of the world countries improved their SDG Index.\n')
 
 ## 2. number and % of population improved SDG Index?
 total_pop <- sum(dfs_index_chg_count$pop, na.rm = T); total_pop
 total_pop_increased <- sum(dfs_index_chg_count$increase_pop, na.rm = T); total_pop_increased
 (total_pop_increased/total_pop*100) %>%                             ## 98.5%
   round(., digits = 1) %>%
-  cat(., '% of the world population improved their SDG Index')
+  cat(., '% of the world population improved their SDG Index.\n')
 
 
 ## 3. for countries with decreased SDG Index, how many are low-income and what it the % ?
@@ -883,9 +882,57 @@ df_chg <- dfs_index_chg %>%
   dplyr::select(-value_not, -value_rel)
 
 
-### plot -------------------------------
+### plot ---------------------------------------------------------------------------------
 df_chg_sf  <- df_chg %>%
-  merge(x = shp, y = ., by.x = "iso_a3", by.y = "iso3",  all.x = T)
+  merge(x = shp, y = ., by.x = "iso_a3", by.y = "iso3",  all.x = T) %>%
+  dplyr::arrange(year, area, value_chg)
+
+
+## - small regions that may be invisible on a map -----------------------
+sf_small <- df_chg_sf %>%
+  dplyr::mutate(area = as.numeric(area)/10^6) %>%
+  dplyr::filter(area/10^4 < 3,
+                !is.na(year))
+
+sf_small_area <- sf_small %>%
+  st_drop_geometry() %>%
+  dplyr::select(iso_a3, area) %>%
+  dplyr::distinct(iso_a3, .keep_all = T)
+
+sf_small_decrease <- df_chg_sf %>%
+  dplyr::mutate(area = as.numeric(area)/10^6) %>%
+  dplyr::filter(value_chg < 0)
+max(sf_small_decrease$area)
+
+fname <- './Data/country classification/shp_prj_smaller3wkm2.shp'
+# sf::st_write(sf_small, dsn = fname, delete_layer = T)
+
+## in case when we want to make the small countries visible on the map, we can add a layer
+## of point-line shape to highlight them 
+### - smallest region to show
+area_show_min <- 10^4
+sf_small_p <- st_read('./Data/country classification/country_small_annotation_points.shp') %>%
+  dplyr::select(-Country_Na) %>%
+  merge(x = ., y = df_chg, by.x = "ISO3", by.y = "iso3",  all.x = T) %>%
+  merge(x = ., y = sf_small_area, by.x = "ISO3", by.y = "iso_a3",  all.x = T) %>%
+  dplyr::filter(!is.na(year)) %>%
+  dplyr::filter(area < area_show_min)
+
+
+sf_small_l <- st_read('./Data/country classification/country_samll_annotation_lines.shp') %>%
+  merge(x = ., y = df_chg, by.x = "ISO3", by.y = "iso3",  all.x = T) %>%
+  merge(x = ., y = sf_small_area, by.x = "ISO3", by.y = "iso_a3",  all.x = T) %>%
+  dplyr::filter(!is.na(year)) %>%
+  dplyr::filter(area < area_show_min)
+
+## test plot
+# tm_shape(df_chg_sf) +
+#   tm_fill('value_chg') +
+#   tm_shape(sf_small_l) +
+#   tm_lines(lwd = .1, alpha = 0.7) +
+#   tm_shape(sf_small_p) +
+#   tm_dots(col = 'value_chg', size = 0.5)
+## ----------------------------------------------------------------------
 
 max(df_chg_sf$value_chg, na.rm = T) # 20
 min(df_chg_sf$value_chg, na.rm = T) # -3.2
@@ -900,20 +947,41 @@ fname <- paste0(dir.fig, '01main/', 'fig1a_SDG_Index_chg_Map_', today, '.jpg'); 
 # jpeg(filename = fname, width=7, height=2.8, units="in", pointsize=18, res=300)
 
 p <- tm_shape(df_chg_sf) +
-  tm_fill('value_chg',
-          palette = col_tmap, #col1,
-          stretch.palette = F,
-          style  = "fixed",
-          breaks = c(#-Inf, -20, -10, 
-            -5, 0, 5, 10, 20, Inf), 
-          labels = c(#"< -20", "[-20, -10)", "[-10, -5]", 
-            "(-5, 0)", "[0, 5)", "[5, 10]", "(10, 20]", "> 20"), 
-          title  = 'Impact on\nSDG Index' , 
-          textNA = 'NA', 
-          colorNA = 'gray90',
-          legend.reverse = T) +
+  tm_fill(
+    col = 'value_chg',
+    palette = col_tmap, 
+    stretch.palette = F,
+    style  = "fixed",
+    breaks = c(#-Inf, -20, -10, 
+      -5, 0, 5, 10, 20, Inf), 
+    labels = c(#"< -20", "[-20, -10)", "[-10, -5]", 
+      "(-5, 0)", "[0, 5)", "[5, 10]", "(10, 20]", "> 20"), 
+    legend.reverse = T,
+    textNA = 'NA', 
+    colorNA = 'gray90',
+    title  = 'Impact on\nSDG Index'
+    ) +
   tm_borders(col = "grey", lwd = 0.1, lty = "solid", alpha = 0.99) +
   tm_credits(text = "a", fontface = "bold", size = 1.2, position = c(0, 0.9)) +
+  
+  ## to make small regions visible ------------- #
+  tm_shape(sf_small_l) +
+  tm_lines(lwd = .05, alpha = 0.5) +
+  tm_shape(sf_small_p) +
+  tm_dots(
+    col = 'value_chg',
+    palette = col_tmap, 
+    stretch.palette = F,
+    style  = "fixed",
+    breaks = c(#-Inf, -20, -10, 
+      -5, 0, 5, 10, 20, Inf), 
+    labels = c(#"< -20", "[-20, -10)", "[-10, -5]", 
+      "(-5, 0)", "[0, 5)", "[5, 10]", "(10, 20]", "> 20"),  
+    legend.col.reverse = T, 
+    legend.show = F,
+    size = 0.02) +
+  ## ------------------------------------------- #
+  
   tm_layout(
     # main.title = 'a', main.title.position = c(0.1,1), 
     frame = F, frame.lwd = 0.1, 
@@ -924,24 +992,33 @@ p <- tm_shape(df_chg_sf) +
     legend.height = -0.5,
     outer.margins=0, inner.margins=0, 
     panel.show = F)
+p
 # dev.off()
-tmap_save(tm = p, filename = fname, width=7, height=2.8, units="in", dpi = 300)
+tmap_save(tm = p, filename = fname, width=7, height=2.8, units="in", dpi = 500)
 ```
 
 
 
-```{r - boxplot - change by 4 income group - fig ex2, eval=FALSE, include=FALSE}
-dfs_index_chg %>%
-  merge(., grp, by.x = 'iso3', by.y = 'iso_a3', all.x = T) %>%
+```{r - boxplot - change by 4 income group - fig ex2}
+dfs_index_chg1 <- dfs_index_chg %>%
+  merge(x = ., 
+        y = grp_update, 
+        by.x = 'iso3', by.y = 'iso_a3', all.x = T) %>%
   dplyr::mutate(
-    group = factor(x = group, levels = c("High income", "Upper middle income", "Lower middle income", "Low income"))) %>%
-  filter(!is.na(group)) %>%
-  
-ggplot(aes(x= group, y=value_chg, 
-           group = group, fill = group, color = group)) + 
+    group_income4 = factor(
+      x = group_income4, 
+      levels = c("High income", "Upper middle income", "Lower middle income", "Low income"))) %>%
+  filter(!is.na(group)) 
+
+dfs_index_chg1 %>%
+  dplyr::filter(!is.na(value_chg)) %>%
+  ggplot(aes(x= group_income4, y=value_chg, 
+         # group = group_income4, 
+         fill = group_income4, 
+         color = group_income4)) + 
   geom_boxplot(outlier.shape = NA, notch = T, fill = NA, show.legend = F) + 
   geom_point(position=position_jitterdodge(jitter.width = 0.5),
-             # aes(fill = group), shape = 21, 
+             # aes(fill = group_income4), shape = 21, 
              # color = 'gray30',
              alpha = 0.6, show.legend = F) +
   # scale_color_brewer(palette = "Blues", direction = -1, na.value = 'black') +
@@ -957,9 +1034,13 @@ ggsave(filename = fname, plot = last_plot(), width = 6, height = 6, units = 'in'
 
 ```{r - boxplot - change by 2 income group - fig ex2}
 dfs_index_chg %>%
+  merge(x = ., 
+        y = grp_update, 
+        by.x = 'iso3', by.y = 'iso_a3', all.x = T) %>%
   dplyr::mutate(
-    group = ifelse(group %in% c("High income", "Upper middle income"), "High income", group),
-    group = ifelse(group %in% c("Lower middle income",  "Low income"), "Low income",  group),
+    # group = ifelse(group %in% c("High income", "Upper middle income"), "High income", group),
+    # group = ifelse(group %in% c("Lower middle income",  "Low income"), "Low income",  group),
+    group = group_income2, 
     group = factor(x = group, levels = c("High income", "Low income"))
     ) %>%
   # dplyr::filter(!is.na(inc_group)) %>%
@@ -970,7 +1051,7 @@ dfs_index_chg %>%
     geom_boxplot(outlier.shape = NA, notch = T, fill = NA, show.legend = F) + 
     geom_point(position=position_jitterdodge(jitter.width = 0.5),
                alpha = 0.6, show.legend = F) +
-    scale_colour_manual(values = rev(color_grp)) +
+    scale_colour_manual(values = color_grp2) +
     # theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
     geom_hline(yintercept = 0, color="red", linetype="dashed") +
     xlab('') + ylab('Impact on SDG Index')
