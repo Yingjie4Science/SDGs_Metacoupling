@@ -24,6 +24,14 @@ source('./Code/_path of data.R')
 
 # Packages ----------------------------------------------------------------
 source('./Code/_package list.R')
+## data package
+library(wbstats)
+library(FAOSTAT)
+## https://github.com/expersso/WHO
+# From Github
+# library(devtools)
+# install_github("expersso/WHO")
+library(WHO)
 
 # if("dplyr" %in% (.packages())){
 #           detach("package:dplyr", unload=TRUE) 
@@ -4503,6 +4511,8 @@ function_format_4yrData_save(iname = iname) ## "There are 17.4% NA"
 ind <- 'BX.KLT.DINV.CD.WD';
 dfwb  <- wb(indicator = ind, country = "countries_only",
             startdate = yr_start, enddate = yr_end) %>%
+# dfwb  <- wb_data(indicator = ind, country = "countries_only",
+#                  start_date = yr_start, end_date = yr_end) %>%
   as.data.frame() %>%
   spread(key = date, value = value) %>%
   left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))

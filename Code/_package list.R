@@ -1,16 +1,8 @@
 
+## make sure R session defaults to English
+Sys.setenv(LANG = "en")
 
 ### packages
-
-## data package
-library(wbstats)
-library(FAOSTAT)
-## https://github.com/expersso/WHO
-# From Github
-# library(devtools)
-# install_github("expersso/WHO")
-library(WHO)
-
 
 ## tidy data
 library(readr)

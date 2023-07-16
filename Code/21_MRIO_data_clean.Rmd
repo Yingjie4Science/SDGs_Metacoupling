@@ -289,7 +289,8 @@ if (n_year_check == 4) {
 
 ## Other data sources
 
-```{r - arms trade, eval=FALSE, include=FALSE}
+###  - arms trade
+```{r, eval=FALSE, include=FALSE}
 xls <- list.files(path = dir.arm, pattern = '_TIV_arms_trade_', full.names = T); xls
 df <- readxl::read_excel(path = xls) #%>%
   ### format as the same as EORA data
@@ -341,8 +342,8 @@ writexl::write_xlsx(x = df_formatted, path = fname)
 
 
 
-
-```{r - human_trafficking, eval=FALSE, include=FALSE}
+###  - human_trafficking
+```{r, eval=FALSE, include=FALSE}
 
 xls <- list.files(path = dir.traffick, pattern = '_human_trafficking', full.names = T); xls
 df <- readxl::read_excel(path = xls) %>%
@@ -413,8 +414,8 @@ writexl::write_xlsx(x = df_formatted, path = fname)
 
 
 
-
-```{r - peacekeeping?}
+### - peacekeeping?
+```{r }
 ### ".\Data\data_01_raw\Arm trade_Peacekeeping\UN_peacekeeping.Rmd"
 
 
@@ -435,8 +436,8 @@ writexl::write_xlsx(x = df_formatted, path = fname)
 ```
 
 
-
-```{r - student_flow, eval=FALSE, include=FALSE}
+###  - student_flow
+```{r, eval=FALSE, include=FALSE}
 ### get the indicator name
 ind <- 'student_flow'
 
@@ -500,9 +501,9 @@ writexl::write_xlsx(x = df_formatted, path = fname)
 
 
 
-
+###  - TradeMatrix_marine_capture
   Refer to the report "OECD FishPEM Model Capture Fisheries Trade Data" by Dr. Jessica Gephart. 
-```{r - TradeMatrix_marine_capture, eval=FALSE, include=FALSE}
+```{r, eval=FALSE, include=FALSE}
 ### get the indicator name
 ind <- 'TradeMatrix_marine_capture'
 
@@ -556,8 +557,8 @@ writexl::write_xlsx(x = df_formatted, path = fname)
 
 
 
-
-```{r - TradeMatrix_Cereals}
+###  - TradeMatrix_Cereals
+```{r}
 
 # See "Cereal trade - maxtrix" section in `10_country_profileData_prepare.Rmd`
 
@@ -566,8 +567,8 @@ writexl::write_xlsx(x = df_formatted, path = fname)
 
 
 
-
-```{r - TradeMatrix_Pesticides_Hzd}
+### - TradeMatrix_Pesticides_Hzd
+```{r }
 
 # see `11_Comtrade_BACI_Pesticides.Rmd`
 
@@ -575,8 +576,8 @@ writexl::write_xlsx(x = df_formatted, path = fname)
 
 
 
-
-```{r - NCD death embodied in trade matrix}
+### - NCD death embodied in trade matrix
+```{r}
 
 # See `NCDs_matrix.R`
 
@@ -588,6 +589,19 @@ writexl::write_xlsx(x = df_formatted, path = fname)
 
 
 
+### - FDI - IMF
+
+  See `FDI_data_prep.Rmd` in "Data/data_01_raw/FDI/"
+  
+```{r}
+### get the indicator name
+ind <- 'FDI'
+yrs <- c(2000, 2005, 2010, 2015)
+dir.i <- './Data/data_01_raw/FDI/IMF/'
+
+fname <- paste0(dir.eora_cleaned, ind, '_combined.xlsx'); fname
+df_formatted <- readxl::read_excel(fname)
+```
 
 
 

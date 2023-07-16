@@ -52,7 +52,7 @@ dir.flowScenario <- './Data/data_02_intermediate/dt02_flows/'
 
 
 ## figures -------------------------------------------------------------------------------
-dir.fig          <- './Data/Figure/'
+dir.fig          <- './Figure/'
 
 
 

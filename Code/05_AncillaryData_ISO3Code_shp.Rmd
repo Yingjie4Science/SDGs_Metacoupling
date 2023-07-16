@@ -2,7 +2,7 @@
 title: "Untitled"
 output: pdf_document
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 
@@ -10,8 +10,6 @@ editor_options:
 
 # Set up
 ```{r Dirs and packages, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-
 ### To clear your environment 
 remove(list = ls())
 
@@ -78,7 +76,14 @@ str(ctr_eora)
 ### to match country full_name and abbr 
 xls_iso_eora <- "./Data/_eora_190country_iso3_match_update.xlsx"
 iso_eora <- readxl::read_excel(path = xls_iso_eora)
-iso_eora_ex <- iso_eora
+iso_eora_ex <- iso_eora %>%
+  dplyr::mutate(Row = gsub('\\.|\\:|\\,', '', Row),
+                Row = trimws(Row),
+                Row = str_squish(Row)) %>%
+  as.data.frame()
+
+fname <- './Data/Ancillary_Data_iso_eora_ex.RData'
+save(iso_eora_ex, file = fname)
 
 
 ### 3. overlap? --> yes
@@ -520,8 +525,6 @@ sf::st_write(shp, dsn = fname, delete_layer = T)
 fname <- './Data/Ancillary_Data_ISO3code_shp.RData'
 save(iso_eora, pop, gdp, shp, grp, grp_update, file = fname)
 
-fname <- './Data/Ancillary_Data_iso_eora_ex.RData'
-save(iso_eora_ex, file = fname)
 ```
 
 
