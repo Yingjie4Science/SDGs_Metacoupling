@@ -131,11 +131,11 @@ pop_l <- pop %>% as.data.frame() %>%
 ## SDG Score & Index
 
 ### Score
-```{r - load data}
+```{r - load data - choose ❓}
 ### load data
 ls_f <- list.files(path = './Data/data_03_results', pattern = '^SDGs_all', full.names = T); ls_f
-tail(ls_f, n = 1)
-load(tail(ls_f, n = 1)) 
+f <- tail(ls_f, n = 1); cat('\n Here, we load this version as input: \n\t', f, '\n\n')
+load(f) 
 
 unique(dfs$scenario)
 snr_levels <- c("value_rel", "value_dst", "value_ner", "value_not")
@@ -158,7 +158,7 @@ dfs_score <- dfs %>%
         y = grp_update %>% 
           dplyr::rename(iso3=iso_a3) %>% 
           dplyr::select(iso3, group_income2) %>%
-          dplyr::rename(group = group_income2) %>% 
+          dplyr::rename(group = group_income2) %>% ## based on MG's suggestion
           dplyr::distinct(iso3, .keep_all = T),
         by = 'iso3', all.x = T) %>%
   as.data.frame()
@@ -574,7 +574,13 @@ tmap_save(tm = tmap_last(), filename = fname, width=7, height=2.8, units="in", d
 ```{r}
 
 dfs_score_goal_snr <- dfs_score %>%
-  summarySE(measurevar= "score", groupvars = c("year", 'scenario', "goal"), na.rm = T) 
+  summarySE(measurevar= "score", groupvars = c("year", 'scenario', "goal"), na.rm = T) %>%
+  as.data.frame() %>%
+  dplyr::mutate_at(vars(score, sd, se, ci), list(~ round(., 2))) %>%
+  ## for viz purpose, change `NaN` to a very small value
+  dplyr::mutate_at(vars(score), ~ifelse(is.nan(.), 10e-9, .)) %>%
+  arrange(goal, scenario, year)
+
 
 p <- dfs_score_goal_snr %>%
   ggplot(data = ., 
@@ -592,6 +598,13 @@ p <- dfs_score_goal_snr %>%
     values = rev(snr_colors), 
     labels = rev(snr_labels), 
     guide = guide_legend(reverse = TRUE)) +
+  # Condition for labeling
+  geom_text(position = position_dodge(0.8), 
+            aes(label = case_when(
+              score == 10e-9 ~ as.character('NA'), 
+              score == 0 ~ paste0(' ', as.character(score)), 
+              TRUE ~ "")),
+            hjust = -0.5, size = 2.5) +
   xlab('SDGs') + ylab("Scores") +
   coord_flip() +
   theme_bar_my +
@@ -701,8 +714,7 @@ dfs_index_snr <- dfs_index %>%
 
 
 ### plot ------------------
-p <- 
-dfs_index_snr %>%
+p <- dfs_index_snr %>%
   ggplot(data = ., 
          aes(
            # x = group,
@@ -821,8 +833,8 @@ sum(dfs_index_chg_count$increase, na.rm = T) %>%                    ## 181
   cat(., '% of the world countries improved their SDG Index.\n')
 
 ## 2. number and % of population improved SDG Index?
-total_pop <- sum(dfs_index_chg_count$pop, na.rm = T); total_pop
-total_pop_increased <- sum(dfs_index_chg_count$increase_pop, na.rm = T); total_pop_increased
+total_pop <- sum(dfs_index_chg_count$pop, na.rm = T); #total_pop
+total_pop_increased <- sum(dfs_index_chg_count$increase_pop, na.rm = T); #total_pop_increased
 (total_pop_increased/total_pop*100) %>%                             ## 98.5%
   round(., digits = 1) %>%
   cat(., '% of the world population improved their SDG Index.\n')
@@ -835,8 +847,12 @@ df_chg_sf_count_lowincome <- dfs_index_chg_count %>%
   dplyr::mutate(low_income = ifelse(stringr::str_detect(fixed(pattern = 'low', ignore_case = T), string = group), 1, 0)) %>%
   as.data.frame()
   
-sum(df_chg_sf_count_lowincome$low_income, na.rm = T)                                      ## 13    are low-income 
-sum(df_chg_sf_count_lowincome$low_income, na.rm = T)/nrow(df_chg_sf_count_lowincome)*100  ## 76.5% are low-income
+(sum(df_chg_sf_count_lowincome$low_income, na.rm = T)) %>% 
+  cat(., 'are low-income countries.\n') 
+## 13 are low-income 
+(sum(df_chg_sf_count_lowincome$low_income, na.rm = T)/nrow(df_chg_sf_count_lowincome)*100) %>%
+  cat(., '% are low-income countries.')
+## 76.5% are low-income
 ```
 
 

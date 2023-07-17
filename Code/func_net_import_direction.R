@@ -31,16 +31,17 @@ func_net_import_direction <- function(df, direction_i, frac){
       net_in      = total_in - total_ex,
       net_in_adj  = ifelse(net_in < 0, 0, net_in), ## make an adjustment (is this correct???)
       x           = net_in, ## or net_in_adj?
-      
+    ) %>%
+    dplyr::mutate(
       ### cal upper/lower bounds
       max0  = max(x, na.rm = T),
       min0  = min(x, na.rm = T),
-      #### 2/ to use top x%
-      max1  = x %>% unlist() %>% na.omit() %>% sort(decreasing = T) %>% dplyr::nth(n = length(.)*frac),
-      min1  = x %>% unlist() %>% na.omit() %>% sort(decreasing = T) %>% dplyr::nth(n = length(.)*(1-frac)),
+      #### 2/ to use top x%; here `n` in the nth() needs to be a single integer
+      max1  = x %>% unlist(.) %>% na.omit(.) %>% sort(decreasing = T) %>% dplyr::nth(n = round(length(.)*frac)),
+      min1  = x %>% unlist(.) %>% na.omit(.) %>% sort(decreasing = T) %>% dplyr::nth(n = round(length(.)*(1-frac))),
       #### 3/ to use top 5 and bottom 5, as SDSN did
-      max2  = x %>% unlist() %>% na.omit() %>% sort(decreasing = T) %>% dplyr::nth(n = 5),
-      min2  = x %>% unlist() %>% na.omit() %>% sort(decreasing = T) %>% dplyr::nth(n = (length(.)-5)),
+      max2  = x %>% unlist(.) %>% na.omit(.) %>% sort(decreasing = T) %>% dplyr::nth(n = 5),
+      min2  = x %>% unlist(.) %>% na.omit(.) %>% sort(decreasing = T) %>% dplyr::nth(n = (length(.)-5)),
       
       ### to decide which upper/lower bounds to use
       max = max1,

@@ -35,7 +35,7 @@ source('./Code/_path of data.R')
 
 ### packages
 source('./Code/_package list.R')
-library(stringr)
+
 
 today <- format(Sys.time(), "%Y%m%d") ## %H%M%S
 ```
@@ -70,7 +70,7 @@ theme_ns <-
 
 
 ```{r Ancillary data}
-load('./Data/Ancillary_Data_ISO3code_shp.RData') ## iso_eora, pop, gdp, shp, grp
+load('./Data/Ancillary_Data_ISO3code_shp.RData') ## iso_eora, pop, gdp, shp, grp, grp_update
 
 ### extended country-iso3 pair list for matching
 load('./Data/Ancillary_Data_iso_eora_ex.RData')  ## ## iso_eora_ex
@@ -402,8 +402,8 @@ library(googlesheets4)
 link <- 'https://docs.google.com/spreadsheets/d/13Di8K8ObDFfdALxrf-YjlGyYf_tNrm1TZ7yMDaozfzc/edit?usp=sharing'
 
 ### Footprint indicators
-direction <- googlesheets4::read_sheet(link, sheet = 'Eora_match_SDG', range = 'D:I', col_types = 'cccccc') %>%
-  dplyr::select(Filename, SDG_class, starts_with('direction')) %>%
+direction <- googlesheets4::read_sheet(link, sheet = 'Eora_match_SDG', range = 'C:J', col_types = 'cccccccc') %>%
+  dplyr::select(FT_Indicators, Filename, Used, SDG_class, starts_with('direction')) %>%
   dplyr::rename(ind = Filename) %>%
   dplyr::distinct(ind, .keep_all = T) %>%
   dplyr::filter(!is.na(ind) &              ## remove rows with NA
@@ -413,16 +413,23 @@ direction <- googlesheets4::read_sheet(link, sheet = 'Eora_match_SDG', range = '
   dplyr::mutate(ind = gsub('SHDB0', 'SHDB', ind)) %>%   ## remove "0" in the ind names to match the actual file name
   as.data.frame()
 # str(direction)
-f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'direction.RData')
-save(direction, file = f)
 
 
 direction_clean <- direction %>%
   dplyr::filter(!is.na(direction)) %>%
-  dplyr::select(ind, SDG_class, direction) %>%
+  # dplyr::filter(Used == 1) %>%
+  dplyr::select(FT_Indicators, ind, Used, SDG_class, direction) %>%
   as.data.frame()
-
 # str(direction_clean)
+
+f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'direction.RData')
+save(direction, direction_clean, file = f)
+## save a same copy of data in XLSX
+f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'direction.xlsx')
+writexl::write_xlsx(x = direction, path = f)
+
+
+
 ```
 
 
@@ -474,7 +481,9 @@ net_imports_fromAll <- net_imports
 ```{r include=FALSE}
 net_imports_fromAll$scenario <- 'fromAll'
 
-dfSummary(net_imports_fromAll)
+# library(remotes)
+# install_github("rapporter/pander") # Strongly recommended
+summarytools::dfSummary(net_imports_fromAll)
 # skimr::skim(net_imports_fromAll)
 
 length(unique(net_imports_fromAll$iso3))
@@ -511,7 +520,7 @@ net_imports_fromAll_check <- net_imports_fromAll %>%
 
 ### save the data ------------------------------------------------------------------------
 n_ft_ind <- length(unique(net_imports_fromAll$ind)); n_ft_ind
-fname <- paste0(dir.flowScenario, 'net_imports_fromAll_', postfix, '_', n_ft_ind, '.RData'); fname
+fname <- paste0(dir.flowScenario, 'net_imports_fromAll_', postfix, '_', today,'_', n_ft_ind, '.RData'); fname
 save(net_imports_fromAll, file = fname)
 ```
 
@@ -526,25 +535,33 @@ save(net_imports_fromAll, file = fname)
 ```{r - load data}
 ### load data
 ls_f <- list.files(path = dir.flowScenario, pattern = '^net_imports_fromAll_', full.names = T); ls_f
-tail(ls_f, n = 1)
-load(tail(ls_f, n = 1)) ## load the latest data `net_imports_fromAll`
+# tail(ls_f, n = 1)
+# load(tail(ls_f, n = 1)) ## load the latest data `net_imports_fromAll`
+
+
+#' the indicator number reduced from 46 to 32, because 14 of which are in fact not used in SDG analysis. 
+#' Even we have all the data on 46 ft indicator, we only need to include what are actually used in data analysis. 
 ```
 
 
+
+  Mengyu provides EORA data calculated from consumption-based and production-based accounting approaches. 8/12/2022
+  Here, we compared the difference between the two results. 
 ```{r - compare: pro VS con}
 # options(scipen=999) ## disabling scientific notation
 options(scipen=0)     ## Scientific notation
 
 ### compare
-load("./Data/data_02_intermediate/dt02_flows/net_imports_fromAll_20220812con_45.RData")
+load("./Data/data_02_intermediate/dt02_flows/net_imports_fromAll_20220812con_20220816_45.RData")
 net_imp_con <- net_imports_fromAll
-load("./Data/data_02_intermediate/dt02_flows/net_imports_fromAll_20220812pro_45.RData")
+load("./Data/data_02_intermediate/dt02_flows/net_imports_fromAll_20220812pro_20230514_45.RData")
 net_imp_pro <- net_imports_fromAll
 
 
+### pick one indicator to compare the difference -----------------------------------------
 ind_i <- 'CO2'
 # ind_i <- 'Water'
-ind_i <- 'Energytotal'
+# ind_i <- 'Energytotal'
 
 net_imp_con_i <- net_imp_con %>%
   as.data.frame() %>%
@@ -558,11 +575,10 @@ net_imp_pro_i <- net_imp_pro %>%
   as.data.frame() %>%
   group_by(ind) %>% arrange(desc(net_in)) %>%
   dplyr::filter(ind == ind_i)
+# str(net_imp_con_i)
 
 
-str(net_imp_con_i)
-
-
+#### to create a plot function to compare
 ggplot_x_y_compare <- function(x, y) {
   ggplot() +
     geom_point(aes(x = x, y = y)) +
@@ -570,18 +586,27 @@ ggplot_x_y_compare <- function(x, y) {
                 labels = trans_format("log10", math_format(10^.x))) +
     scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
             labels = trans_format("log10", math_format(10^.x))) +
+    geom_abline(slope = 1) +
+    xlab('con-based') + 
+    ylab('pro-based') +
     theme_bw() 
 }
 
+ggplot_x_y_compare(x = net_imp_con_i$total_ex, y = net_imp_pro_i$total_ex) +
+  ggtitle(paste0(ind_i, ' - total exports'))
+ggplot_x_y_compare(x = net_imp_con_i$total_in, y = net_imp_pro_i$total_in) +
+  ggtitle(paste0(ind_i, ' - total imports'))
+ggplot_x_y_compare(x = net_imp_con_i$net_in, y = net_imp_pro_i$net_in) +
+  ggtitle(paste0(ind_i, ' - net imports'))
+ggplot() + geom_point(aes(x = net_imp_con_i$net_in, y = net_imp_pro_i$net_in)) + 
+  ggtitle(paste0(ind_i, ' - net imports')) +
+  xlab('con-based') + 
+  ylab('pro-based') +
+  theme_bw() 
 
-ggplot_x_y_compare(x = net_imp_con_i$total_ex, y = net_imp_pro_i$total_ex)
-ggplot_x_y_compare(x = net_imp_con_i$total_in, y = net_imp_pro_i$total_in)
-ggplot_x_y_compare(x = net_imp_con_i$net_in, y = net_imp_pro_i$net_in)
-ggplot() + geom_point(aes(x = net_imp_con_i$net_in, y = net_imp_pro_i$net_in)) + theme_bw() 
 
 
-
-###
+### --------------------------------------------------------------------------------------
 # var_rm = 'net_in' ## to remove this variable
 var_rm = 'score'  ## to remove this variable
 
@@ -614,15 +639,25 @@ net_imp_vs_i.p <- net_imp_vs_i %>%
   xlab(paste0(ind_i, ' - ranked by net imports')) +
   theme_bw() 
 net_imp_vs_i.p
-fname <- paste0(dir.fig, 'check_conVSpro/compare_netImports_', ind_i, '_', var4vs, '.png'); fname
+fname <- paste0(dir.fig, 'check_conVSpro/compare_netImports_', ind_i, '_', var4vs, '.png'); #fname
 ggsave(filename = fname, plot = net_imp_vs_i.p, width = 10, height = 20, units = 'in', dpi = 200)
 ```
 
 
-```{r - Index}
+```{r - choose data️️️ ❗}
 ###
+ls_f
+f <- subset(x = ls_f, subset = grepl(pattern = postfix, x = ls_f)); f
+f <- f[length(f)]; cat('\n we will use this version for final analysis: \n\t', f)
+load(f) ## load the latest data `net_imports_fromAll`
+
+net_imports_fromAll_use <- net_imports_fromAll
+```
+
+
+```{r - Index}
 ### spillover normalized score for each indicator
-spillover_norm <- net_imports_fromAll %>%
+spillover_norm <- net_imports_fromAll_use %>%
   dplyr::select(ind, iso3, year, score) %>%
   spread(key = 'ind', value = 'score')
 
@@ -633,7 +668,7 @@ spillover_norm <- spillover_norm %>%
 
 
 ### score for the aggregated index (i.e., the average value of all indicators) ---------------------
-spillover_index <- net_imports_fromAll %>%
+spillover_index <- net_imports_fromAll_use %>%
   ungroup() %>% as.data.frame() %>%
   dplyr::filter(year %in% year_list) %>%
   dplyr::select(ind, iso3, year, score) %>%
@@ -647,7 +682,7 @@ hist(spillover_index$index)
 
 
 ### look at social and environmental aspect separately ---------------------------------------------
-# spillover_index_se <- net_imports_fromAll %>%
+# spillover_index_se <- net_imports_fromAll_use %>%
 #   ungroup() %>% as.data.frame() %>%
 #   dplyr::filter(year %in% c(2000, 2005, 2010, 2015)) %>%
 #   dplyr::select(ind, iso3, year, score) %>%
@@ -703,7 +738,7 @@ dev.off()
 
 
 ### - 4th approach ------------------------------------
-if (!require("devtools")) install.packages("devtools")
+# if (!require("devtools")) install.packages("devtools")
 # devtools::install_github("talgalili/d3heatmap")
 library("d3heatmap")
 d3heatmap((data), colors = "RdYlBu", 
@@ -718,9 +753,9 @@ detach(package:d3heatmap, unload=TRUE)
 
 
 ```{r - check on one ind, eval=FALSE, include=FALSE}
-unique(net_imports_fromAll$ind)
+unique(net_imports_fromAll_use$ind)
 
-test <- net_imports_fromAll %>%
+test <- net_imports_fromAll_use %>%
   dplyr::filter(ind %in% c('CO2', 'Water')) %>%
   dplyr::filter(year %in% c(2015)) %>%
   dplyr::select(1:6) %>%
@@ -738,18 +773,21 @@ test <- net_imports_fromAll %>%
 
 ### Map
 
-```{r - fig2b - TNI Index}
+```{r - fig2b - map - TNI Index}
 ### map of spillover Index score ---------------------------------------------------------
 ### 
 spillover_index_shp <- shp %>%
-  merge(x = ., y = spillover_index, by.x = 'iso_a3', by.y = 'iso3', all.x = T) %>%
+  dplyr::select(-economy, -income_grp) %>%
+  merge(x = ., 
+        y = spillover_index, by.x = 'iso_a3', by.y = 'iso3', all.x = T) %>%
   arrange(!is.na(year))
 # str(spillover_index_shp)
 
 ### to check if all the spillover data has been matched with the shp
 spillover_index_shp_match_check <- spillover_index %>%
   dplyr::filter(year == 2015) %>%
-  merge(y = shp, x = ., by.y = 'iso_a3', by.x = 'iso3', all.x = T) 
+  merge(y = shp %>% dplyr::select(-economy, -income_grp), 
+        x = ., by.y = 'iso_a3', by.x = 'iso3', all.x = T) 
 nrow(spillover_index_shp_match_check) ## ROW was not included here. 
 
 
@@ -784,8 +822,8 @@ fname <- paste0(dir.fig, 'spillover/', fignm);
 fname
 ggsave(filename = fname, plot = fig, width = width_2col, height = width_2col*2.8/7, units = unit_ns, dpi = 300)
 
-fname <- paste0(dir.fig, '01main/',    fignm);
-ggsave(filename = fname, plot = fig, width = width_2col, height = width_2col*2.8/7, units = unit_ns, dpi = 300)
+# fname <- paste0(dir.fig, '01main/',    fignm);
+# ggsave(filename = fname, plot = fig, width = width_2col, height = width_2col*2.8/7, units = unit_ns, dpi = 300)
 
 
 
@@ -825,18 +863,12 @@ spillover_index_top_bottom <- spillover_index_shp %>%
   
   ## to get the top 10 and bottom 10 -----------------------------
   dplyr::filter(dense_rank(index) <= 10 | dense_rank(desc(index)) <= 10) %>%
-  ### --> self-defined 2 group: high, low income
-  # dplyr::mutate(group = case_when(
-  #   str_detect(income_grp, 'High|Upper') ~ "high income", ## high or upper-middle
-  #   str_detect(income_grp, 'Low') ~ "low income",         ## low or low-middle
-  #   TRUE ~ '0')) %>%
-  ### --> more groups based on World Band classification
+  
+  ### choose country group classification
   dplyr::mutate(
-    group = tm::removeNumbers(income_grp),
-    group = gsub(":.*", "", group),
-    group = gsub("(?!\\:)[[:punct:]]", "", group, perl=TRUE),
+    group = group_income2,
     group = stringr::str_squish(group),
-    group = factor(x = group, levels = c("High income", "Upper middle income", "Lower middle income", "Low income"))) %>%
+    group = factor(x = group, levels = c("High income", "Low income"))) %>%
   dplyr::mutate(name = ifelse(iso_a3 == 'USA', 'United States', name)) %>% ## long name to short 
   as.data.frame()
 ```
@@ -909,12 +941,11 @@ ggsave(filename = fname, plot = last_plot(), width = width_2col/3*2, height = wi
 ```
 
 
-```{r - fig2a - index rank county-color-2-group}
+```{r - fig2a - bar - index rank county-color-2-group}
 p <- spillover_index_top_bottom %>%
   dplyr::mutate(rank = case_when(
     index > 50 ~ "top 10", 
     TRUE ~ 'bottom 10')) %>%
-  dplyr::mutate(group = ifelse(group %in% c("High income", "Upper middle income"), "High income", "Low income")) %>%
   ggplot(aes(x = reorder(name, index))) +
   geom_col(aes(y = index, fill = (rank)), show.legend = T) + 
   geom_point(aes(y = -2, color = group), show.legend = T, size = 3) + # size = 1.2, 
@@ -930,13 +961,15 @@ p <- spillover_index_top_bottom %>%
         legend.key.height = unit(.3, 'cm'),  #change legend key height
         legend.key.width  = unit(.3, 'cm'),  #change legend key width
         legend.text = element_text(size=8),  #change legend text font size
-        legend.position = c(0.8, 0.2), legend.margin=unit(0, "cm")) +
+        # legend.margin=unit(0, "cm"),
+        legend.margin=margin(0, 0, 0, 0),
+        legend.position = c(0.8, 0.2)) +
   guides(
    color = guide_legend(order = 2, title = NULL, override.aes = list(fill  = c(NA, NA)), reverse = F),
    fill  = guide_legend(order = 1, title = NULL, override.aes = list(shape = c(NA, NA)), reverse = T)) 
 
 fig <- ggarrange(p, labels = "a", font.label = list(size = 12), vjust = 1, hjust = 0); fig
-fname <- paste0(dir.fig, 'spillover/', 'fig2a_spillover_top_bot_color_2grp_', postfix, '_', today,'.jpg'); fname
+fname <- paste0(dir.fig, '01main/', 'fig2a_spillover_top_bot_color_2grp_', postfix, '_', today,'.jpg'); fname
 ggsave(filename = fname, plot = fig, width = width_2col/3*2, height = width_2col/2, units = 'cm', dpi = 600)
 ```
 
@@ -948,7 +981,7 @@ ggsave(filename = fname, plot = fig, width = width_2col/3*2, height = width_2col
   *To do*: order the list based on characters or property (social vs. environmental vs. economic vs. security ...)
 
 ```{r - fig3ex - Index rank with MC categories}
-n_type <- length(unique(net_imports_fromAll$ind)); n_type
+n_type <- length(unique(net_imports_fromAll_use$ind)); n_type
 list20 <- unique(spillover_index_top_bottom$iso_a3); list20
 
 spillover_index_type <- spillover_norm %>%
@@ -989,7 +1022,7 @@ ggplot(spillover_index_type_SDGtype,
     legend.box.margin = margin(r = 0, b = 0, unit = "mm"), # small margin
     legend.key.size = unit(0.4,"cm"),
     panel.grid.major.y = element_blank(),
-    legend.margin=unit(0, "cm")) +
+    legend.margin=margin(0, 0, 0, 0)) +
   ylab('Impact Index') + xlab('Country')
 
 fname <- paste0(dir.fig, 'spillover/', 'spillover_index_top_bottom_ByType_', postfix, '_', today, '.jpg'); fname
@@ -997,8 +1030,8 @@ ggsave(filename = fname, plot = last_plot(), width = width_2col/3*2, height = wi
 ```
 
 
-
-```{r - score of SE, eval=FALSE, include=FALSE}
+*NOT in use*
+```{r - score of SE [X], eval=FALSE, include=FALSE}
 spillover_index_se_shp <- shp %>%
   merge(x = ., y = spillover_index_se, by.x = 'iso_a3', by.y = 'iso3', all.x = T) %>%
   arrange(!is.na(year))
@@ -1057,7 +1090,8 @@ ft  <- googlesheets4::read_sheet(link, sheet = 1) %>%
   dplyr::filter(Used == '1', 
                 !is.na(Filename),
                 !grepl('\\?', Filename)) %>%
-  dplyr::select(Filename, ShortName) 
+  dplyr::select(Filename, ShortName) %>%
+  arrange(Filename)
 
 fts <- ft %>%
   dplyr::mutate(#ShortName = str_to_title(ShortName),
@@ -1071,7 +1105,10 @@ fts <- ft %>%
 ## 2. map the selected spillovers ------------------
 yr <- 2015
 spillover_norm_each_shp <-  shp %>%
-  merge(x = ., y = spillover_norm, by.x = 'iso_a3', by.y = 'iso3', all.x = T) %>%
+  merge(x = ., 
+        y = spillover_norm, 
+        by.x = 'iso_a3', by.y = 'iso3', 
+        all.x = T) %>%
   gather(key = 'indicator', value = 'spillover_norm', (ncol(shp)+1):(ncol(.)-1)) %>%
   dplyr::filter(year == yr)
 
@@ -1094,8 +1131,10 @@ map_each_ind <- map_each %>%
   dplyr::filter(!is.na(ShortName)) %>%
   distinct(ShortName, indicator)
 
-ind_selected <- map_each_ind$indicator; ind_selected
-ind_name     <- map_each_ind$ShortName; ind_name
+# ind_selected <- map_each_ind$indicator; ind_selected
+# ind_name     <- map_each_ind$ShortName; ind_name
+n_p <- length(unique(map_each_ind$indicator))
+n_row <- ceiling(n_p/6 + 0.01); n_row 
 
 
 map_each_p <- map_each %>%
@@ -1103,7 +1142,7 @@ map_each_p <- map_each %>%
   ggplot()+
   geom_sf(aes(fill = spillover_norm), color='gray80', size = 0.1) +
   scale_fill_distiller(palette = "Spectral", direction = -1, na.value = 'gray70', name= 'Impact Score') +
-  facet_wrap(~ShortName, ncol = 6) +
+  facet_wrap(~ShortName, ncol = 6, nrow = n_row) +
   # ggtitle(yr)+
   theme(legend.position = c(0.9, 0.08)) +
   theme(panel.grid = element_blank(),
@@ -1115,7 +1154,7 @@ map_each_p <- map_each %>%
         ) 
 map_each_p
 fname <- paste0(dir.fig, 'spillover/', 'map_spillover_norm_each_', yr, '_long_', today, '.jpg'); #fname
-ggsave(filename = fname, plot = map_each_p, width = 8, height = 4.5, units = 'in', dpi = 300)
+ggsave(filename = fname, plot = map_each_p, width = 8, height = 4.5/6*n_row, units = 'in', dpi = 300)
 ```
 
 
@@ -1126,7 +1165,7 @@ ggsave(filename = fname, plot = map_each_p, width = 8, height = 4.5, units = 'in
   This chuck aims to zoom in to EU region, which is small on the world map. 
   One can ignore this at this stage. 
   
-```{r - zoom in map for EU, eval=FALSE, include=FALSE}
+```{r - zoom in map for EU [X], eval=FALSE, include=FALSE}
 func_make_polygon <- function(lon_bounds, lat_bounds){
   pts <- c()
   for (j in lat_bounds) {

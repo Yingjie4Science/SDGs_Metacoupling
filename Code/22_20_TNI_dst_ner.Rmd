@@ -18,6 +18,10 @@ editor_options:
 # Set up
 
 ```{r}
+
+### To clear your environment 
+remove(list = ls())
+
 ### packages
 source('./Code/_package list.R')
 source('./Code/func_net_import_direction.R')
@@ -52,7 +56,7 @@ ner_stat <- ner.matrix %>%
   dplyr::mutate(total = sum(n),
                 percent = scales::percent(n/total, accuracy = 0.1))
 ner_stat
-# ner_stat$n/sum(ner_stat$n) * 100 
+ner_stat$n/sum(ner_stat$n) * 100
 
 ### --> 96.9% distant pairs; 3.1% nearby pairs
 
@@ -118,10 +122,6 @@ load(f)
   * In the scenario of `only nearby` interaction, we need to use the 'burden' from `distant` interactions (Be careful here!) 
   * `distant only` scenario = no nearby  trade: to evaluate *nearby*  impact --> use nearby  footprints data
   * `nearby only`  scenario = no distant trade: to evaluate *distant* impact --> use distant footprints data
-  
-
-
-
 
 ```{r - distant only scenario --> nearby impact}
 
@@ -254,8 +254,20 @@ net_imports_fromDst  <- net_imports
 #### - Save R data
 ```{r}
 
-net_imports_fromDst_fromNer <- rbind(net_imports_fromNer, net_imports_fromDst)
+net_imports_fromDst_fromNer <- rbind(net_imports_fromNer, net_imports_fromDst) %>%
+  ### use SHDB 2019 for 2015 --------------------!!!
+  dplyr::mutate(
+    year = ifelse(str_detect(string = ind, pattern = 'SHDB') & year == 2019, 
+                  2015, year)) %>%
+  as.data.frame()
 
+
+## count how many indicators are included 
+# net_imports_ind <- net_imports_fromDst_fromNer %>%
+#   ungroup() %>%
+#   dplyr::distinct(ind, .keep_all = F) %>%
+#   dplyr::mutate(ind = trimws(ind)) %>%
+#   arrange(ind)
 
 ## shdb do not have data in 2000, 2005, 2010
 net_imports_bind_check <- net_imports_fromDst_fromNer %>%
@@ -267,9 +279,5 @@ n_ft_ind <- length(unique(net_imports_fromDst_fromNer$ind));  n_ft_ind
 fname <- paste0(dir.flowScenario, 'net_imports_fromDst_fromNer_', n_ft_ind, '.RData'); fname
 save(net_imports_fromDst_fromNer, file = fname)
 ```
-
-
-
-
 
 

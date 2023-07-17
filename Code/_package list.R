@@ -49,6 +49,7 @@ library(conflicted)
 conflict_prefer("filter", "dplyr")
 conflict_prefer("arrange", "dplyr")
 conflict_prefer("mutate", "dplyr")
+conflicts_prefer(dplyr::desc)
 conflict_prefer("print", "base")
 conflict_prefer("save", "base")
 

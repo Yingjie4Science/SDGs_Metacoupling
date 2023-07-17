@@ -599,7 +599,7 @@ ind <- 'FDI'
 yrs <- c(2000, 2005, 2010, 2015)
 dir.i <- './Data/data_01_raw/FDI/IMF/'
 
-fname <- paste0(dir.eora_cleaned, ind, '_combined.xlsx'); fname
+fname <- paste0(dir.eora_cleaned, ind, '_matrix.xlsx'); fname
 df_formatted <- readxl::read_excel(fname)
 ```
 
