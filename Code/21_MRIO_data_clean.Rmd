@@ -100,8 +100,6 @@ iso_eora <- readxl::read_excel(path = xls_iso_eora)
 ### to choose data version by modifying `dir.eora` in `_path of data.R`
 
 
-
-
 ### to list all the input data files
 library(stringr)
 pattern <- '^YJ_'
@@ -141,39 +139,6 @@ writexl::write_xlsx(x = inds_df, path = './Data/_eora_indicators_io_list.xlsx')
   
 
 
-  **Rename files** - in case the name system is not consistent. 
-```{r eval=FALSE, include=FALSE}
-
-## 1. fix `Water_scare` file
-name_old <- list.files(path = dir.eora, pattern="Water_scare", full.names = T)
-name_old
-name_new <- gsub('scare', 'scare_', name_old)
-name_new <- gsub('__', '_', name_new)
-name_new
-file.rename(from = name_old, to = name_new)
-
-
-## 2. fix SHDB files
-xls.ls.rename <- subset(xls.ls, grepl(pattern = 'SHDB', x = xls.ls))
-for (file in xls.ls.rename) {
-  ## new name
-  file_new <- file %>%
-    gsub(pattern = '20220801', '',  x = .) %>%
-    gsub(pattern = 'SHDB_', 'SHDB', x = .)
-  name_dir <- paste0(dirname(xls.eora.ls[1]), '/')
-  name_old <- paste0(name_dir, file)
-  name_new <- paste0(name_dir, file_new)
-  if (file.exists(name_old)) {
-    ## rename
-    file.rename(name_old, name_new)
-  } else {
-    cat("The file does not exist\n")
-  }
-}
-```
-  
-  
-
 ```{r - loop read and combine xlsx ❗}
 # pattern <- '^YJ_CO2'
 n_year_check <- 4 ## if 4 years data, to make sure no more files will be matched. 
@@ -187,7 +152,8 @@ for (i in inds) {
   pattern <- paste0('^YJ_', i, '_20'); #print(pattern)
   xls.eora.ls <- list.files(path = dir.eora, pattern = pattern, full.names = T); xls.eora.ls
   
-  ### in case the pattern would match too many files, we use this `if else` function to pop out a warning message if anything goes wrong. 
+  ###' in case the pattern would match too many files, 
+  ###' we use this `if else` function to pop out a warning message if anything goes wrong. 
   if(length(xls.eora.ls) > n_year_check | length(xls.eora.ls) < (n_year_check-1) ) {
     # print('Match error!') 
     stop('Match error!')
@@ -202,8 +168,11 @@ for (i in inds) {
       yr <- str_sub(xls, -9, -6)
       df.eora  <- readxl::read_excel(path = xls)
       df.eora1 <- df.eora %>%
-        left_join(., iso_eora, by = c('Row' = 'Row')) %>% ## add ctr code
-        arrange(!is.na(iso3_eora))
+        left_join(., 
+                  iso_eora %>% dplyr::select(Row, iso3_eora), 
+                  by = c('Row' = 'Row')) %>% ## add ctr code
+        arrange(!is.na(iso3_eora)) %>%
+        as.data.frame()
   
       ### rename the cols
       ctr_ls_eora <- unique(df.eora1$iso3_eora); ctr_ls_eora
@@ -229,10 +198,58 @@ for (i in inds) {
     fname <- paste0(dir.eora_cleaned, iname, '.xlsx'); print(fname); cat('\n\n')
     writexl::write_xlsx(x = df.eora.x.all, path = fname)
   }
+  
 }
 
 ```
 
+
+
+
+```{r - loop detailed SHDB}
+dir.shdb.detail <- './Data/data_02_intermediate/dt02_flows/eora/SHDB2019_135_renamed/'
+pattern <- '^YJ_SHDB'
+inds_ls <- list.files(path = dir.shdb.detail, pattern = pattern, full.names = T); inds_ls
+  
+for (xls in inds_ls) {
+  
+  ### Extracting the last n characters from a string in R, and get the year number
+  yr <- str_sub(xls, -9, -6)
+  df.eora  <- readxl::read_excel(path = xls)
+  df.eora1 <- df.eora %>%
+    left_join(., 
+              iso_eora %>% dplyr::select(Row, iso3_eora), 
+              by = c('Row' = 'Row')) %>% ## add ctr code
+    arrange(!is.na(iso3_eora)) %>%
+    as.data.frame()
+
+  ### rename the cols
+  ctr_ls_eora <- unique(df.eora1$iso3_eora); ctr_ls_eora
+  names(df.eora1)
+  names(df.eora1) <- c('ctr', ctr_ls_eora, 'iso3')
+
+  ### reorder the col names
+  col_name_ctr <- names(df.eora1)[-c(1, ncol(df.eora1))];  ## remove "ctr" in the 1st col and "iso3" in the last
+  # print(col_name_ctr)
+  print(paste0('Number of countries: ', length(col_name_ctr)))
+
+  df.eora.yr <- df.eora1 %>%
+    dplyr::mutate(year = yr) %>%
+    dplyr::select(year, ctr, iso3, all_of(col_name_ctr))
+
+  ### append all 4 years data in one table
+  # df.eora.x.all <- rbind(df.eora.x.all, df.eora.yr);
+  df.eora.x.all <- df.eora.yr
+
+  print(paste0('Total number of rows for the combine data set: ', nrow(df.eora.x.all)))
+
+  ### save as xlsx
+  iname <- basename(xls) %>% gsub('YJ_', '', x=.) %>% gsub(paste0('_',yr), '', x=.)
+  fname <- paste0(dir.eora_cleaned, iname); print(fname); cat('\n\n')
+  writexl::write_xlsx(x = df.eora.x.all, path = fname)
+}
+
+```
 
 
 

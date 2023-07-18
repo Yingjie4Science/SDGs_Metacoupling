@@ -1,0 +1,154 @@
+---
+title: "Untitled"
+author: "Yingjie"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+# Set up
+```{r Paths and packages, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+### To clear your environment 
+remove(list = ls())
+
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+setwd(dir)
+setwd('..') # set directory by one folder up
+getwd()
+
+### data path 
+source('./Code/_path of data.R')
+
+
+### packages
+source('./Code/_package list.R')
+```
+
+
+# Rename data
+
+  **Rename files** - in case the name system is not consistent. 
+  
+```{r - rename files, eval=FALSE, include=FALSE}
+
+## 1. fix `Water_scare` file
+name_old <- list.files(path = dir.eora, pattern="Water_scare", full.names = T)
+name_old
+name_new <- gsub('scare', 'scare_', name_old)
+name_new <- gsub('__', '_', name_new)
+name_new
+file.rename(from = name_old, to = name_new)
+
+
+## 2. fix SHDB files
+xls.ls.rename <- subset(xls.ls, grepl(pattern = 'SHDB', x = xls.ls))
+for (file in xls.ls.rename) {
+  ## new name
+  file_new <- file %>%
+    gsub(pattern = '20220801', '',  x = .) %>%
+    gsub(pattern = 'SHDB_', 'SHDB', x = .)
+  name_dir <- paste0(dirname(xls.eora.ls[1]), '/')
+  name_old <- paste0(name_dir, file)
+  name_new <- paste0(name_dir, file_new)
+  if (file.exists(name_old)) {
+    ## rename
+    file.rename(name_old, name_new)
+  } else {
+    cat("The file does not exist\n")
+  }
+}
+```
+
+
+
+
+# SHDB data
+
+* This data was updated on *2023-07-17* by Mengyu. 
+ 
+ The new version includes 135 SHDB indicators, instead of 25 SHDB.
+ 
+ Here, we want to rename the files for easy identification. 
+
+```{r - rename SHDB - indicators, include=FALSE}
+
+### load SHDB name list ------------------------
+library(googlesheets4)
+link <- 'https://docs.google.com/spreadsheets/d/13Di8K8ObDFfdALxrf-YjlGyYf_tNrm1TZ7yMDaozfzc/edit?usp=sharing'
+shdb_names  <- googlesheets4::read_sheet(link, sheet = 'SHDB_details') %>%
+  as.data.frame() 
+
+shdb_names_ <- shdb_names %>%
+  dplyr::select(Filename, Unit, shdb_pid, shdb_id) %>%
+  dplyr::mutate(
+    shdb_name = paste0(Filename, '_', shdb_id),
+    shdb_name = gsub('\\.', '', shdb_name)
+    ) %>%
+  as.data.frame() 
+  
+
+
+### load SHDB data ------------------------------
+getwd()
+pattern <- '^YJ_SHDB_20230718'
+path.new <- './Data/data_02_intermediate/dt02_flows/eora/SHDB2019_135/'
+xls.eora.ls <- list.files(path = path.new, pattern = pattern, full.names = T); xls.eora.ls
+if (length(xls.eora.ls) != 135) {
+  stop("Misisng files!")
+}
+xls.ls <- basename(xls.eora.ls); xls.ls
+# xls.ls[1]
+
+## rename files -------------------------
+for (file in xls.ls) {
+  # print(file)
+  
+  ## pid
+  pid.i <- file %>%
+    gsub(pattern = 'YJ_SHDB_20230718|_2019\\.xlsx', '',  x = .) %>%
+    as.numeric(.)
+  # print(pid.i)
+  
+  ## shdb_name
+  name.i <- shdb_names_ %>%
+    dplyr::filter(shdb_pid == pid.i) %>%
+    dplyr::select(shdb_name) %>%
+    unlist() %>%
+    unname()
+  
+  cat('\n\t *** shdb_pid + shdb_name: ', pid.i, ' --> \t', name.i, '\n')
+  
+  ## new file name ---------------------------
+  # file_new <- file %>% gsub(pattern = '20230718', '',  x = .) 
+  ## or 
+  file_new <- paste0('YJ_', name.i, '_2019.xlsx')
+  
+  ## add path 
+  dir_old <- paste0(dirname(xls.eora.ls[1]), '/') 
+  dir_new <- gsub('_135', '_135_renamed', x = dir_old)
+  name_old       <- paste0(dir_old, file)
+  name_old_inNew <- paste0(dir_new, file)
+  name_new       <- paste0(dir_new, file_new)
+  # print(basename(name_new))
+  # print(name_new)
+  
+  
+  ## Copy the file to the destination folder
+  file.copy(name_old, dir_new)
+  
+  
+  ## rename file -------------------------------
+  if (file.exists(name_old_inNew)) {
+    ## rename
+    file.rename(name_old_inNew, name_new)
+  } else {
+    cat("\n\n The file does not exist! \n\n")
+  }
+  
+}
+```
+  
