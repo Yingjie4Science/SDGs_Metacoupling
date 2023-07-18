@@ -8,15 +8,16 @@ editor_options:
 ---
 
 
-
+# Setup
 ```{r}
 knitr::opts_chunk$set(echo = TRUE)
 
 ### To clear your environment 
-# remove(list = ls())
+remove(list = ls())
 
 ### data path
 source('./Code/_path of data.R')
+source('./Code/_package list.R')
 
 library(dplyr)
 library(ggplot2)
@@ -47,10 +48,10 @@ theme_ns <-
 ```
 
 
-## Data
+# Data input
 
 
-### SI data
+## SI data
 
 ```{r - income group}
 
@@ -69,7 +70,8 @@ grp_id <- grp %>%
 ```
 
 
-### cepii distance data prep.
+
+## CEPII distance data
   
   https://pacha.dev/cepiigeodist/reference/dist_cepii.html
   
@@ -196,24 +198,37 @@ ctr_list_cepii <- dist %>%
 
 
 
-### footprint
+## Footprint data
 ```{r}
 
-### loop the normalization based on `direction` ------------------------------------------
-f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'direction.RData')
-load(f)
+## load ft indicator list and direction data ----------------------
+f <- paste0(dirname(dir.eora_cleaned), '/', 'direction_fts.rds'); f
+direction_fts <- readRDS(file = f)
 
-ft_ind <- direction %>%
-  dplyr::select(ind, SDG_class, direction) %>%
+f <- paste0(dirname(dir.eora_cleaned), '/', 'direction.RData')
+load(f) ## `direction`, `direction_clean`
+
+### loop the normalization based on `direction` ------------------------------------------
+ft_ind <- direction_clean %>%
+  dplyr::select(ind, SDG_class, ShortName, direction, everything()) %>%
   dplyr::filter(!is.na(direction)) %>%
+  dplyr::filter(Used == '1') %>%
   arrange(SDG_class)
 
-cat(length(unique(ft_ind$ind)), 'indicators were included in the analysis.')
+cat(length(unique(ft_ind$ind)), 'indicators were included in the analysis.\n')
 
 
 ### !!! ** Choose how many type of flows will be used**
-n_flows <- 2
-# n_flows <- 3
+class_detail <- F
+# class_detail <- T
+
+###' class-detailed | class-aggregated 
+###' ---------------------------------- #
+###' high on low    | Vertical
+###' high on high   | Vertical
+###' low on high    | Horizontal
+###' low on low     | Horizontal
+###' -----------------------------------#
 
 
 ### --> pick an ft indicator as a test -----
@@ -228,13 +243,26 @@ links_dist_type_collection <- data.frame()
 for (ind in unique(ft_ind$ind)) {
   print(ind)
   
-  
   xls <- paste0(dir.eora_cleaned, ind, '.xlsx'); xls
   
+  ## if the data are from SHDB, we use 2019 to represent 2015
+  is_shdb <- str_detect(string = ind, pattern = "SHDB")
   
-  mat <- readxl::read_excel(xls) %>% 
-    ungroup() %>%
-    dplyr::filter(year == 2015) 
+  if (is_shdb == F) {
+    mat <- readxl::read_excel(xls) %>% 
+      ungroup() %>%
+      dplyr::filter(year == 2015) 
+  } else {
+    mat <- readxl::read_excel(xls) %>% 
+      ungroup() %>%
+      dplyr::mutate(year = ifelse(year == 2019, 2015, year)) %>%
+      dplyr::filter(year == 2015) 
+  }
+  
+  ## to check if all the data have been loaded in 
+  if (nrow(mat) < 1) {
+    cat('\n\t This indicator has misisng data, pls check! \n')
+  }
   
   links <- mat %>%
     gather(key = 'to', value = 'weight', 4:ncol(.)) %>%
@@ -242,7 +270,7 @@ for (ind in unique(ft_ind$ind)) {
     dplyr::mutate(type = ind) %>%
     dplyr::select(-ctr, -year) %>%
     arrange(from, to) %>%
-    distinct(from, to, .keep_all = T) %>%  
+    dplyr::distinct(from, to, .keep_all = T) %>%  
     as.data.frame()
   
   links_dist <- merge(x = links, y = dist, by.x = c('from', 'to'), by.y = c('iso_o', 'iso_d'), all.x = T) %>%
@@ -266,7 +294,7 @@ for (ind in unique(ft_ind$ind)) {
   #   arrange(!is.na(od))
   
   ### --> if we want to see a detailed classification of one group's impact on the other
-  links_dist_type3 <- links_dist %>%
+  links_dist_detail <- links_dist %>%
     dplyr::mutate(
       od_direction = case_when(
       group_od %in% c(14, 13, 12) ~ 'low on high', ## 'vertical flow'
@@ -275,8 +303,8 @@ for (ind in unique(ft_ind$ind)) {
     ) %>% as.data.frame()
     
   
-  ### --> if we want to only see if the interaction happen acorss large income difference groups
-  links_dist_type2 <- links_dist %>%
+  ### --> if we want to only see if the interaction happen across large income difference groups
+  links_dist_aggr <- links_dist %>%
     dplyr::mutate(
       od_direction = case_when(
       group_od %in% c(14, 13, 12) ~ 'Vertical flows', ## 
@@ -287,10 +315,10 @@ for (ind in unique(ft_ind$ind)) {
   
   
   ### !!! choose one for analysis
-  if (n_flows == 2) {
-    links_dist_type <- links_dist_type2
-  } else if (n_flows == 3) {
-    links_dist_type <- links_dist_type3
+  if (class_detail == F) {
+    links_dist_type <- links_dist_aggr
+  } else if (class_detail == T) {
+    links_dist_type <- links_dist_detail
   } else {
     print('NA ...................')
     break
@@ -301,19 +329,21 @@ for (ind in unique(ft_ind$ind)) {
   
 }
 
+cat(length(unique(links_dist_type_collection$type)), 'indicators were included in the analysis.\n')
 ```
 
 
 
 
-### ft distance 
+# Analysis - FT distance 
 
   For country *m*, on average, how far has its impact reached to? 
   
   Here we use the *footprint distance* to measure the *impact distance*.
   
-#### - distance measure  
+## distance measure  
 ```{r}
+
 ## for a receiving country, calculate its impact distance --------------------------------- 
 ft_d <- links_dist_type_collection %>%
   dplyr::mutate(ftd = weight * dist) %>%                  ## flow * distance
@@ -374,14 +404,22 @@ ft_ind_ls_labels <- ft_ind_ls_levels %>%
 
 
 
-```{r plot - by ft indicator}
+```{r plot - by ft indicator - ex6}
 p1 <- ft_d %>% 
   # dplyr::filter(SDG_class != 'Soci') %>% ## subset for easy plot
   dplyr::mutate(od_direction = factor(x = od_direction, levels = od_direction_levels, labels = od_direction_labels)) %>%
-  dplyr::mutate(type = factor(x = type, levels = ft_ind_ls_levels, labels = ft_ind_ls_labels)) %>%
+  
+  ### - used this before 2023-07-01
+  # dplyr::mutate(type = factor(x = type, levels = ft_ind_ls_levels, labels = ft_ind_ls_labels)) %>%
+  ### - change on since  2023-07-17
+  dplyr::mutate(type = ShortName) %>%
+  arrange(type) %>%
+  dplyr::mutate(type = as.factor(type)) %>%
+  
+  ### - plot
   ggplot() +
   geom_histogram(aes(x = d_avg_ft, fill = od_direction), position="identity", alpha=0.5, show.legend = T) +
-  geom_vline(aes(xintercept=mean(d_avg_ft, na.rm=T)), color="red", size = .5) + # linetype="dashed", alpha = .5, 
+  geom_vline(aes(xintercept=mean(d_avg_ft, na.rm=T)), color="red", linewidth = .5) + # linetype="dashed", alpha = .5, 
   # ggplot2::annotate(
   #   "text", 
   #   x = round(mean(ft_d$d_avg_ft, na.rm=T)*1, digits = 1),
@@ -390,7 +428,7 @@ p1 <- ft_d %>%
   #   colour = "red", size = 2) +
   # facet_wrap(~od_direction, ncol = 1) + ## for one indicator
   # facet_grid(type~od_direction) +
-  facet_wrap(~type, ncol = 6) +
+  facet_wrap(~type, ncol = 4) +
   theme_ns +
   # theme_minimal() +
   theme(
@@ -402,15 +440,17 @@ p1 <- ft_d %>%
     panel.grid = element_blank(),
     ) +
   ylim(0,20) + 
-  scale_x_continuous(breaks = c(seq(0, d_max, 8), round(mean(ft_d$d_avg_ft, na.rm=T), digits = 1))) +
+  scale_x_continuous(
+    limits = c(0, ceiling(d_max+0.01)), 
+    breaks = c(seq(0, d_max, 9), round(mean(ft_d$d_avg_ft, na.rm=T), digits = 1))) +
   xlab(label = bquote('Distance (10'^3~'km)')) + 
   labs(fill='') # Impact pairs
 
 
 ggarrange(p1, labels = '')
-fname <- paste0(dir.fig, '01main/', 'ImpactDistance_by_ft',
+fname <- paste0(dir.fig, '01main/', 'Extend_fig6_ImpactDistance_by_ft',
                 '_class', od_direction_count, '_', today, '.jpg'); fname
-ggsave(filename = fname, plot = last_plot(), width = 6.5+0.5, height = 9, units = 'in', dpi = 300)
+ggsave(filename = fname, plot = last_plot(), width = 7, height = 7, units = 'in', dpi = 300)
 ```
 
 
@@ -418,12 +458,13 @@ ggsave(filename = fname, plot = last_plot(), width = 6.5+0.5, height = 9, units 
 
 
 
-```{r plot - summary across indicators}
+```{r plot - summary across indicators - 2d}
 ind <- 'AvgAcrossFT'
 ft_d_summary <- ft_d %>%
   Rmisc::summarySE(measurevar= "d_avg_ft", groupvars = c('to', 'od_direction'), na.rm = T) %>%
   as.data.frame()
   
+d_max_ <- max(ft_d_summary$d_avg_ft, na.rm=T) %>% ceiling(.); d_max_
 
 p <- ft_d_summary %>% 
   # dplyr::filter(SDG_class != 'Soci') %>% ## subset for easy plot
@@ -440,18 +481,20 @@ p <- ft_d_summary %>%
     panel.grid = element_blank(),
     ) +
   ylim(0,20) + 
-  scale_x_continuous(breaks = c(seq(0, d_max, 8), round(mean(ft_d$d_avg_ft, na.rm=T), digits = 1))) +
+  scale_x_continuous(
+    limits = c(0, d_max_), 
+    breaks = c(seq(0, d_max_, 9), round(mean(ft_d$d_avg_ft, na.rm=T), digits = 1))) +
   xlab(label = bquote('Distance (10'^3~'km)')) + 
   labs(fill='Impact pair')
 ggarrange(p, labels = 'd')
-fname <- paste0(dir.fig, '01main/', 'ImpactDistance_', ind,
+fname <- paste0(dir.fig, '01main/', 'fig2d_ImpactDistance_', ind,
                 '_class', od_direction_count, '_', today, '.jpg'); fname
 ggsave(filename = fname, plot = last_plot(), width = 7.5/2, height = 7.5/2, units = 'in', dpi = 300)
 ```
 
 
 
-#### - nearby (contiguous) or not
+## count % of nearby (contiguous) or not
 ```{r}
 
 ## impact distance by group of 'nearby or not'
