@@ -74,6 +74,11 @@ load('./Data/Ancillary_Data_ISO3code_shp.RData') ## iso_eora, pop, gdp, shp, grp
 
 ### extended country-iso3 pair list for matching
 load('./Data/Ancillary_Data_iso_eora_ex.RData')  ## ## iso_eora_ex
+
+
+### Load cleaned data from Google Sheet --------------------------------------------------
+f <- paste0(dirname(dir.eora_cleaned), '/', 'direction.RData')
+load(f) ## `direction`, `direction_clean`
 ```
 
 
@@ -394,41 +399,10 @@ net_imports2_revise <- net_imports2 %>%
 #   dplyr::filter(!is.na(ind) & !is.na(direction))
 
 
-
-
 ### 
-### Use data from Google Doc -------------------------------------------------------------
-library(googlesheets4)
-link <- 'https://docs.google.com/spreadsheets/d/13Di8K8ObDFfdALxrf-YjlGyYf_tNrm1TZ7yMDaozfzc/edit?usp=sharing'
-
-### Footprint indicators
-direction <- googlesheets4::read_sheet(link, sheet = 'Eora_match_SDG', range = 'C:J', col_types = 'cccccccc') %>%
-  dplyr::select(FT_Indicators, Filename, Used, SDG_class, starts_with('direction')) %>%
-  dplyr::rename(ind = Filename) %>%
-  dplyr::distinct(ind, .keep_all = T) %>%
-  dplyr::filter(!is.na(ind) &              ## remove rows with NA
-                  !grepl("\\?", ind)) %>%  ## remove rows contain "?"
-  arrange(ind) %>%
-  dplyr::mutate(direction = as.numeric(direction)) %>%  ## this can remove "?" 
-  dplyr::mutate(ind = gsub('SHDB0', 'SHDB', ind)) %>%   ## remove "0" in the ind names to match the actual file name
-  as.data.frame()
-# str(direction)
-
-
-direction_clean <- direction %>%
-  dplyr::filter(!is.na(direction)) %>%
-  # dplyr::filter(Used == 1) %>%
-  dplyr::select(FT_Indicators, ind, Used, SDG_class, direction) %>%
-  as.data.frame()
-# str(direction_clean)
-
-f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'direction.RData')
-save(direction, direction_clean, file = f)
-## save a same copy of data in XLSX
-f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'direction.xlsx')
-writexl::write_xlsx(x = direction, path = f)
-
-
+### Load cleaned data from Google Sheet --------------------------------------------------
+# f <- paste0(dirname(dir.eora_cleaned), '/', 'direction.RData')
+# load(f) ## `direction`, `direction_clean`
 
 ```
 
@@ -656,6 +630,9 @@ net_imports_fromAll_use <- net_imports_fromAll
 
 
 ```{r - Index}
+
+year_list <- c(2000, 2005, 2010, 2015)
+
 ### spillover normalized score for each indicator
 spillover_norm <- net_imports_fromAll_use %>%
   dplyr::select(ind, iso3, year, score) %>%
@@ -1072,37 +1049,14 @@ fname <- paste0(dir.fig, 'spillover/', 'map_spillover_index_se', '_', today, '.j
 
 
 
-```{r - score map of each impact}
-# install.packages("devtools")
-# library(devtools)
-# devtools::install_github("tidyverse/googlesheets4")
+```{r - fig ex5 - score map of each impact}
 
-## 1. which to be chosen for mapping -------------
-library(googlesheets4)
-# gs4_deauth()
-# gs4_auth()
-
-link <- 'https://docs.google.com/spreadsheets/d/13Di8K8ObDFfdALxrf-YjlGyYf_tNrm1TZ7yMDaozfzc/edit?usp=sharing'
-
-### Footprint indicators (to use the `ShortName`)
-ft  <- googlesheets4::read_sheet(link, sheet = 1) %>%
-  as.data.frame() %>%
-  dplyr::filter(Used == '1', 
-                !is.na(Filename),
-                !grepl('\\?', Filename)) %>%
-  dplyr::select(Filename, ShortName) %>%
-  arrange(Filename)
-
-fts <- ft %>%
-  dplyr::mutate(#ShortName = str_to_title(ShortName),
-                ShortName = ifelse(str_detect(ShortName, 'footprint'), 
-                                   paste0(ShortName, '*'), ## to indicate "displaced footprints"
-                                   ShortName))
+## load ft indicator list and direction data ----------------------
+f <- paste0(dirname(dir.eora_cleaned), '/', 'direction_fts.rds'); f
+fts <- readRDS(file = f)
 
 
-
-
-## 2. map the selected spillovers ------------------
+## 2. map the selected spillovers --------------------------------
 yr <- 2015
 spillover_norm_each_shp <-  shp %>%
   merge(x = ., 
@@ -1119,7 +1073,9 @@ unique(spillover_norm_each_shp$indicator) %>% sort()
 ### merge and select indicators
 map_each <- spillover_norm_each_shp %>%
   # dplyr::filter(year == yr) %>%
-  merge(x = ., y = fts, by.x = 'indicator', by.y = 'Filename', all.x = T)
+  merge(x = ., 
+        y = fts, 
+        by.x = 'indicator', by.y = 'Filename', all.x = T)
 
 map_each_na <- map_each %>%
   st_drop_geometry() %>%
@@ -1133,16 +1089,17 @@ map_each_ind <- map_each %>%
 
 # ind_selected <- map_each_ind$indicator; ind_selected
 # ind_name     <- map_each_ind$ShortName; ind_name
-n_p <- length(unique(map_each_ind$indicator))
-n_row <- ceiling(n_p/6 + 0.01); n_row 
+n_p <- length(unique(map_each_ind$indicator)); n_p
+n_col <- 4
+n_row <- ceiling(n_p/n_col + 0.01); n_row 
 
 
 map_each_p <- map_each %>%
   dplyr::filter(!is.na(ShortName)) %>%  ## remove un-matched 
   ggplot()+
   geom_sf(aes(fill = spillover_norm), color='gray80', size = 0.1) +
-  scale_fill_distiller(palette = "Spectral", direction = -1, na.value = 'gray70', name= 'Impact Score') +
-  facet_wrap(~ShortName, ncol = 6, nrow = n_row) +
+  scale_fill_distiller(palette = "Spectral", direction = -1, na.value = 'gray70', name= 'Effect Score') +
+  facet_wrap(~ShortName, ncol = n_col, nrow = n_row) +
   # ggtitle(yr)+
   theme(legend.position = c(0.9, 0.08)) +
   theme(panel.grid = element_blank(),
@@ -1154,7 +1111,7 @@ map_each_p <- map_each %>%
         ) 
 map_each_p
 fname <- paste0(dir.fig, 'spillover/', 'map_spillover_norm_each_', yr, '_long_', today, '.jpg'); #fname
-ggsave(filename = fname, plot = map_each_p, width = 8, height = 4.5/6*n_row, units = 'in', dpi = 300)
+ggsave(filename = fname, plot = map_each_p, width = 7, height = 7, units = 'in', dpi = 300)
 ```
 
 

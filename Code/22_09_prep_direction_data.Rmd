@@ -1,0 +1,112 @@
+---
+title: "Direction"
+author: "Yingjie"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+### To clear your environment 
+remove(list = ls())
+
+getwd()
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+setwd(dir)
+setwd('..') # set directory by one folder up
+getwd()
+
+### data path 
+source('./Code/_path of data.R')
+
+### packages
+source('./Code/_package list.R')
+
+library(googlesheets4)
+# gs4_deauth()
+# gs4_auth()
+
+
+### Use data from Google Doc -------------------------------------------------------------
+link <- 'https://docs.google.com/spreadsheets/d/13Di8K8ObDFfdALxrf-YjlGyYf_tNrm1TZ7yMDaozfzc/edit?usp=sharing'
+```
+
+
+
+```{r - sheet1}
+
+### Footprint indicators (to use the `ShortName`)
+direction_ft  <- googlesheets4::read_sheet(link, sheet = 1) %>%
+  as.data.frame() %>%
+  dplyr::filter(
+    !is.na(Used),
+    !is.na(Filename),
+    !grepl('\\?', Filename)) %>%
+  dplyr::select(Filename, ShortName, Used) %>%
+  arrange(Filename)
+
+direction_fts <- direction_ft %>%
+  dplyr::filter(Used == '1') %>%
+  dplyr::mutate(#ShortName = str_to_title(ShortName),
+                ShortName = ifelse(str_detect(ShortName, 'footprint'), 
+                                   paste0(ShortName, '*'), ## to indicate "displaced footprints"
+                                   ShortName))
+
+### Save a single object to a file
+f <- paste0(dirname(dir.eora_cleaned), '/', 'direction_fts.rds'); f
+saveRDS(object = direction_fts, file = f)
+### Restore it under a different name
+# fts <- readRDS("mtcars.rds")
+```
+
+
+
+
+```{r - sheet 2}
+
+### Footprint indicators
+direction <- googlesheets4::read_sheet(link, sheet = 'Eora_match_SDG', range = 'C:J', col_types = 'cccccccc') %>%
+  dplyr::select(FT_Indicators, Filename, Used, SDG_class, starts_with('direction')) %>%
+  dplyr::rename(ind = Filename) %>%
+  dplyr::distinct(ind, .keep_all = T) %>%
+  dplyr::filter(!is.na(ind) &              ## remove rows with NA
+                  !grepl("\\?", ind)) %>%  ## remove rows contain "?"
+  arrange(ind) %>%
+  
+  ### add short names
+  left_join(.,
+            y = direction_ft %>% dplyr::select(-Used), 
+            by = c('ind' = 'Filename')) %>%
+  dplyr::mutate(
+    ShortName = ifelse(str_detect(ShortName, 'footprint'),
+                       paste0(ShortName, '*'), ## to indicate "displaced footprints"
+                       ShortName)) %>%
+
+  dplyr::mutate(direction = as.numeric(direction)) %>%  ## this can remove "?" 
+  dplyr::mutate(ind = gsub('SHDB0', 'SHDB', ind)) %>%   ## remove "0" in the ind names to match the actual file name
+  as.data.frame()
+# str(direction)
+
+
+direction_clean <- direction %>%
+  dplyr::filter(!is.na(direction)) %>%
+  dplyr::filter(!is.na(ShortName)) %>%
+  # dplyr::filter(Used == 1) %>%
+  dplyr::select(FT_Indicators, ind, ShortName, Used, SDG_class, direction) %>%
+  as.data.frame()
+# str(direction_clean)
+
+
+f <- paste0(dirname(dir.eora_cleaned), '/', 'direction.RData')
+save(direction, direction_clean, file = f)
+## save a same copy of data in XLSX
+f <- paste0(dirname(dir.eora_cleaned), '/', 'direction.xlsx')
+writexl::write_xlsx(x = direction, path = f)
+
+```
+
+
+
+
