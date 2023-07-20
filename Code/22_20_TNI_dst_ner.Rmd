@@ -28,6 +28,8 @@ source('./Code/func_net_import_direction.R')
 
 ### data path
 source('./Code/_path of data.R')
+
+today <- format(Sys.time(), "%Y%m%d"); today
 ```
 
 
@@ -111,7 +113,9 @@ spillover_name_list <- data.frame(ind = gsub('.xlsx', '', basename(xls.ls))) %>%
 ### loop the normalization based on `direction` ------------------------------------------
 
 f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'direction.RData')
-load(f)
+load(f) ## `direction`, `direction_clean`
+
+direction_use <- direction_clean
 ```
 
 
@@ -134,10 +138,10 @@ net_imports <- data.frame()
 
 
 ### this for loop can be used in other scenarios 
-for (i in 1:nrow(direction)) {
+for (i in 1:nrow(direction_use)) {
   # print(i)
-  ind <- direction[i, 'ind']       %>% unlist() %>% paste(sep = '', collapse = ''); 
-  drt <- direction[i, 'direction'] %>% unlist() %>% paste(sep = '', collapse = '') %>% as.numeric()
+  ind <- direction_use[i, 'ind']       %>% unlist() %>% paste(sep = '', collapse = ''); 
+  drt <- direction_use[i, 'direction'] %>% unlist() %>% paste(sep = '', collapse = '') %>% as.numeric()
   print(ind)
   print(drt)
   
@@ -196,10 +200,10 @@ net_imports <- data.frame()
 
 
 ### this loop process is the same as "nearby only" scenario above
-for (i in 1:nrow(direction)) {
+for (i in 1:nrow(direction_use)) {
   # print(i)
-  ind <- direction[i, 'ind']       %>% unlist() %>% paste(sep = '', collapse = ''); 
-  drt <- direction[i, 'direction'] %>% unlist() %>% paste(sep = '', collapse = '') %>% as.numeric()
+  ind <- direction_use[i, 'ind']       %>% unlist() %>% paste(sep = '', collapse = ''); 
+  drt <- direction_use[i, 'direction'] %>% unlist() %>% paste(sep = '', collapse = '') %>% as.numeric()
   print(ind)
   print(drt)
   
@@ -276,7 +280,7 @@ net_imports_bind_check <- net_imports_fromDst_fromNer %>%
 
 ### save the data
 n_ft_ind <- length(unique(net_imports_fromDst_fromNer$ind));  n_ft_ind
-fname <- paste0(dir.flowScenario, 'net_imports_fromDst_fromNer_', n_ft_ind, '.RData'); fname
+fname <- paste0(dir.flowScenario, 'net_imports_fromDst_fromNer_', today, '_', n_ft_ind, '.RData'); fname
 save(net_imports_fromDst_fromNer, file = fname)
 ```
 

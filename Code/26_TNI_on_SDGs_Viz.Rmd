@@ -479,7 +479,7 @@ ggsave(filename = fname, plot = fig, width = 6, height = 8, units = 'in', dpi = 
 
 
 
-```{r - map of 17 SDGs change - fig ex3}
+```{r - map of 17 SDGs change - fig ex_3}
 
 df_chg <- dfs_score_chg %>%
   dplyr::select(iso3, year, goal, value_chg) %>%
@@ -494,7 +494,7 @@ df_chg_sf  <- df_chg %>%
 col_tmap <- colors_changes
 title_ls <- paste0('SDG ', vars); title_ls
 
-fname <- paste0(dir.fig, '01main/SDG_score_chg_Map_byGoal_', today, '.jpg'); fname
+fname <- paste0(dir.fig, '01main/ex_3_SDG_chg_Map_byGoal_', today, '.jpg'); fname
 # jpeg(filename = fname, width=7, height=6, units="in", pointsize=18, res=500) ## width=7, height=4 --> ncol=4
 
 tm_shape(df_chg_sf) +
@@ -622,7 +622,7 @@ ggsave(filename = fname, plot = last_plot(), width = 6, height = 8, units = 'in'
 
 
 
-####  - Score by goal by scenario by group - fig ex7
+####  - Score by goal by scenario by group - fig ex_7
 
 ```{r}
 dfs_score_goal_snr_grp <- dfs_score %>%
@@ -1015,7 +1015,7 @@ tmap_save(tm = p, filename = fname, width=7, height=2.8, units="in", dpi = 500)
 
 
 
-```{r - boxplot - change by 4 income group - fig ex2}
+```{r - boxplot - change by 4 income group - fig ex_2}
 dfs_index_chg1 <- dfs_index_chg %>%
   merge(x = ., 
         y = grp_update, 
@@ -1043,12 +1043,12 @@ dfs_index_chg1 %>%
   geom_hline(yintercept = 0, color="red", linetype="dashed") +
   xlab('') + ylab('Impact on SDG Index')
   
-fname <- paste0(dir.fig, '01main/Extend_fig_SDG_Index_chg_byGroup_4grp_', today, '.jpg'); fname
+fname <- paste0(dir.fig, '01main/ex_2_SDG_Index_chg_byGroup_4grp_', today, '.jpg'); fname
 ggsave(filename = fname, plot = last_plot(), width = 6, height = 6, units = 'in', dpi = 300)
 ```
 
 
-```{r - boxplot - change by 2 income group - fig ex2}
+```{r - boxplot - change by 2 income group - fig ex_2}
 dfs_index_chg %>%
   merge(x = ., 
         y = grp_update, 
@@ -1072,7 +1072,7 @@ dfs_index_chg %>%
     geom_hline(yintercept = 0, color="red", linetype="dashed") +
     xlab('') + ylab('Impact on SDG Index')
   
-fname <- paste0(dir.fig, '01main/Extend_fig_SDG_Index_chg_byGroup_2grp_', today, '.jpg'); fname
+fname <- paste0(dir.fig, '01main/ex_2_SDG_Index_chg_byGroup_2grp_', today, '.jpg'); fname
 ggsave(filename = fname, plot = last_plot(), width = 6, height = 6, units = 'in', dpi = 300)
 ```
 

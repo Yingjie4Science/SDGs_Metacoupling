@@ -492,6 +492,8 @@ net_imports_fromAll_check <- net_imports_fromAll %>%
   dplyr::filter(!year %in% c(2000, 2005, 2010, 2015)) %>%
   dplyr::distinct(ind, year, .keep_all = T)
 
+unique(net_imports_fromAll$ind) %>% sort()
+
 ### save the data ------------------------------------------------------------------------
 n_ft_ind <- length(unique(net_imports_fromAll$ind)); n_ft_ind
 fname <- paste0(dir.flowScenario, 'net_imports_fromAll_', postfix, '_', today,'_', n_ft_ind, '.RData'); fname
@@ -957,7 +959,7 @@ ggsave(filename = fname, plot = fig, width = width_2col/3*2, height = width_2col
   
   *To do*: order the list based on characters or property (social vs. environmental vs. economic vs. security ...)
 
-```{r - fig3ex - Index rank with MC categories}
+```{r - fig ex_4 - Index rank with MC categories}
 n_type <- length(unique(net_imports_fromAll_use$ind)); n_type
 list20 <- unique(spillover_index_top_bottom$iso_a3); list20
 

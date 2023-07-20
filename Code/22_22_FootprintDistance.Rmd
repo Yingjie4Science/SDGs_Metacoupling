@@ -448,7 +448,7 @@ p1 <- ft_d %>%
 
 
 ggarrange(p1, labels = '')
-fname <- paste0(dir.fig, '01main/', 'Extend_fig6_ImpactDistance_by_ft',
+fname <- paste0(dir.fig, '01main/', 'ex_6_ImpactDistance_by_ft',
                 '_class', od_direction_count, '_', today, '.jpg'); fname
 ggsave(filename = fname, plot = last_plot(), width = 7, height = 7, units = 'in', dpi = 300)
 ```

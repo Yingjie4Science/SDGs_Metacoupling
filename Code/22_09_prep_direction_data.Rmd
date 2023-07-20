@@ -38,7 +38,7 @@ link <- 'https://docs.google.com/spreadsheets/d/13Di8K8ObDFfdALxrf-YjlGyYf_tNrm1
 ```{r - sheet1}
 
 ### Footprint indicators (to use the `ShortName`)
-direction_ft  <- googlesheets4::read_sheet(link, sheet = 1) %>%
+direction_ft  <- googlesheets4::read_sheet(link, sheet = "eora_indicators") %>%
   as.data.frame() %>%
   dplyr::filter(
     !is.na(Used),
@@ -67,7 +67,7 @@ saveRDS(object = direction_fts, file = f)
 ```{r - sheet 2}
 
 ### Footprint indicators
-direction <- googlesheets4::read_sheet(link, sheet = 'Eora_match_SDG', range = 'C:J', col_types = 'cccccccc') %>%
+direction <- googlesheets4::read_sheet(link, sheet = 'Eora_match_SDG', range = 'C:K', col_types = 'ccccccccc') %>%
   dplyr::select(FT_Indicators, Filename, Used, SDG_class, starts_with('direction')) %>%
   dplyr::rename(ind = Filename) %>%
   dplyr::distinct(ind, .keep_all = T) %>%

@@ -430,6 +430,13 @@ writexl::write_xlsx(x = df_formatted, path = fname)
 ```
 
 
+### - Material footprint
+
+  See data process in `10_country_profileData_prepare.Rmd`
+```{r}
+
+```
+
 
 ### - peacekeeping?
 ```{r }
