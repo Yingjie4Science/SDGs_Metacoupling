@@ -843,18 +843,20 @@ score_4_7_1s <- df_score
 
 ### SDG 5
 
-#### - 5.5.2 Proportion of women in mgt <❓need to double-check>
-       5.5.2 Proportion of women in managerial positions  
-```{r eval=FALSE, include=FALSE}
+#### - ❓? 5.5.2 Proportion of women in managerial positions  
+
+```{r}
 
 ind_sdg <- 'Proportion of women in managerial positions'
-ind_ft  <- 'SHDB15' ## Risk of Gender inequality by Sector based on representation in the workforce; or 3.B.f Female Representation in the Workforce by Sector 
+ind_ft  <- 'SHDB15_3Bf' 
+##' Risk of Gender inequality by Sector based on representation in the workforce; 
+##' or 3.B.f Female Representation in the Workforce by Sector 
 unit_check <- 1
 unit_sdg   <- '%'
 
 ### Check the Unit!!!
 ### rel --> %
-### ft  --> 1 ppl
+### ft  --> 10^3 ppl
 ### total workers --> 10^3 ppl
 
 
@@ -891,8 +893,10 @@ rel_not_merge <- rel %>%
   merge(x = ., y = oft,           by = c('iso3', 'year'), all.x = T) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
-    value_rel = (value*total_workers)/(total_workers + 0), ## % of female in managerial positions; +1 to avoid calculation error
-    ## 'fromAll' (net imports) is the risk of non-female, which can be seen as "the number of male" - the higher the worse
+    value_rel = (value*total_workers)/(total_workers + 0), 
+    ## % of female in managerial positions; +1 to avoid calculation error
+    ##' `fromAll` (net imports) is the risk of non-female, 
+    ##' which can be seen as "the number of male" - the higher the worse
     value_not = (value*total_workers)/(total_workers - fromAll)*100,
     value_dst = (value*total_workers)/(total_workers - fromNer)*100,
     value_ner = (value*total_workers)/(total_workers - fromDst)*100) %>% 
@@ -1562,9 +1566,10 @@ score_8_1_1 <- df_score
 
 
 
-#### - 8.4.21 material/pop ❓
-   8.4.2-1 Domestic material consumption per capita
-  12.2.2-1
+#### - 8.4.2x = 12.2.1x material/pop
+   8.4.1 Material footprint, material footprint per capita, and material footprint per GDP
+   8.4.2.1 Domestic material consumption per capita
+  12.2.2.1
   
 ***Note***
   DE    Domestic extraction
@@ -1582,8 +1587,9 @@ score_8_1_1 <- df_score
   
 Data Source: https://www.resourcepanel.org/global-material-flows-database
 
-```{r }
+```{r}
 ind_sdg  <- 'material_per_pop' ## ton/pop
+ind_ft   <- 'Material_footprint'
 unit_check <- 1
 
 ### Check the Unit!!!
@@ -1612,6 +1618,16 @@ ft   <- ft_w %>%
   dplyr::select(-ctr) %>%
   gather(key = 'year', value = 'ft', `2000`:ncol(.)) %>%
   dplyr::mutate(ft = ft*unit_check) %>%  
+  dplyr::rename('MF' = 'ft') %>%
+  ## Since `MF = DE + RMEIM - RMEEX`, and we need the value of total net import, i.e., `fromAll` 
+  left_join(x=.,
+            y=mat %>% dplyr::rename('DE' = 'value'), 
+            by = c('iso3', 'year')) %>%
+  dplyr::mutate(fromAll = MF - DE,
+                ind     = ind_ft) %>%
+  # dplyr::select(-MF, -DE) %>%
+  dplyr::select(ind, year, iso3, everything()) %>%
+  # dplyr::filter(year == 2015) %>%
   as.data.frame()
 
 
@@ -1621,14 +1637,14 @@ rel_not_merge <- mat %>%
   merge(x = ., y = ft,    by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = pop_l, by = c('iso3', 'year'), all.x = T) %>%
   dplyr::mutate(
-    ind       = 'material',
+    # ind       = 'material',
     value_rel = (value + 0)/pop,
-    value_not = (ft       )/pop,
+    value_not = (value + fromAll)/pop,
     value_dst = (NA)/pop,
     value_ner = (NA)/pop,
     ) %>%
   ### for easy-checking the numbers
-  dplyr::select(ind, iso3, year, value, ft, everything())
+  dplyr::select(ind, iso3, year, value, everything())
 
 rel_not <- rel_not_merge %>%
   dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
@@ -1644,19 +1660,22 @@ df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, t
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
 
+
+score_8_4_2x <- df_score
 ```
 
 
 
 
 
-####  - 8.4.22 material/gdp ❓❌
+####  - 8.4.2y = 12.2.1y material/gdp
    
    8.4.2-2 Domestic material consumption per GDP (low material intensity indicates high SDG ind_sdg score)
   12.2.2-2 
   
-```{r eval=FALSE, include=FALSE}
+```{r include=FALSE}
 ind_sdg  <- 'material_per_gdp' ## ton/usd
+ind_ft   <- 'Material_footprint'
 unit_check <- 1
 
 ### Check the Unit!!!
@@ -1670,11 +1689,13 @@ rel_not_merge <- mat %>%
   merge(x = ., y = ft,          by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = gdp_rel_not, by = c('iso3', 'year'), all.x = T) %>%
   dplyr::mutate(
-    ind       = 'material',
-    value_rel = (value + 0)/gdp_rel,
-    value_not = (ft       )/gdp_not) %>%
+    value_rel = (value +       0)/gdp_rel,
+    value_not = (value + fromAll)/gdp_not,
+    value_dst =              (NA)/gdp_dst,
+    value_ner =              (NA)/gdp_ner,
+    ) %>%
   ### for easy-checking the numbers
-  dplyr::select(ind, iso3, year, value, ft, everything())
+  dplyr::select(ind, iso3, year, value, everything())
 
 rel_not <- rel_not_merge %>%
   dplyr::select(ind, iso3, year, value_rel, value_not)
@@ -1690,6 +1711,8 @@ df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, t
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
 
+
+score_8_4_2y <- df_score
 ```
 
 
@@ -2167,12 +2190,17 @@ score_11_6_22 <- df_score
 
 
 ### SDG 12
+
+
+#### - 12.2.1x = 8.4.2x Material footprint per capita
+
   **12.2.1** Material footprint, material footprint per capita, and material footprint per GDP
 
   - 12.2.1x Domestic material consumption per capita
   
-```{r - 12.2.1x Material footprint per capita}
+```{r}
 ind_sdg  <- 'Material footprint per capita' ## ton per capita
+ind_ft   <- 'Material_footprint'
 unit_check <- 1
 
 ### Check the Unit!!!
@@ -2181,64 +2209,13 @@ unit_check <- 1
 ### pop --> 1 people
 
 
-### Resource consumption or emissions under the current trading world situation -------------------------
-## DE    Domestic extraction (unit: tonne)
-xls <- list.files(path = dir.input1, pattern = '^Domestic material extraction', full.names = T); xls
-DE <- readxl::read_excel(path = xls) %>% 
-  dplyr::select(-ctr) %>%
-  gather(key = 'year', value = 'value', `2000`:ncol(.)) %>%
-  dplyr::mutate(value = as.numeric(value), 
-                value = value*unit_check) %>%  
-  as.data.frame()
-  
-
-### Outsourced footprints (oft) flow --------------------------------------------------------------------
-## --> Material footprint (mft) = DE + RMEIM - RMEEX
-xls <- list.files(path = dir.input1, pattern = '^Material footprint', full.names = T); xls
-mft <- readxl::read_excel(path = xls) %>% 
-  dplyr::select(-ctr) %>%
-  gather(key = 'year', value = 'value', `2000`:ncol(.)) %>%
-  dplyr::mutate(value = as.numeric(value), 
-                ind   = 'Material footprint') %>% 
-  dplyr::rename(mft = value) %>%
-  dplyr::select(ind, year, iso3, mft) %>%
-  as.data.frame()
-
-
-### w/o trade, and with trade together  -----------------------------------------------------------------
-rel_not_merge <- DE %>%
-  merge(x = ., y = pop_l, by = c('iso3', 'year'), all.x = T) %>%
-  merge(x = ., y = mft,   by = c('iso3', 'year'), all.x = T) %>%
-  dplyr::mutate(
-    value_rel = (value)/pop,
-    value_not = (mft  )/pop,
-    value_dst = NA,
-    value_ner = NA
-    ) %>%
-  ### for easy-checking the numbers
-  dplyr::select(ind, iso3, year, value, everything())
-
-rel_not <- rel_not_merge %>%
-  dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
-
-
-### normalization  -------------------------------------------------------
-### Be careful with **Data Direction!**
-### big - better? --> func_norm_sdg_score_good
-### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
-  # spread(key = 'scenario', value = c('value_norm')) %>%
-  dplyr::mutate(ind_sdg = ind_sdg) %>%
-  as.data.frame()
-
-
-score_12_2_1x <- df_score
+score_12_2_1x <- score_8_4_2x
 ```
   
   
   
-  
-```{r - 12.2.1y Material footprint per GDP}
+#### - 12.2.1y = 8.4.2y Material footprint per GDP  
+```{r}
 ind_sdg  <- 'Material footprint per GDP' ## ton per USD
 unit_check <- 1
 
@@ -2248,44 +2225,17 @@ unit_check <- 1
 ### gdp_rel_not --> 1 $
 
 
-
-### w/o trade, and with trade together  -----------------------------------------------------------------
-rel_not_merge <- DE %>%
-  merge(x = ., y = gdp_rel_not, by = c('iso3', 'year'), all.x = T) %>%
-  merge(x = ., y = mft,         by = c('iso3', 'year'), all.x = T) %>%
-  dplyr::mutate(
-    value_rel = (value)/gdp_rel,
-    value_not = (mft  )/gdp_not,
-    value_dst = NA,
-    value_ner = NA
-    ) %>%
-  dplyr::select(ind, iso3, year, value, everything())
-
-rel_not <- rel_not_merge %>%
-  dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
-
-
-### normalization  -------------------------------------------------------
-### Be careful with **Data Direction!**
-### big - better? --> func_norm_sdg_score_good
-### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
-  # spread(key = 'scenario', value = c('value_norm')) %>%
-  dplyr::mutate(ind_sdg = ind_sdg) %>%
-  as.data.frame()
-
-
-score_12_2_1y <- df_score
+score_12_2_1y <- score_8_4_2y
 ```
 
 
 
 
-
+####  - 12.2.1 SO2
   **12.2.1** Material footprint, material footprint per capita, and material footprint per GDP
   - SO₂ emissions embodied in imports (kg/capita). SO₂ emissions have severe health impacts and are a significant cause of premature mortality worldwide.
   
-```{r - 12.2.1 SO2}
+```{r}
 ind_sdg  <- 'so2_per_pop' ## kg per capita
 unit_check <- 1000
 
@@ -2348,6 +2298,7 @@ score_12_2_1 <- df_score
 ```
 
 
+#### - 12.2.1z NitrogenTotal/GDP - 1 ag ❌,
 
   12.2.1 Material footprint per GDP - NitrogenTotal
   
@@ -2357,7 +2308,7 @@ score_12_2_1 <- df_score
   
   * use the "Nitrogen Total" based on row sum of EORA matrix
   
-```{r - 12.2.1z NitrogenTotal/GDP - 1 ag ❌, eval=FALSE, include=FALSE}
+```{r eval=FALSE, include=FALSE}
 
 ind_sdg  <- 'NitrogenTotal per GDP' ## kg/$
 ind_ft   <- 'NitrogenTotal'
@@ -2442,8 +2393,9 @@ score_12_2_1z <- df_score
 ```
 
 
-  
-```{r - 12.2.1w NitrogenTotal/GDP - 2 EORA}
+
+####  - 12.2.1w NitrogenTotal/GDP - 2 EORA  
+```{r}
 
 ind_sdg  <- 'NitrogenTotal per GDP' ## kg/$
 ind_ft   <- 'NitrogenTotal'
