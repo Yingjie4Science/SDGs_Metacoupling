@@ -9,7 +9,7 @@ editor_options:
 
 ```{r Dirs and Packages}
 ### To clear your environment 
-# remove(list = ls())
+remove(list = ls())
 
 ### set work dir
 path <- rstudioapi::getSourceEditorContext()$path
@@ -32,13 +32,6 @@ library(FAOSTAT)
 # library(devtools)
 # install_github("expersso/WHO")
 library(WHO)
-
-# if("dplyr" %in% (.packages())){
-#           detach("package:dplyr", unload=TRUE) 
-#           detach("package:plyr", unload=TRUE) 
-# } 
-# # library(plyr)
-# library(dplyr)
 
 ### search data range
 yr_start <- 1990
@@ -112,9 +105,11 @@ load(fname)
 
 ## County list in World Bank ---------------------------------------------
 ### provides a snapshot of available countries, indicators, and other relevant information.
+wb_cachelist <- wb_cachelist
 str(wb_cachelist, max.level = 1)
 ## The countries data frame
-wb_geo <- wb_cachelist$countries 
+wb_geo <- wb_cachelist$countries %>%
+  dplyr::rename('income' = 'income_level')
 head(wb_geo, 3)
 
 # ctr_wb <- wb_geo %>%
@@ -128,10 +123,11 @@ wb_ind <- wb_cachelist$indicators
 
 ### country list in World Bank data
 ctr_wb <- wb(indicator = 'SP.POP.TOTL', country = "countries_only") %>%
-  distinct(iso3c, iso2c, country)  ## 216 countries in the WB list
-ctr_wb <- merge(ctr_wb, wb_geo, 
+  dplyr::distinct(iso3c, iso2c, country, .keep_all = T)  ## 216 countries in the WB list
+ctr_wb <- merge(ctr_wb, 
+                wb_geo, 
                 by = c('iso3c','country','iso2c'), all.x = T)%>%
-  select(country, iso3c, region, income)
+  dplyr::select(country, iso3c, region, income)
 
 
 
@@ -152,13 +148,14 @@ ctr0 %>% group_by(income) %>% tally()
 # PRK North Korea, Low income
 
 ctr <- ctr0 %>%
-  mutate(income = ifelse(iso3_eora=='SWZ' & is.na(income), 'Lower middle income', income), ## replace(income, iso3_eora=='SWZ', 'Lower middle income'),
-         income = ifelse(iso3_eora=='ANT' & is.na(income), 'High income',         income), ## replace(income, iso3_eora=='ANT', 'High income'),
-         income = ifelse(iso3_eora=='MKD' & is.na(income), 'Upper middle income', income), ## replace(income, iso3_eora=='MKD', 'Upper middle income'),
-         income = ifelse(iso3_eora=='ROW' & is.na(income), 'Low income',          income), ## replace(income, iso3_eora=='ROW', 'Low income'),
-         income = ifelse(iso3_eora=='TWN' & is.na(income), 'High income',         income), ## replace(income, iso3_eora=='TWN', 'High income'),
-         income = ifelse(iso3_eora=='SUN' & is.na(income), 'Upper middle income', income), ## replace(income, iso3_eora=='SUN', 'Upper middle income'),
-         income = ifelse(iso3_eora=='PRK' & is.na(income), 'Low income',          income)) %>%
+  dplyr::mutate(
+    income = ifelse(iso3_eora=='SWZ' & is.na(income), 'Lower middle income', income), ## replace(income, iso3_eora=='SWZ', 'Lower middle income'),
+    income = ifelse(iso3_eora=='ANT' & is.na(income), 'High income',         income), ## replace(income, iso3_eora=='ANT', 'High income'),
+    income = ifelse(iso3_eora=='MKD' & is.na(income), 'Upper middle income', income), ## replace(income, iso3_eora=='MKD', 'Upper middle income'),
+    income = ifelse(iso3_eora=='ROW' & is.na(income), 'Low income',          income), ## replace(income, iso3_eora=='ROW', 'Low income'),
+    income = ifelse(iso3_eora=='TWN' & is.na(income), 'High income',         income), ## replace(income, iso3_eora=='TWN', 'High income'),
+    income = ifelse(iso3_eora=='SUN' & is.na(income), 'Upper middle income', income), ## replace(income, iso3_eora=='SUN', 'Upper middle income'),
+    income = ifelse(iso3_eora=='PRK' & is.na(income), 'Low income',          income)) %>%
   as.data.frame()
 
 
@@ -196,6 +193,7 @@ keywords <- c(
   # 'slum' 
   # 'public'
   # 'land area'
+  'Labor force'
   # 'urban|rural'
   # 'urban|city|cities'
   # 'male|female'
@@ -262,11 +260,11 @@ keywords <- c(
   # '*disaster*', 'undernourishment', 'vulnerable*', 'investment in *'
   # '* poverty .*', 'Literacy'
   )
-keywords <- 'Mortality'
-keywords <- 'death'
-keywords <- 'aid|investment|assistance'
-keywords_not <- 'paid|Paid'
-keywords <- 'fisheries'
+# keywords <- 'Mortality'
+# keywords <- 'death'
+# keywords <- 'aid|investment|assistance'
+# keywords_not <- 'paid|Paid'
+# keywords <- 'fisheries'
 vars     <- wbsearch(pattern = keywords, extra = T) %>%
   dplyr::filter(stringr::str_detect(indicator, pattern = keywords)) %>%
   # dplyr::filter(!stringr::str_detect(indicator, pattern = keywords_not)) %>%
@@ -458,7 +456,7 @@ unique(FAO_FBS$item)
 ### ILO 
 ```{r}
 require(Rilostat)
-options(ilostat_cache_dir = 'C:/temp')
+options(ilostat_cache_dir = 'D:/temp')
 ### https://ilostat.github.io/Rilostat/articles/Rilostat.html
 
 options(scipen=999) ## prevent scientific notation in R
@@ -2628,7 +2626,9 @@ function_format_4yrData_save(iname = iname)
 
 
 ### Goal 8 - Decent Work and Economic Growth
-```{r - employment?}
+
+#### - employment?
+```{r}
 # SL.EMP.TOTL.SP.NE.ZS	  + Employment to population ratio, 15+, total (%) (national estimate)
 # SL.EMP.TOTL.SP.ZS	     ++ Employment to population ratio, 15+, total (%) (modeled ILO estimate)
 # SL.EMP.TOTL.SP.FE.NE.ZS	+ Employment to population ratio, 15+, female (%) (national estimate)
@@ -2642,6 +2642,7 @@ function_format_4yrData_save(iname = iname)
 ind <- "SL.EMP.TOTL.SP.FE.ZS"     # [1991-2015]
 ind <- "SL.EMP.TOTL.SP.FE.NE.ZS"  # [1991-2015]
 ind <- "SL.EMP.TOTL.SP.ZS"; iname <- 'Employment to population ratio_modeled ILO'
+
 C080301 <- wb(indicator = ind, country = "countries_only",
               startdate = yr_start, enddate = yr_end) %>%
   as.data.frame() %>%
@@ -2708,8 +2709,8 @@ C081001 <- wb(indicator = ind, country = "countries_only",
 
 
 
-
-```{r - workers - ILO}
+####  - workers - ILO
+```{r}
 ## 1. Employees by sex and economic activity (thousands) -------------------------------------------
 wk <- get_ilostat(id = 'EES_TEES_SEX_EC2_NB_A', segment = 'indicator', time_format = 'num', type = 'both') %>%
   dplyr::filter(sex == 'SEX_T') %>%
@@ -2724,7 +2725,6 @@ wk_test <- wk %>%
 
 wk1 <- wk %>%
   dplyr::select(ref_area, ref_area.label, time, obs_value)
-
 
 
 
@@ -2748,9 +2748,6 @@ wk_integrate <- wk %>%
 wk2 <- wk_integrate %>%
   ungroup() %>%
   dplyr::select(ref_area, ref_area.label, time, obs_value)
-
-
-
 
 
 ## 3. Employment by sex and economic activity (thousands) ------------------------------------------
@@ -2827,8 +2824,8 @@ wk_compare %>%
   # filter(value_cal < 30 & value < 30) %>%
   ggplot() +
   geom_point(aes(x = wk1, y = wk2)) +
-  geom_point(aes(x = wk1, y = wk3), color = 'red',  alpha = 0.3, size = 5) +
-  geom_point(aes(x = wk1, y = wk4), color = 'blue', alpha = 0.3, size = 2) +
+  geom_point(aes(x = wk1, y = wk3), color = 'red',  alpha = 0.2, size = 5) +
+  geom_point(aes(x = wk1, y = wk4), color = 'blue', alpha = 0.2, size = 2) +
   scale_y_log10() + scale_x_log10() +
   theme_bw()
 
@@ -2844,6 +2841,9 @@ wk_compare %>%
   scale_y_log10() + scale_x_log10() +
   theme_bw()
 
+## pick one year to check the numbers 
+# wk_compare2015 <- wk_compare %>%
+#   dplyr::filter(time == 2015)
 
 ### to decide data or integrate data ---------------------------------------------------------------
 workers <- wk_compare %>%
@@ -2866,7 +2866,7 @@ yr_nData <- workers %>%
 
 ### convert to the unified format
 workers_wide <- workers %>%
-  dplyr::filter(time >= 1970) %>%
+  dplyr::filter(time >= 2000) %>%
   spread(key = time, value = obs_value) %>%
   merge(x = ctr_eora, y = ., by.x = "iso3_eora", by.y = 'ref_area', all.x = T) %>%
   dplyr::mutate(
@@ -2877,6 +2877,10 @@ workers_wide <- workers %>%
                 ) %>%
   dplyr::select(country_eora, iso3_eora, indicatorID, indicator, iso2c, country, everything()) %>%
   as.data.frame()
+
+# workers_wide_check <- workers_wide %>%
+#   dplyr::filter(iso3_eora %in% c('CAF', 'SRB'))
+
 
 var_w <- workers_wide
 iname <- unique(var_w$indicator)[!is.na(unique(var_w$indicator))]; iname
@@ -2889,8 +2893,69 @@ function_format_4yrData_save(iname = iname) ## "There are 4.2% NA"
 
 
 
+#### - workers = Labor force, total (WB)
+  Labor force comprises people ages 15 and older who supply labor for the production of goods and services during a specified period. It includes people who are currently employed and people who are unemployed but seeking work as well as first-time job-seekers. Not everyone who works is included, however. Unpaid workers, family workers, and students are often omitted, and some countries do not count members of the armed forces. Labor force size tends to vary during the year as seasonal workers enter and leave.
+  
+  ID: SL.TLF.TOTL.IN
+  Source: World Bank, World Development Indicators database. Estimates are based on data obtained from International Labour Organization and United Nations Population Division.
 
 
+  SL.TLF.1564.IN	-      NA   Labor force (15-64 years), total
+  SL.TLF.ACTI.ZS	- 8.4% NA   Labor force participation rate, total (% of total population ages 15-64) (modeled ILO estimate)
+  SL.TLF.TOTL.IN	- 8.4% NA   Labor force, total
+
+```{r}
+# ind <- "SL.TLF.1564.IN"   
+# ind <- "SL.TLF.ACTI.ZS"
+ind <- "SL.TLF.TOTL.IN"
+
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(dfwb)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname)
+```
+
+
+  * Compare ILO and WB data
+```{r}
+f <- paste0(dir.cleaned, "workers_thousands_4yrs.xlsx") 
+w.ilo <- readxl::read_excel(f) %>%
+  tidyr::gather(key = 'year', value = 'ilo', `2000`:`2015`)
+
+f <- paste0(dir.cleaned, "Labor force, total_4yrs.xlsx") 
+w.wb <- readxl::read_excel(path = f) %>%
+  tidyr::gather(key = 'year', value = 'wb', `2000`:`2015`)
+
+w.wb.ilo <- w.ilo %>% 
+  left_join(
+  x = w.ilo, 
+  y = w.wb, 
+  by = c("iso3", "ctr", "year")
+)
+
+sum(is.na(w.wb.ilo$ilo))
+sum(is.na(w.wb.ilo$wb))
+
+w.wb.ilo %>%
+  ggplot(aes(x = ilo*1000, y = wb)) +
+  geom_point() +
+  geom_abline(slope = 1) +
+  scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+              labels = trans_format("log10", math_format(10^.x))) +
+     scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+              labels = trans_format("log10", math_format(10^.x))) +
+  theme_bw()
+```
+
+
+####  - fatal
   **Occupational injuries** (Indicator description)
   Method of computation
   Given that relative measures are easier to interpret and favour comparability between countries, activities and over time, ILOSTAT presents statistics on the occupational injuries incidence rate, calculated as follows:
@@ -2900,7 +2965,7 @@ function_format_4yrData_save(iname = iname) ## "There are 4.2% NA"
   - Non-fatal occupational injuries incidence rate = Number of new cases of non-fatal occupational injuries during the reference period x 100’000 / Number of workers in the reference group
   
   https://ilostat.ilo.org/resources/concepts-and-definitions/description-occupational-injuries/
-```{r - fatal}
+```{r}
 ### Cases of fatal occupational injury by economic activity | Annual
 # fname <- paste0(dir.raw, 'ILOSTAT/INJ_FATL_ECO_NB_A-full-2021-03-23.csv'); fname
 # fatal <- read_csv(file = fname) %>%
@@ -3007,7 +3072,8 @@ function_format_4yrData_save(iname = iname) ## "There are 31.4% NA"
 
 
 
-```{r - non-fatal}
+####  - non-fatal
+```{r}
 ### all available indicators from ILOSTAT ----------------------------------------------------------
 toc <- get_ilostat_toc()
 toc2 <- get_ilostat_toc(search = c('Annual', 'non-fatal|non-Fatal'), fixed = F, lang = 'en')
@@ -3086,10 +3152,10 @@ function_format_4yrData_save(iname = iname) ## "There are 33.6% NA"
 
 
 
-
+#### - fatal per 100k
   **This is to test if ILO's data are consistent**
   There are three data source for this same indicator. 
-```{r - fatal per 100k}
+```{r}
 ## 1. SDG indicator 8.8.1 - Fatal occupational injuries per 100'000 workers ------------------------
 dat1 <- get_ilostat(id = 'SDG_F881_SEX_MIG_RT_A', segment = 'indicator', time_format = 'num', type = 'both') %>%
   dplyr::filter(sex == 'SEX_T') %>%
