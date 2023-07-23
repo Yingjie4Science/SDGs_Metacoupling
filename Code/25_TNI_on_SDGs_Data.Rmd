@@ -176,8 +176,17 @@ total_workers <- readxl::read_excel(path = xls) %>%
   as.data.frame() %>%
   dplyr::select(-ctr) %>%
   gather(key = 'year', value = 'total_workers', `2000`:ncol(.)) %>%
+  dplyr::mutate(total_workers = as.numeric(total_workers)) %>%
+  as.data.frame()
+
+
+xls <- list.files(path = dir.input1, pattern = '^Labor force, total', full.names = T); xls 
+total_labor <- readxl::read_excel(path = xls) %>% 
+  as.data.frame() %>%
+  dplyr::select(-ctr) %>%
+  gather(key = 'year', value = 'total_workers', `2000`:ncol(.)) %>%
   dplyr::mutate(total_workers = as.numeric(total_workers),
-                total_workers = total_workers*1000) %>%
+                total_workers = total_workers/1000) %>% 
   as.data.frame()
 ```
 
@@ -264,6 +273,7 @@ ind_sdg <- 'Poverty Proportion'
 ind_ft  <- 'Poverty' 
 unit_check <- 1
 unit_ind   <- 'Percent'
+direction_sdg <- -1
 
 
 ### Check the Unit!!!
@@ -317,7 +327,8 @@ hist(rel_not$value_rel)
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -331,9 +342,11 @@ score_1_1_1 <- df_score
 ### SDG 2
 
   2.4.1 Proportion of agricultural area under productive and sustainable agriculture
+  
 ```{r - 2.4.1 cropland/total land}
 ind_sdg  <- 'cropland_percent' ## m2/m2
 unit_check <- 1
+direction_sdg <- -1 ## more is good or bad ???
 
 ### Check the Unit!!!
 ### rel --> ha
@@ -392,7 +405,8 @@ hist(rel_not$value_rel)
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -412,6 +426,7 @@ ind_sdg <- 'Cereals_ton per person'
 ind_ft  <- 'Cereals_net_Import' 
 unit_check <- 1
 unit_ind   <- 'kg per capita per year'
+direction_sdg <- 1
 
 ### Check the Unit!!!
 ### rel --> ton = 1000 kg
@@ -472,7 +487,8 @@ hist(rel_not$value_rel, xlab = unit_ind)
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_good(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -487,6 +503,7 @@ score_2_1_2 <- df_score
 ```{r - 3.9.1 PM25/total land}
 ind_sdg  <- 'PM25_concentration' ## ton/km2
 unit_check <- 1000
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel --> kt = 1000 ton
@@ -538,7 +555,8 @@ hist(rel_not$value_rel)
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -552,6 +570,7 @@ score_3_9_1 <- df_score
 ```{r - 3.9.1s SO2/total land}
 ind_sdg  <- 'SO2_concentration' ## ton/ha
 unit_check <- 1000
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel --> kt = 1000 * ton
@@ -603,7 +622,8 @@ hist(rel_not$value_rel)
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -625,6 +645,7 @@ ind_sdg    <- 'Mortality rate - NCD'
 ind_ft     <- 'TradeMatrix_NCD_death_number' 
 unit_check <- 1
 unit_ind   <- 'death per million people'
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel       --> 1 people of death
@@ -716,7 +737,8 @@ ggplot(data = rel_not_merge_shp) +
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -746,6 +768,7 @@ score_3_4_1 <- df_score
 ind_sdg    <- 'student_flow' ## person
 ind_ft     <- 'student_flow'
 unit_check <- 1
+direction_sdg <- 1
 
 ### Check the Unit!!!
 ### rel --> 
@@ -783,7 +806,8 @@ rel_not <- rel_not_merge %>%
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_good(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -797,6 +821,7 @@ score_4_7_1 <- df_score
 ind_sdg    <- 'student_flow_in' ## person
 ind_ft     <- 'student_flow'
 unit_check <- 1
+direction_sdg <- 1
 
 ### Check the Unit!!!
 ### rel --> 
@@ -831,7 +856,8 @@ rel_not <- rel_not_merge %>%
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_good(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -843,7 +869,9 @@ score_4_7_1s <- df_score
 
 ### SDG 5
 
-#### - ❓? 5.5.2 Proportion of women in managerial positions  
+#### - XXX 5.5.2 Proportion of women in managerial positions  
+
+  (1) 1st way to use World Bank data (TBD - NOT IN USE now) 
 
 ```{r}
 
@@ -853,6 +881,7 @@ ind_ft  <- 'SHDB15_3Bf'
 ##' or 3.B.f Female Representation in the Workforce by Sector 
 unit_check <- 1
 unit_sdg   <- '%'
+direction_sdg <- 1
 
 ### Check the Unit!!!
 ### rel --> %
@@ -866,8 +895,8 @@ rel_w <- readxl::read_excel(path = xls) %>% as.data.frame()  ## the status data
 rel <- rel_w %>%
   dplyr::select(-ctr) %>%
   gather(key = 'year', value = 'value', `2000`:ncol(.)) %>%
-  dplyr::mutate(value = as.numeric(value), 
-                value = value) %>%  
+  dplyr::mutate(value = as.numeric(value),
+                value = value) %>%
   as.data.frame()
 
 
@@ -892,7 +921,7 @@ rel_not_merge <- rel %>%
   merge(x = ., y = total_workers, by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = oft,           by = c('iso3', 'year'), all.x = T) %>%
   dplyr::mutate(
-    ind       = unique(oft$ind),
+    ind       = ind_ft,
     value_rel = (value*total_workers)/(total_workers + 0), 
     ## % of female in managerial positions; +1 to avoid calculation error
     ##' `fromAll` (net imports) is the risk of non-female, 
@@ -932,7 +961,8 @@ rel_not <- rel_not_merge %>%
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_good(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -943,9 +973,96 @@ df_score <- func_norm_sdg_score_good(df = rel_not, trim = 0.025, bottom = 0.05, 
 
 
 ### plot to compare ----------------------------------------------------------------------
-helper_func_plot_map(data = rel_not, var = 'value_rel', yr = 2015, filename_postfix = ind_sdg)
+helper_func_plot_map(data = rel_not, var = 'value_rel', yr = 2015, filename_postfix = paste0(ind_sdg, '_1'))
 ```
 
+
+
+#### - 5.5.2 Proportion of women in managerial positions  
+
+  (2) Using data from EORA
+
+```{r}
+
+ind_sdg <- 'Proportion of women in managerial positions'
+ind_ft  <- 'SHDB15_3Bf' 
+##' Risk of Gender inequality by Sector based on representation in the workforce; 
+##' or 3.B.f Female Representation in the Workforce by Sector 
+
+unit_check <- 1
+unit_sdg   <- '%'
+direction_sdg <- -1 ## func_norm_sdg_score_bad()
+
+### Check the Unit!!!
+### rel --> %
+### ft  --> 10^3 ppl
+### total workers --> 10^3 ppl
+
+
+### Resource consumption or emissions under the current trading world situation --------------------
+### use the row sum based on EORA data
+f <- paste0(dir.eora_cleaned, ind_ft, '.xlsx')
+rel <- readxl::read_excel(f) %>%
+  ## for SHDB data, we use 2019 for 2015 because of data gap
+  dplyr::mutate(year = ifelse(year == 2019, 2015, year)) %>%
+  gather(key = 'd', value = 'value', 4:ncol(.)) %>%
+  group_by(year, iso3, ctr) %>%
+  dplyr::summarise(value = sum(value, na.rm = T)) %>%
+  ## given most of the data in Greenland is missing, we set it as NA
+  dplyr::mutate(value = ifelse(iso3 =='GRL', NA, value)) %>%
+  dplyr::select(-ctr)
+
+
+### Outsourced footprints (oft) flow -----------------------------------------------------
+oft <- net_imports_bind  %>%
+  dplyr::filter(ind == ind_ft) %>%
+  # dplyr::mutate(net_in = format(net_in, scientific = F)) %>%
+  dplyr::select(ind, year, iso3, net_in, scenario) %>%
+  dplyr::mutate(net_in = ifelse(year == 2000, NA, net_in)) %>%  ## for SHDB data only, as no data for 2000
+  spread(key = scenario, value = net_in) %>%
+  arrange(ind, iso3, year)
+
+
+### w/o trade, and with trade together  --------------------------------------------------
+rel_not_merge <- rel %>%
+  # merge(x = ., y = total_workers, by = c('iso3', 'year'), all.x = T) %>% ## data interpolation issue in this data
+  merge(x = ., y = total_labor, by = c('iso3', 'year'), all.x = T) %>%
+  merge(x = ., y = oft,         by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::mutate(
+    ind       = ind_ft,
+    ## total at-risk/total worker
+    value_rel = (value)/(total_workers + 1),                          
+    ## [(total at-risk) - (at-risk workers working for exports)] / total workers
+    value_not = (value - (-fromAll)) / (total_workers),  
+    ## [(total at-risk) - (at-risk workers working for nearby exports)] / total workers
+    value_dst = (value - (-fromNer)) / (total_workers),
+    value_ner = (value - (-fromDst)) / (total_workers)) %>% 
+  ### for easy-checking the numbers
+  dplyr::select(ind, iso3, year, value, everything())
+
+
+rel_not <- rel_not_merge %>%
+  dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
+
+
+### normalization  -------------------------------------------------------
+### Be careful with **Data Direction!**
+### big - better? --> func_norm_sdg_score_good
+### big - bad?    --> func_norm_sdg_score_bad
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  # spread(key = 'scenario', value = c('value_norm')) %>%
+  dplyr::mutate(ind_sdg = ind_sdg) %>%
+  as.data.frame()
+
+
+### ! Un-comment the following line to include this indicator in the final analysis 
+score_5_5_2x <- df_score
+
+
+### plot to compare ----------------------------------------------------------------------
+helper_func_plot_map(data = rel_not, var = 'value_rel', yr = 2015, filename_postfix = paste0(ind_sdg, '_EORA'))
+```
 
 
 #### - 5.1 Gender Equality in workforce
@@ -961,25 +1078,28 @@ helper_func_plot_map(data = rel_not, var = 'value_rel', yr = 2015, filename_post
 
 ```{r}
 ind_sdg <- 'Gender Equality in workforce'
-ind_ft  <- 'SHDB15' ## Risk of Gender inequality by Sector based on representation in the workforce (or 3.B.f Female Representation in the Workforce by Sector)
+ind_ft  <- 'SHDB15_3Be' 
+
+## 3.B.e Overall Gender Inequity in Country
 
 unit_check <- 1
 unit_sdg   <- ""
 
+direction_sdg <- -1
+
 ### Check the Unit!!!
-### rel --> 1 person
-### ft  --> risk-weighted employment (Xiao et al. 2017, Ecological Economics)
+### rel -->           10^3 person
+### ft  -->           risk-weighted employment (Xiao et al. 2017, Ecological Economics)
 ### total workers --> 10^3 person
 
 
 ### Resource consumption or emissions under the current trading world situation ----------
 ### --> use the EORA data to calculate `total risk-weighted employment`
-f <- paste0(dir.eora_cleaned, 'SHDB15.xlsx')
+f <- paste0(dir.eora_cleaned, 'SHDB15_3Be.xlsx')
 rel <- readxl::read_excel(f) %>%
   ### use SHDB 2019 for 2015 --------------------!!!
   dplyr::mutate(
-    year = ifelse(str_detect(string = ind_ft, pattern = 'SHDB') & year == 2019, 
-                  2015, year)) %>%
+    year = ifelse(year == 2019, 2015, year)) %>%
   gather(key = 'd', value = 'value', 4:ncol(.)) %>%
   group_by(year, iso3, ctr) %>%
   dplyr::summarise(value = sum(value, na.rm = F)) %>%
@@ -1006,20 +1126,18 @@ oft <- net_imports_bind  %>%
 
 ### w/o trade, and with trade together  --------------------------------------------------
 rel_not_merge <- rel %>%
-  merge(x = ., y = total_workers, by = c('iso3', 'year'), all.x = T) %>%
+  merge(x = ., y = total_labor, by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = oft,           by = c('iso3', 'year'), all.x = T) %>%
   dplyr::mutate(
-    ind       = unique(oft$ind),
-    #' assume 40 hours a week, and total weeks = (365/7)
-    value_rel = (value)/(total_workers*40*365/7)*100,  ## (risk-weighted employment)/(total employment)
-    # value_not = (value - (-fromAll))/(total_workers*3),
-    value_not = (value - (-fromAll))/(total_workers*40*365/7)*100, # for an exporter, if no trade, less risk would be exported.
-    value_dst = (value - (-fromNer))/(total_workers*40*365/7)*100,
-    value_ner = (value - (-fromDst))/(total_workers*40*365/7)*100) %>% 
+    ind       = ind_ft,
+    ## total at-risk/total worker
+    value_rel = (value)/(total_workers + 1),                          
+    ## [(total at-risk) - (at-risk workers working for exports)] / total workers
+    value_not = (value - (-fromAll)) / (total_workers),  
+    ## [(total at-risk) - (at-risk workers working for nearby exports)] / total workers
+    value_dst = (value - (-fromNer)) / (total_workers),
+    value_ner = (value - (-fromDst)) / (total_workers)) %>% 
   dplyr::select(ind, iso3, year, value, everything())
-
-#' match 
-#' 
 
 
 # rel_not_merge1 <- 
@@ -1028,9 +1146,6 @@ rel_not_merge <- rel %>%
   gather(key = 'scenario', value = 'value', value_rel:value_ner) %>%
   ggplot(data = ., aes(x=scenario, y=value)) + 
   geom_violin(trim=FALSE)
-
-
-
 
 
 check1 <- rel_not_merge %>% 
@@ -1048,13 +1163,14 @@ rel_not <- rel_not_merge %>%
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_good(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
 
 ### ! Un-comment the following line to include this indicator in the final analysis 
-score_5_5_2y <- df_score
+score_5_1_1 <- df_score
 
 
 ### plot to compare ----------------------------------------------------------------------
@@ -1072,6 +1188,7 @@ helper_func_plot_map(data = rel_not, var = 'value_rel', yr = 2015, filename_post
 ind_sdg    <- 'gdp_per_water' ## USD/m3
 ind_ft     <- 'Water'
 unit_check <- 10^9
+direction_sdg <- 1
 
 ### Check the Unit!!!
 ### rel --> 10^9 m3
@@ -1121,7 +1238,8 @@ hist(rel_not$value_rel)
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_good(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1139,6 +1257,7 @@ score_6_4_1 <- df_score
 ```{r - 6.4.2 water/resources}
 ind_sdg    <- 'water_stress' ## m3/m3
 unit_check <- 10^9 
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel --> 10^9 m3
@@ -1201,7 +1320,8 @@ hist(rel_not$value_rel)
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1226,6 +1346,7 @@ ind_sdg <- 'NWP concentration'
 ind_ft  <- 'NitrogenNWP' 
 unit_check <- 10^3
 unit_ind   <- 'kg/m3'
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel --> ton = 10^3 kg
@@ -1279,7 +1400,8 @@ hist(rel_not$value_rel, xlab = unit_ind)
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1295,6 +1417,8 @@ score_6_3_2 <- df_score
 ```{r - 7.1.2 renewable/pop}
 ind_sdg  <- 'renewable_per_pop' ## TJ/pop
 unit_check <- 1
+direction_sdg <- 1
+
 ### Check the Unit!!!
 ### rel    --> TJ;        
 ### oft    --> GJ = /10^3 TJ; 
@@ -1347,7 +1471,9 @@ hist(rel_not$value_rel)
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_good(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
 
@@ -1364,6 +1490,8 @@ score_7_1_2 <- df_score
 ind_sdg    <- 'energy_intensity' ## TJ/USD
 ind_ft     <- 'Energytotal'
 unit_check <- 1
+direction_sdg <- -1
+
 ### Check the Unit!!!
 ### rel    --> TJ = 10^6 MJ => MJ
 ### oft    --> GJ = 10^3 MJ => MJ --> need to double check the unit with Mengyu: TJ*1000 or TJ or GJ (now assume the later)???       
@@ -1417,7 +1545,8 @@ hist(rel_not$value_rel)
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1444,6 +1573,8 @@ score_7_3_1 <- df_score
 ```{r - 7.2.1 renewable/total}
 ind_sdg    <- 'renewable_share' ## TJ/TJ
 unit_check <- 10^3
+direction_sdg <- 1
+
 ### Check the Unit!!!
 ### rel    --> TJ = 10^6 MJ    
 ### oft    --> TJ*1000;        <? need to confirm ???> 
@@ -1492,7 +1623,8 @@ hist(rel_not$value_rel)
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_good(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1517,6 +1649,7 @@ score_7_2_1 <- df_score
 ```{r }
 ind_sdg  <- 'gdp_growth' ## usd/usd
 unit_check <- 1 
+direction_sdg <- 1
 
 ### Check the Unit!!!
 ### rel --> usd
@@ -1556,7 +1689,8 @@ rel_not <- rel_not_merge %>%
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_good(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1570,6 +1704,10 @@ score_8_1_1 <- df_score
    8.4.1 Material footprint, material footprint per capita, and material footprint per GDP
    8.4.2.1 Domestic material consumption per capita
   12.2.2.1
+  
+  Material Footprint (MF) is the attribution of global material extraction to domestic final demand of a country. 
+  
+  The total material footprint is the sum of the **material footprint** for *biomass, fossil fuels, metal ores and non-metallic minerals*. -- from https://unstats.un.org/sdgs/metadata/files/Metadata-12-02-01.pdf
   
 ***Note***
   DE    Domestic extraction
@@ -1591,6 +1729,7 @@ Data Source: https://www.resourcepanel.org/global-material-flows-database
 ind_sdg  <- 'material_per_pop' ## ton/pop
 ind_ft   <- 'Material_footprint'
 unit_check <- 1
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel --> ton
@@ -1655,7 +1794,8 @@ rel_not <- rel_not_merge %>%
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1677,6 +1817,7 @@ score_8_4_2x <- df_score
 ind_sdg  <- 'material_per_gdp' ## ton/usd
 ind_ft   <- 'Material_footprint'
 unit_check <- 1
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### mat --> ton
@@ -1706,7 +1847,8 @@ rel_not <- rel_not_merge %>%
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1728,6 +1870,7 @@ ind_sdg <- 'fatal_per_e5_workers'
 ind_ft  <- 'osh_fatal' ## case
 unit_check <- 1
 unit_sdg   <- 'case/10^5 workers'
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel --> 1
@@ -1790,7 +1933,8 @@ rel_not <- rel_not_merge %>%
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1810,6 +1954,7 @@ ind_sdg <- 'nonfatal_per_e5_workers'
 ind_ft  <- 'osh_non-fatal' ## case
 unit_check <- 1
 unit_sdg   <- 'case/10^5 workers'
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel --> 1
@@ -1864,7 +2009,8 @@ rel_not <- rel_not_merge %>%
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1882,6 +2028,7 @@ score_8_8_1y <- df_score
 ```{r - 9.4.1x co2/gdp}
 ind_sdg  <- 'co2_per_gdp' ## ton/USD
 unit_check <- 1000
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel --> kt = 1000 ton
@@ -1931,7 +2078,8 @@ hist(rel_not$value_rel)
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1979,7 +2127,7 @@ ind_sdg  <- 'co2_in_fossil' ## ton/ha
   
   Labour share of Gross Domestic Product = Total compensation of employees / Gross Domestic Product * 100.
   
-  It provides information about the relative share of output which is paid as compensation to employees (or *labour*) as compared with the share paid to *capital* in the production process for a given reference period. 
+  It provides information about the relative share of output which is paid as compensation to employees (or *labor*) as compared with the share paid to *capital* in the production process for a given reference period. 
   
   "As mentioned above, this calculation method does not provide a comprehensive measure of the labour income share, as it does not take into account the *labour income* of the self-employed. Ideally, wherever possible, the numerator should be adjusted to include not only compensation of employees, but earnings of the self-employed as well."
   --> https://sdg-tracker.org/inequality
@@ -1990,6 +2138,7 @@ ind_sdg  <- 'co2_in_fossil' ## ton/ha
 ind_sdg <- 'labor salary OR income share of GDP'
 ind_ft  <- 'Salary' ## wage footprint = labor salary/income footprint
 unit_sdg   <- '%'
+direction_sdg <- 1
 
 ### Check the Unit!!!
 ### rel --> % of GDP
@@ -2041,7 +2190,9 @@ rel_not <- rel_not_merge %>%
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_good(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
 
@@ -2064,6 +2215,7 @@ helper_func_plot_map(data = rel_not, var = 'value_not', yr = 2015, filename_post
 ```{r - 11.6.21 pm25/pop}
 ind_sdg  <- 'pm25_per_pop' ## ton/pop
 unit_check <- 1000
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel --> kt (EDGAR)    ## mg/m3 (world bank)
@@ -2114,7 +2266,8 @@ rel_not <- rel_not_merge %>%
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2128,6 +2281,7 @@ score_11_6_2 <- df_score
 ```{r - 11.6.22 pm10/pop}
 ind_sdg  <- 'pm10_per_pop' ## ton/pop
 unit_check <- 1000
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel --> kt (EDGAR)    ## mg/m3 (world bank)
@@ -2178,7 +2332,8 @@ rel_not <- rel_not_merge %>%
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2237,7 +2392,9 @@ score_12_2_1y <- score_8_4_2y
   
 ```{r}
 ind_sdg  <- 'so2_per_pop' ## kg per capita
+ind_ft   <- 'SO2'
 unit_check <- 1000
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel --> kt (EDGAR)    
@@ -2259,7 +2416,7 @@ rel <- rel_w %>%
 
 ### Outsourced footprints (oft) flow --------------------------------------------------------------------
 oft <- net_imports_bind  %>%
-  dplyr::filter(ind == 'SO2') %>%
+  dplyr::filter(ind == ind_ft) %>%
   # dplyr::mutate(net_in = format(net_in, scientific = F)) %>%
   dplyr::select(ind, year, iso3, net_in, scenario) %>%
   spread(key = scenario, value = net_in)
@@ -2288,7 +2445,8 @@ rel_not <- rel_not_merge %>%
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2298,9 +2456,11 @@ score_12_2_1 <- df_score
 ```
 
 
-#### - 12.2.1z NitrogenTotal/GDP - 1 ag ❌,
+#### - 12.2.1z NitrogenTotal/GDP -- using ag ❌,
 
   12.2.1 Material footprint per GDP - NitrogenTotal
+  
+  Emissions of reactive nitrogen embodied in imported goods and services. Reactive nitrogen corresponds here to emissions of *ammonia, nitrogen oxides and nitrous oxide* to the atmosphere, and of reactive nitrogen potentially exportable to water bodies, all of which can be harmful to human health and the environment.
   
   *Two data* can be used as the "Nitrogen Total" consumption
   
@@ -2313,6 +2473,7 @@ score_12_2_1 <- df_score
 ind_sdg  <- 'NitrogenTotal per GDP' ## kg/$
 ind_ft   <- 'NitrogenTotal'
 unit_check <- 10^3
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel            --> kg/ha 
@@ -2365,7 +2526,8 @@ hist(rel_not$value_rel)
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2394,12 +2556,13 @@ score_12_2_1z <- df_score
 
 
 
-####  - 12.2.1w NitrogenTotal/GDP - 2 EORA  
+####  - 12.2.1w NitrogenTotal/GDP - using EORA  
 ```{r}
 
 ind_sdg  <- 'NitrogenTotal per GDP' ## kg/$
 ind_ft   <- 'NitrogenTotal'
 unit_check <- 1
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel            --> ton
@@ -2451,7 +2614,8 @@ hist(rel_not$value_rel)
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2476,6 +2640,7 @@ score_12_2_1w <- df_score
 ind_sdg    <- 'GHG emissions per year' ## ton/yr
 ind_ft     <- 'GHG' ## ton
 unit_check <- 1000
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel --> kt = 1000 ton
@@ -2523,7 +2688,8 @@ hist(rel_not$value_rel)
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2542,6 +2708,7 @@ score_13_2_2 <- df_score
 ind_sdg    <- 'CO2 per area of forest' ## ton/ha
 ind_ft     <- 'Landuse_forest'         ## ha
 unit_check <- 100 
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel --> km2 = 100 ha (forest area data from world bank)
@@ -2591,7 +2758,9 @@ rel_not <- rel_not_merge %>%
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
 
@@ -2626,6 +2795,7 @@ forest_rel_not <- rel %>%
 ```{r}
 ind_sdg  <- 'Eutrophication - N Use per area of cropland' ## kg/ha
 ind_ft   <- 'NitrogenNWP'
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel            --> kg/ha
@@ -2678,7 +2848,8 @@ hist(rel_not$value_rel)
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2695,6 +2866,7 @@ score_14_1_1x <- df_score
 ```{r}
 ind_sdg  <- 'Eutrophication - P Use per area of cropland' ## kg/ha
 ind_ft   <- 'Phosphorusirriwater'
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel            --> kg/ha
@@ -2747,7 +2919,8 @@ hist(rel_not$value_rel)
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2771,6 +2944,7 @@ score_14_1_1y <- df_score
 ind_sdg  <- 'TradeMatrix_marine_capture_imported' ## ton/ton
 ind_ft   <- 'TradeMatrix_marine_capture'
 unit_check <- 1
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel            --> ton
@@ -2819,7 +2993,8 @@ hist(rel_not$value_rel)
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2836,6 +3011,7 @@ score_14_4_1 <- df_score
 ```{r - 15.1.1 forest/total land}
 ind_sdg  <- 'forest_percent' ## m3/m3
 unit_check <- 100 
+direction_sdg <- 1
 
 ### Check the Unit!!!
 ### rel --> km2
@@ -2868,7 +3044,8 @@ rel_not <- rel_not_merge %>%
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_good(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2888,6 +3065,7 @@ score_15_1_1 <- df_score
 ```{r - 15.2.1 forest change}
 ind_sdg  <- 'forest_change' ## ha/ha
 unit_check <- 100 
+direction_sdg <- 1
 
 ### Check the Unit!!!
 ### rel --> km2  ## 1 km = 100 ha
@@ -2949,7 +3127,8 @@ rel_not <- rel_not_merge %>%
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_good(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2974,6 +3153,7 @@ score_15_2_1 <- df_score
 
 ind_sdg    <- 'human_trafficking' ## person per 100,000 population
 unit_check <- 1
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel --> 
@@ -3009,7 +3189,8 @@ rel_not <- rel_not_merge %>%
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -3093,6 +3274,7 @@ score_16_4_2 <- df_score
 ind_sdg  <- 'Corruption' ## 
 ind_ft   <- 'Corruption'
 unit_check <- 1
+direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel --> Point
@@ -3153,7 +3335,8 @@ check1 <- rel_not_merge %>%
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -3191,6 +3374,8 @@ score_16_5 <- df_score
 
 ind_sdg  <- 'FDI per GDP' ## 
 ind_ft   <- 'FDI_matrix'
+
+direction_sdg <- 1
 
 ### Check the Unit!!!
 ### rel --> USD
@@ -3260,7 +3445,8 @@ hist(rel_not$value_rel)
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_good(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -3280,6 +3466,7 @@ score_17_3_1x <- df_score
 ```{r}
 ind_sdg  <- 'ODA per GDP' ## 
 # ind_ft   <- ''
+direction_sdg <- 1
 
 ### Check the Unit!!!
 ### rel --> USD
@@ -3321,7 +3508,8 @@ hist(rel_not$value_rel)
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_good(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
