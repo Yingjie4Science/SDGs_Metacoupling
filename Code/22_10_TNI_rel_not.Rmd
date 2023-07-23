@@ -69,16 +69,23 @@ theme_ns <-
 ```
 
 
-```{r Ancillary data}
+## Ancillary data
+
+```{r iso3; shp}
 load('./Data/Ancillary_Data_ISO3code_shp.RData') ## iso_eora, pop, gdp, shp, grp, grp_update
 
 ### extended country-iso3 pair list for matching
 load('./Data/Ancillary_Data_iso_eora_ex.RData')  ## ## iso_eora_ex
+```
 
 
+```{r direction}
 ### Load cleaned data from Google Sheet --------------------------------------------------
 f <- paste0(dirname(dir.eora_cleaned), '/', 'direction.RData')
 load(f) ## `direction`, `direction_clean`
+
+##
+direction_all <- direction
 ```
 
 
@@ -399,11 +406,6 @@ net_imports2_revise <- net_imports2 %>%
 #   dplyr::filter(!is.na(ind) & !is.na(direction))
 
 
-### 
-### Load cleaned data from Google Sheet --------------------------------------------------
-# f <- paste0(dirname(dir.eora_cleaned), '/', 'direction.RData')
-# load(f) ## `direction`, `direction_clean`
-
 ```
 
 
@@ -413,10 +415,10 @@ net_imports2_revise <- net_imports2 %>%
 ### put all spillover indicators in one table 
 net_imports <- data.frame()
 
-for (i in 1:nrow(direction_clean)) {
+for (i in 1:nrow(direction_all)) {
   # print(i)
-  ind <- direction_clean[i, 'ind']       %>% unlist() %>% paste(sep = '', collapse = ''); 
-  drt <- direction_clean[i, 'direction'] %>% unlist() %>% paste(sep = '', collapse = '') %>% as.numeric()
+  ind <- direction_all[i, 'ind']       %>% unlist() %>% paste(sep = '', collapse = ''); 
+  drt <- direction_all[i, 'direction'] %>% unlist() %>% paste(sep = '', collapse = '') %>% as.numeric()
   print(ind)
   print(drt)
   
@@ -451,7 +453,8 @@ net_imports_fromAll <- net_imports
 
   
 
-#### - result summary
+#### - save final data
+
 ```{r include=FALSE}
 net_imports_fromAll$scenario <- 'fromAll'
 
@@ -464,7 +467,9 @@ length(unique(net_imports_fromAll$iso3))
 unique(net_imports_fromAll$year) %>% sort()
 
 
-### unify the year list ------------------------------------------------------------------
+###' unify the year list ------------------------------------------------------------------
+###' Use the number of years in EORA to determine how many years of data we need to include 
+###' in this analysis 
 f <- paste0(dir.flowScenario, 'para_n_year_check.RData'); f
 load(f) ## `n_year_check` -- how many years of data are included in EORA
 n_year_check
@@ -627,7 +632,10 @@ f <- subset(x = ls_f, subset = grepl(pattern = postfix, x = ls_f)); f
 f <- f[length(f)]; cat('\n we will use this version for final analysis: \n\t', f)
 load(f) ## load the latest data `net_imports_fromAll`
 
-net_imports_fromAll_use <- net_imports_fromAll
+
+### For further analysis, only keep the ft indicators that have direction information 
+net_imports_fromAll_use <- net_imports_fromAll %>%
+  dplyr::filter(ind %in% c(direction_clean$ind))
 ```
 
 
@@ -797,7 +805,7 @@ map1 <- spillover_index_shp %>%
 
 fig <- ggarrange(map1, labels = "b", font.label = list(size = 12), vjust = 1, hjust = 0); fig
 fignm <- paste0('fig2b_map_spillover_index_2015_', postfix, '_', today, '.jpg')
-fname <- paste0(dir.fig, 'spillover/', fignm);
+fname <- paste0(dir.fig, '01main/', fignm);
 fname
 ggsave(filename = fname, plot = fig, width = width_2col, height = width_2col*2.8/7, units = unit_ns, dpi = 300)
 
