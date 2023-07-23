@@ -7,6 +7,15 @@ editor_options:
   chunk_output_type: inline
 ---
 
+# Overview
+
+  To get the output for the analysis, we only need to run these two chunks
+  - `#### --> All indicators`
+  - `# 4. Plot network for each TNI`
+  
+  Other sections/chunks are for testing and selecting the best viz option. 
+  
+  
 
 # 1. Introduction 
 
@@ -14,7 +23,7 @@ editor_options:
 ```{r include=FALSE}
 
 ### To clear your environment  -----------------------------------------------------------
-# remove(list = ls())
+remove(list = ls())
 
 
 # Download the workshop materials: bit.ly/sunbelt-2021
@@ -77,11 +86,12 @@ not_any_na <- function(x) all(!is.na(x)) ## temp %>% select(where(not_any_na)) -
 
 
 
-# 2. Reading network data into 'igraph'
+# 2. Load network data
 
 
 ## Ancillary data
-```{r }
+
+```{r - iso3}
 load('./Data/Ancillary_Data_ISO3code_shp.RData') ## iso_eora, pop, gdp, shp, grp, grp_update
 
 grp <- rbind(
@@ -101,6 +111,26 @@ grp_update_net <- rbind(
 
 ### extended country-iso3 pair list for matching
 load('./Data/Ancillary_Data_iso_eora_ex.RData')  ## ## iso_eora_ex
+```
+
+
+```{r - direction}
+### loop the normalization based on direction ------------------------------------------------------
+# xls <- paste0('./Data/data_02_intermediate/dt02_flows/', "spillover_name_list_directions.xlsx"); xls
+# direction <- readxl::read_excel(path = xls) %>%
+#   dplyr::filter(!is.na(ind) & !is.na(direction))
+
+f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'direction.RData')
+load(f) ## `direction`, `direction_clean`
+
+direction_use <- direction %>%
+  dplyr::filter(!is.na(direction)) %>%
+  dplyr::filter(Used == 1) %>%
+  dplyr::filter(!ind %in% c('Material_footprint')) %>% ## need to update this data!
+  dplyr::select(ind, direction, everything())
+
+
+# ind_selected <- unique(direction_use$ind)
 ```
 
 
@@ -228,17 +258,9 @@ xls.ls <- list.files(path = dir.eora_cleaned, pattern = 'xlsx$', full.names = T)
 
 ### Get the list of files for SHDB data, and remove them from the whole list
 library(stringr)
-xls.ls.SHDB <- str_subset(xls.ls, pattern="SHDB")
-xls.ls.other<- setdiff(xls.ls, xls.ls.SHDB); xls.ls.other; length(xls.ls.other)
-
-xls <- xls.ls.other[4]; xls 
-
-
-
-### loop the normalization based on direction ------------------------------------------------------
-xls <- paste0('./Data/data_02_intermediate/dt02_flows/', "spillover_name_list_directions.xlsx"); xls
-direction <- readxl::read_excel(path = xls) %>%
-  dplyr::filter(!is.na(ind) & !is.na(direction))
+# xls.ls.SHDB <- str_subset(xls.ls, pattern="SHDB")
+# xls.ls.other<- setdiff(xls.ls, xls.ls.SHDB); xls.ls.other; length(xls.ls.other)
+# xls <- xls.ls.other[4]; xls 
 
 
 ### put all spillover indicators in one table 
@@ -246,17 +268,18 @@ links_scaled_all <- data.frame()
 
 frac <- 0.025
 
-for (i in 1:nrow(direction)) {
+for (i in 1:nrow(direction_use)) {
 
-  ind <- direction[i, 1] %>% unlist() %>% paste(sep = '', collapse = ''); 
-  drt <- direction[i, 2] %>% unlist() %>% paste(sep = '', collapse = '') %>% as.numeric()
-  print(ind)
-  print(drt)
+  ind <- direction_use[i, 1] %>% unlist() %>% paste(sep = '', collapse = ''); 
+  drt <- direction_use[i, 2] %>% unlist() %>% paste(sep = '', collapse = '') %>% as.numeric()
+  cat('\n\n', i, '\t', ind, '\t', drt, '\n')
   
-  
-  xls <- paste0(dir.eora_cleaned, ind, '.xlsx'); print(xls)
+  xls <- paste0(dir.eora_cleaned, ind, '.xlsx'); print(xls);
   mat <- readxl::read_excel(xls) %>% 
     ungroup() %>%
+    ### use SHDB 2019 for 2015 --------------------!!!
+    dplyr::mutate(year = ifelse(
+      str_detect(string = ind, pattern = 'SHDB') & year == 2019, 2015, year)) %>%
     dplyr::filter(year == 2015) 
 
   links <- mat %>%
@@ -278,8 +301,8 @@ for (i in 1:nrow(direction)) {
       ### cal upper/lower bounds ----------------------------
       max0  = max(x, na.rm = T),
       min0  = min(x, na.rm = T),
-      max1  = x %>% unlist() %>% na.omit() %>% sort(decreasing = T) %>% dplyr::nth(n = length(.)*frac),
-      min1  = x %>% unlist() %>% na.omit() %>% sort(decreasing = T) %>% dplyr::nth(n = length(.)*(1-frac)),
+      max1  = x %>% unlist() %>% na.omit() %>% sort(decreasing = T) %>% dplyr::nth(n = round(length(.)*frac)),
+      min1  = x %>% unlist() %>% na.omit() %>% sort(decreasing = T) %>% dplyr::nth(n = round(length(.)*(1-frac))),
       ### to decide which upper/lower bounds to use ---------
       max = max0,
       min = min0) %>% as.data.frame() %>%
@@ -327,7 +350,7 @@ ind <- 'Landuse_forest'
 ind <- 'total'
   
 links <- links_scaled_all_Net %>%
-  dplyr::select(c('from', 'to', ind)) %>%
+  dplyr::select(all_of(c('from', 'to', ind))) %>%
   dplyr::rename_at(3, ~"weight") %>%
   ## look at the top 15 flows
   arrange(desc(weight)) %>%
@@ -799,18 +822,15 @@ dev.off()
 
 # 4. Plot network for each TNI
 
-
 ```{r}
 ### functions
 rescale = function(x,a,b,c,d){c + (x-a)/(b-a)*(d-c)}
 
 
-
-### `ind_selected` generated from `22_1_Spillovers_analysis.Rmd`
-
-for (i in 1:length(ind_selected)) {
+for (i in 1:nrow(direction_use)) {
   
-  ind <- ind_selected[i]
+  ind     <- direction_use[i, 'ind']
+  indname <- direction_use[i, 'ShortName']
   
   ### Data -----------------------------------------------------------------------------------------
   
@@ -931,7 +951,7 @@ for (i in 1:length(ind_selected)) {
        vertex.label.family="Arial", 
        vertex.frame.color = "gray60", # Node border color
        vertex.label.cex= 0.5)           # Font size        
-  title(main = ind_name[i], 
+  title(main = indname, 
         outer = TRUE, 
         cex.main = 0.6, # font size
         adj  = 0,       # 0-1: left to right

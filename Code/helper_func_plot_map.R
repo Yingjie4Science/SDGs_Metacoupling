@@ -4,6 +4,12 @@
 
 helper_func_plot_map <- function(data, var = 'value_rel', yr = 2015, filename_postfix = '') {
   
+  ## palette for fill color
+  if (direction_sdg == -1) {
+    pal <- '-RdYlBu'
+  } else {
+    pal <- 'RdYlBu'
+  }
   
   rel_not_sf  <- data %>%
     dplyr::filter(year == yr) %>%
@@ -13,7 +19,9 @@ helper_func_plot_map <- function(data, var = 'value_rel', yr = 2015, filename_po
   min <- min(rel_not_sf$value_rel, na.rm = T); min # 0.000001094
   
   p <- tm_shape(rel_not_sf) +
-    tm_fill(col = var, style  = "quantile", n = 10, textNA = 'NA', colorNA = 'gray90') +
+    tm_fill(col = var, style  = "quantile", n = 10, textNA = 'NA', 
+            palette = pal,
+            colorNA = 'gray90') +
     tm_borders(col = "grey", lwd = 0.1, lty = "solid", alpha = 0.99) +
     tm_layout(frame = F, frame.lwd = 0.1,
               legend.position = c(0,0),

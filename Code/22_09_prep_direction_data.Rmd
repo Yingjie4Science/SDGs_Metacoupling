@@ -85,7 +85,7 @@ direction <- googlesheets4::read_sheet(link, sheet = 'Eora_match_SDG', range = '
                        ShortName)) %>%
 
   dplyr::mutate(direction = as.numeric(direction)) %>%  ## this can remove "?" 
-  dplyr::mutate(ind = gsub('SHDB0', 'SHDB', ind)) %>%   ## remove "0" in the ind names to match the actual file name
+  # dplyr::mutate(ind = gsub('SHDB0', 'SHDB', ind)) %>%   ## remove "0" in the ind names to match the actual file name
   as.data.frame()
 # str(direction)
 

@@ -685,7 +685,7 @@ p <-
          fill    = guide_legend(override.aes = list(pattern = "none"), reverse = T) ) 
 
 fig <- ggarrange(p, labels = "", font.label = list(size = 20))
-fname <- paste0(dir.fig, '01main/fig3ex_score_goal_snr4_grp_', today, '.jpg'); fname
+fname <- paste0(dir.fig, '01main/ex_7_score_goal_snr4_grp_', today, '.jpg'); fname
 ggsave(filename = fname, plot = fig, width = 6, height = 8, units = 'in', dpi = 500)
 ```
 
@@ -872,7 +872,7 @@ p <- tm_shape(dfs_index_sf) +
           # stretch.palette = T,
           breaks = c(0, seq(50, 100, by = 10)),
           # labels = seq(0, 100, by = 10),
-          title  = c('SDG Index\n(Baseline)', 'SDG Index\n(Global lockdown)'),
+          title  = c('SDG Index\n(Baseline)', 'SDG Index\n(Global autarky)'),
           textNA = 'NA', colorNA = 'gray90',
           legend.reverse = T) +
   tm_borders(col = "white", lwd = 0.1, lty = "solid", alpha = 0.99) +
@@ -887,7 +887,7 @@ p <- tm_shape(dfs_index_sf) +
     panel.show = F) +
   tm_facets(free.scales.fill = F, ncol = 1)
 
-fname <- paste0(dir.fig, '01main/', 'fig1ex_SDG_Index_Map_Baseline + Lockdown_', today, '.jpg'); fname
+fname <- paste0(dir.fig, '01main/', 'ex_1_SDG_Index_Map_Baseline_Lockdown_', today, '.jpg'); fname
 tmap_save(tm = p, filename = fname, width=7, height=2.8*2, units="in", dpi = 300)
 ```
 
