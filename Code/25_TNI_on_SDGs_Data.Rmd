@@ -266,9 +266,10 @@ gdp_rel_not <- rel_not %>%
 
 ### SDG 1
 
+####  - 1.1.1 Poverty population
   1.1.1 Proportion of the population living below the international poverty line
   
-```{r - 1.1.1 Poverty population}
+```{r}
 ind_sdg <- 'Poverty Proportion'
 ind_ft  <- 'Poverty' 
 unit_check <- 1
@@ -337,6 +338,78 @@ score_1_1_1 <- df_score
 
 ```
 
+####  - 1.2.1 Poverty line
+
+  *SDG*
+    - 1.2.1 Proportion of population living below the national poverty line, by sex and age
+  
+  *SHDB*
+    - 1.B Poverty - 1.B.a Percent of population living under the relevant poverty line
+  
+```{r}
+ind_sdg <- 'Poverty line Proportion'
+ind_ft  <- 'SHDB2_1Ba' 
+direction_sdg <- -1
+
+
+### Check the Unit!!!
+### rel         --> 10^3 people
+### oft         --> 10^3 people
+### total pop_l --> 1    people
+
+
+### Resource consumption or emissions under the current trading world situation ----------
+###' to use EORA-SHDB data
+###' use the row sum based on EORA data, total pop at risk
+f <- paste0(dir.eora_cleaned, ind_ft, '.xlsx')
+rel <- readxl::read_excel(f) %>%
+  ## for SHDB data, we use 2019 for 2015 because of data gap
+  dplyr::mutate(year = ifelse(year == 2019, 2015, year)) %>%
+  gather(key = 'd', value = 'value', 4:ncol(.)) %>%
+  group_by(year, iso3, ctr) %>%
+  dplyr::summarise(value = sum(value, na.rm = T)) %>%
+  ## given most of the data in Greenland is missing, we set it as NA
+  dplyr::mutate(value = ifelse(iso3 =='GRL', NA, value)) %>%
+  dplyr::select(-ctr)
+  
+
+### Outsourced footprints (oft) flow ---------------------------------------------------------------
+oft <- net_imports_bind  %>%
+  dplyr::filter(ind == ind_ft) %>%
+  dplyr::select(ind, year, iso3, net_in, scenario) %>%
+  spread(key = scenario, value = net_in)
+
+
+### w/o trade, and with trade together  ------------------------------------------------------------
+rel_not_merge <- rel %>%
+  merge(x = ., y = pop_l,  by = c('iso3', 'year'), all.x = T) %>% 
+  merge(x = ., y = oft,    by = c('iso3', 'year'), all.x = T) %>% 
+  dplyr::mutate(
+    ind       = unique(oft$ind),
+    value_rel = (value)/(pop/1000), 
+    ##' if no trade, an exporter would reduce the number of people at poverty 
+    ##' i.e., (-fromAll) = number of employment with poverty risk associated with exports
+    value_not = (value - (-fromAll))/(pop/1000),
+    value_dst = (value - (-fromNer))/(pop/1000),
+    value_ner = (value - (-fromDst))/(pop/1000)
+    ) %>%  
+  ### for easy-checking the numbers
+  dplyr::select(ind, iso3, year, value, everything())
+
+rel_not <- rel_not_merge %>%
+  dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
+
+hist(rel_not$value_rel)
+
+
+### normalization  -------------------------------------------------------
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  dplyr::mutate(ind_sdg = ind_sdg) %>%
+  as.data.frame()
+
+score_1_2_1 <- df_score
+```
 
 
 ### SDG 2
@@ -752,6 +825,85 @@ score_3_4_1 <- df_score
 
 ### SDG 4
 
+#### - 4.1.2 Children out of School
+
+*SDG*
+  4.1 By 2030, ensure that all girls and boys complete free, equitable and quality primary and secondary education leading to relevant and effective learning outcomes
+  
+  4.1.2 Completion rate (primary education, lower secondary education, upper secondary education) 
+  
+*SHDB*
+  5.C Children out of School - 5.C.c Percent of Children Out of Primary School, total	
+  
+```{r}
+ind_sdg <- 'Children out of School'
+ind_ft  <- 'SHDB23_5Cc' 
+direction_sdg <- -1
+
+
+### Check the Unit!!!
+### rel         --> 10^3 people
+### oft         --> 10^3 people
+### total pop_l --> 1    people
+
+
+### Resource consumption or emissions under the current trading world situation ----------
+###' to use EORA-SHDB data
+###' use the row sum based on EORA data, total pop at risk
+f <- paste0(dir.eora_cleaned, ind_ft, '.xlsx')
+rel <- readxl::read_excel(f) %>%
+  ## for SHDB data, we use 2019 for 2015 because of data gap
+  dplyr::mutate(year = ifelse(year == 2019, 2015, year)) %>%
+  gather(key = 'd', value = 'value', 4:ncol(.)) %>%
+  group_by(year, iso3, ctr) %>%
+  dplyr::summarise(value = sum(value, na.rm = T)) %>%
+  ## given most of the data in Greenland is missing, we set it as NA
+  dplyr::mutate(value = ifelse(iso3 =='GRL', NA, value)) %>%
+  dplyr::select(-ctr)
+  
+
+### Outsourced footprints (oft) flow ---------------------------------------------------------------
+oft <- net_imports_bind  %>%
+  dplyr::filter(ind == ind_ft) %>%
+  dplyr::select(ind, year, iso3, net_in, scenario) %>%
+  spread(key = scenario, value = net_in)
+
+
+### w/o trade, and with trade together  ------------------------------------------------------------
+rel_not_merge <- rel %>%
+  merge(x = ., y = pop_l,  by = c('iso3', 'year'), all.x = T) %>% 
+  merge(x = ., y = oft,    by = c('iso3', 'year'), all.x = T) %>% 
+  dplyr::mutate(
+    ind       = unique(oft$ind),
+    value_rel = (value)/(pop/1000), 
+    ##' if no trade, an exporter would reduce the number of people at risk 
+    ##' i.e., (-fromAll) = number of employment with out-of-school risk associated with exports
+    value_not = (value - (-fromAll))/(pop/1000),
+    value_dst = (value - (-fromNer))/(pop/1000),
+    value_ner = (value - (-fromDst))/(pop/1000)
+    ) %>%  
+  ### for easy-checking the numbers
+  dplyr::select(ind, iso3, year, value, everything())
+
+rel_not <- rel_not_merge %>%
+  dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
+
+hist(rel_not$value_rel)
+
+
+### normalization  -------------------------------------------------------
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  dplyr::mutate(ind_sdg = ind_sdg) %>%
+  as.data.frame()
+
+score_4_1_2 <- df_score
+```  
+  
+  
+
+#### - 4.7.1 student_flow - outflow
+
   4.7.1 Extent to which (i) global citizenship education
   
   **NNED ATTENTION!!!**
@@ -764,7 +916,7 @@ score_3_4_1 <- df_score
   **comments**
   - to use total population or use `School enrollment, tertiary_population`
   
-```{r - 4.7.1 student_flow - outflow}
+```{r}
 ind_sdg    <- 'student_flow' ## person
 ind_ft     <- 'student_flow'
 unit_check <- 1
@@ -817,7 +969,9 @@ score_4_7_1 <- df_score
 ```
 
 
-```{r - 4.7.1s student_flow - inflow}
+####  - 4.7.1s student_flow - inflow
+
+```{r}
 ind_sdg    <- 'student_flow_in' ## person
 ind_ft     <- 'student_flow'
 unit_check <- 1
@@ -2114,6 +2268,29 @@ ind_sdg  <- 'co2_in_fossil' ## ton/ha
 
 ```
 
+
+
+#### - ?? 9.a.1
+
+*SDG*
+  9.a Facilitate sustainable and resilient infrastructure development in developing countries through enhanced financial, technological and technical support to African countries, least developed countries, landlocked developing countries and small island developing States 
+  
+  9.a.1 Total official international support (official development assistance plus other official flows) to infrastructure
+
+*Flow*
+  [x] AIDData, and Boston U's GDP center data, are both for China only (sending system). 
+  
+  [] OECD - https://www.oecd.org/development/idsonline.htm 
+  
+    - “Flows by provider and recipient”, which provides comprehensive aggregate historical and forward-looking data on the volume, origin and destination of resource flows (including country programmable aid);
+    
+    - https://stats.oecd.org/Index.aspx?datasetcode=TABLE7B
+    
+    
+  
+```{r}
+
+```
 
 
 
