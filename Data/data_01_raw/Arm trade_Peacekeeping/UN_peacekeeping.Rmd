@@ -1,0 +1,506 @@
+---
+title: "UN_peacekeeping"
+author: "Yingjie"
+date: "2/23/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+Troop and Police Contributions
+  UN police and military personnel are "contributed" to serve under the blue flag from over 100 countries to carry out the mandates defined by the Security Council. Military operations aim to protect populations against threats and contribute to a secure environment. Policing is central in preventing, mitigating and resolving violent conflict and contributing to early peace-building and reconciliation. Uniformed personnel are contributed and deployed under several different types of arrangements.
+
+# Package and path
+```{r }
+
+### To clear your environment 
+# remove(list = ls())
+
+## tidy data
+library(tidyverse)
+library(lubridate)
+library(viridis)
+# library(xlsx)
+library(readxl)
+library(readr)
+
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+setwd(dir)
+```
+
+## Functions
+```{r}
+not_any_na <- function(x) all(!is.na(x))
+not_all_na <- function(x) any(!is.na(x))
+```
+
+
+
+# Data
+
+## UN data
+
+### clean _contributions_ data
+```{r }
+### data
+# download from https://peacekeeping.un.org/en/data-troop-and-police-contributions
+
+getwd()
+xls <- './UN peacekeeping operations/odp_contributionranks_fixCountryName.xlsx'
+ctr_iso  <- readxl::read_excel(path = xls, sheet = 1) %>%
+  ungroup() %>%
+  distinct(ISOCode3, Contributing_Country)
+names(ctr_iso) <- c('iso3', 'Contributing_Country')
+
+
+
+# 'BY GENDER' dataset has the most comprehensive vars
+csv <- './UN peacekeeping operations/odp_contributionsbygender.csv'
+df <- read_csv(file = csv) %>%
+  mutate(date = as.Date(Last_Reporting_Date, format = '%m/%d/%Y'),
+         year = year(date),
+         total= Female_Personnel + Male_Personnel) %>%
+  as.data.frame()
+
+str(df)
+names(df)
+unique(df$Personnel_Type)
+
+
+### to calculate the total contribution, by each specific date
+df_ym <- df %>% as.data.frame() %>%
+  dplyr::filter(year == 2015) %>%
+  dplyr::select(ISOCode3, 
+                Contributing_Country,
+                Personnel_Type,
+                Mission_Acronym,
+                # Female_Personnel, Male_Personnel, 
+                Last_Reporting_Date, 
+                year,
+                total, date) %>%
+  # filter(date == as.Date('2015-12-31')) %>%
+  group_by(ISOCode3, Contributing_Country, Mission_Acronym, year, date, Personnel_Type) %>%
+  summarise(value = sum(total)) %>%
+  spread(key = Personnel_Type, value = value) %>%
+  dplyr::mutate(total_contr = sum(`Experts on Mission`, Troops, `Individual Police`, `Formed Police Units`, na.rm = T))
+
+### to calculate the total contribution, by year
+df_yr <- df_ym %>%
+  ungroup() %>%
+  dplyr::select(-date) %>%
+  group_by(ISOCode3, Contributing_Country, Mission_Acronym, year) %>%
+  summarise_all(list( ~ sum(., na.rm = TRUE)))
+
+
+### to list all the `Mission` names
+unique(df_yr$Mission_Acronym)
+```
+
+
+
+### clean _peacekeeping operations_
+
+  Not sure where this data comes from...
+```{r}
+### where is the data from? ------------------------------------------------------------------------
+getwd()
+xls <- './UN peacekeeping operations/UN peacekeeping operations.xlsx'
+df  <- readxl::read_excel(path = xls, sheet = 1) 
+df_op <- df %>%
+  separate(col = 'MISSION NAME', into = c('name1', 'region'), 
+           sep = ' in | for ', remove = F) %>%
+  dplyr::select(`MISSION NAME`, name1, ACRONYM, Headquarters, Location, region, countries, everything()) %>%
+  rename(from      = ACRONYM,
+         from_name = name1,
+         from_geo  = Headquarters, 
+         to        = Location,
+         to_region = region)
+names(df_op)
+# write.xlsx(x = dt, file = xls, sheetName = 'col_separate', row.names = F, append = T)
+```
+
+
+  More accurate data. 
+```{r}
+###
+library(tabulizer)
+pdf <- './UN peacekeeping operations/pdf_byMission/dec15_3.pdf'
+tabs <- tabulizer::extract_tables(file = pdf, output = "data.frame", guess = T)
+
+tab_df <- data.frame()
+
+for (i in 1:length(tabs)) {
+  
+  tab <- tabs[i] %>% as.data.frame() %>% select(where(not_all_na)) %>% #select(!starts_with("X"))
+    mutate_all(na_if,"") %>% 
+    select(where(not_all_na))
+  
+  print(ncol(tab))
+  
+  ## We notice the number of columns in each page is different, and only 7 is correct. 
+  ## - if ncol = 6, the last column should be separated into two. 
+  ## - if ncol = 8, the last two columns should be combined (or added as they are numbers)
+  if (ncol(tab) == 6) {
+    tab <- tab %>% separate(col = ncol(.), into = c('s1', 's2'), sep = ' ')
+    
+    } else if (ncol(tab) == 8) {
+      
+      tab1 <- tab %>% 
+        dplyr::mutate(
+          a = .[, ncol(.)-1],
+          b = .[, ncol(.)-0]) %>%
+        dplyr::mutate_at(.vars = c('a', 'b'), ~gsub(",", "", x = .)) %>%
+        dplyr::mutate_at(.vars = c('a', 'b'), as.numeric) %>%
+        rowwise() %>%
+        dplyr::mutate(s = sum(a, b, na.rm = T)) %>%
+        select(-a, -b) %>%
+        as.data.frame()
+      n <- ncol(tab1); n
+      tab1 <- tab1[, -c((n-1), (n-2))]
+      tab <- tab1
+      
+      } else {
+        tab = tab
+      }
+  
+  print(paste0(' -- i = ', i, ' -- ', ncol(tab)))
+  
+  ## bind all the pages
+  names(tab) <- c('Country', 'UN_Mission', 'Description', 'Male', 'Female', 'Mission', 'Total')
+  tab_df <- rbind(tab_df, tab)
+}
+
+
+library(tidyr)
+
+unique(tab_df$UN_Mission)  %>% sort() ## there are some non- `UN_Mission` names were mis-read into this column --> to be removed...
+unique(tab_df$Description) %>% sort() ## there are some `Country` names were mis-read into this column 
+unique(tab_df$Male) %>% sort()        ## there are some `Country` names were mis-read into this column
+unique(tab_df$Female) %>% sort()      ## there are some `Country` names AND `UN_Mission` names were mis-read into this column
+
+tab_df1 <- tab_df %>%
+  # filter(!is.na(Country) | !is.na(Mission)) %>%
+  mutate(UN_Mission2  = replace(x = UN_Mission,  grepl("Expert|Troop|Individual|Formed", UN_Mission), NA),  ## remove noise in this column
+         ctr1 = replace(x = Description, grepl("Expert|Troop|Individual|Formed", Description), NA), ## to get `Country` names
+         ctr1 = gsub(',|[[:digit:]]+', '', ctr1), 
+         ctr2 = gsub(',|[[:digit:]]+', '', Male),
+         ctrM = gsub(',|[[:digit:]]+', '', Female),
+                  ) %>%
+  mutate_all(na_if,"") %>% 
+  dplyr::select(-Male, -Female)%>%
+  as.data.frame()
+
+
+unique(tab_df1$Country)
+unique(tab_df1$UN_Mission2)
+
+tab_df2 <- tab_df1 %>%
+  ungroup() %>%
+  ### --> fix `Country`: remove noise (i.e., any of `UN_Mission`) from `Country` names--------------
+  dplyr::mutate(Country2 = ifelse(Country %in% unique(tab_df1$UN_Mission2), NA, Country),
+                ctr3     = ifelse(ctrM %in% unique(tab_df1$UN_Mission2), NA, ctrM),
+                m        = ifelse(is.na(ctr3), ctrM, NA),
+                Country2 = ifelse(is.na(Country2), ctr1, Country2),
+                Country2 = ifelse(is.na(Country2), ctr2, Country2),
+                Country2 = ifelse(is.na(Country2), ctr3, Country2),
+                ) %>%
+  dplyr::select(Country, Country2, ctr1, ctr2, ctrM, UN_Mission, UN_Mission2, m, everything()) %>%
+  dplyr::select(-Description, -ctr1, -ctr2, -ctrM, -ctr3)%>%
+  ### Fill in missing values with previous or next value
+  tidyr::fill(Country2) %>%
+  
+  ### --> fix `UN_Mission2`: get `UN_Mission` names that are in the `Country` column ---------------
+  dplyr::mutate(UN_Mission2 = ifelse(is.na(UN_Mission2) & is.na(Country2), Country, UN_Mission2),
+                UN_Mission2 = ifelse(is.na(UN_Mission2), m, UN_Mission2)) %>%
+  dplyr::select(Country2, UN_Mission, UN_Mission2, m, everything()) %>%
+  dplyr::select(-UN_Mission, -Country, -m)%>%
+  as.data.frame()
+  
+
+  
+tab_df3 <- tab_df2 %>%  
+  
+  ### --> fix `Total`: 1. some of the `Total` are in the `Mission` column -----------------------------
+  mutate(Total    = ifelse(is.na(Total), Mission, Total)) %>%
+  
+  ### some of the `Mission` name and `Total` are in the same cell of `Total`, we should separate them
+  mutate(Mission2 = gsub(',|[[:digit:]]+', '', Mission),       ## get the `Mission` name only
+         m1       = gsub(',|[[:digit:]]+', '', Total),         ## get the `Mission` name only
+         Total2   = as.numeric(gsub("\\D", "", Total)),
+         t1       = as.numeric(gsub("\\D", "", Mission))) %>%    ## get the `Total` number only
+  
+  dplyr::mutate(Mission2 = dplyr::case_when(is.na(Mission2) ~ m1,
+                                     Mission2 == m1  ~ Mission2,
+                                     T               ~ paste0(Mission2, ' ', m1))) %>%
+  as.data.frame() %>%
+  ungroup() %>%
+  dplyr::mutate(Mission3 = ifelse(is.na(Mission2) & !is.na(UN_Mission2), paste0('999', UN_Mission2), Mission2)) %>%
+  # select(Mission, Mission2, m1, everything()) %>%
+  select(-m1) %>%
+  mutate_all(na_if,"") %>% 
+  
+  
+  ### --> fix `Total`: 2. -----------------------------
+  mutate(Total2 = ifelse(is.na(Total2), t1, Total2)) %>%
+  
+  ### some `Mission` names are in `Female` column, but should exclude values from Female if they are numbers
+  # mutate(Mission2 = ifelse(is.na(Mission2), 
+  #                          gsub('[[:digit:]]+', '', Female), 
+  #                          Mission2)) %>%
+  
+  # mutate_all(na_if,"") %>% 
+  # arrange(is.na(Description2)) %>%
+  select(-t1, -Total, -Mission) %>% ## remove the standby data
+  as.data.frame()
+
+str(tab_df3)
+
+### clean the data and only keep operation by county data
+tab_df4 <- tab_df3 %>%
+  dplyr::mutate(
+    Country2 = trimws(Country2),
+    Mission2 = trimws(Mission2),
+    Country2 = stringr::str_squish(Country2),
+    Mission2 = stringr::str_squish(Mission2)) %>%             
+  dplyr::select(-UN_Mission2, -Mission3) %>%
+  dplyr::filter(!is.na(Mission2) & !is.na(Total2)) %>%
+  group_by(Country2, Mission2) %>%
+  summarise(max = max(Total2, na.rm = T)) %>%
+  ungroup() %>%
+  # dplyr::mutate(check = Country2 == Mission2) %>%
+  dplyr::filter(Country2 != Mission2,
+                !Mission2 %in% unique(.$Country2))
+  
+  
+
+str(tab_df4)
+### ??? still, many countries are missing from the data ... 
+
+
+
+### test code -------------------------------------------------------------------------------------
+# tab1 <- tabs[1] %>% as.data.frame() %>% select(where(not_all_na)) %>% 
+#       mutate_all(na_if,"") %>% select(where(not_all_na))
+# tab2 <- tabs[2] %>% as.data.frame() %>% select(where(not_all_na)) %>% 
+#       mutate_all(na_if,"") %>% select(where(not_all_na))
+# tab3 <- tabs[7] %>% as.data.frame() %>% select(where(not_all_na)) %>% 
+#       mutate_all(na_if,"") %>% select(where(not_all_na))
+# 
+# dfs <- do.call(rbind, tabs)
+```
+
+
+
+
+### read pdf - contribution 
+```{r}
+library(tabulizer)
+pdf <- './UN peacekeeping operations/pdf/aug15_1.pdf'
+tabs <- tabulizer::extract_tables(file = pdf, output = "data.frame", guess = T) 
+
+
+tab_df <- data.frame()
+
+func_list2df <- function(tabs){
+  for (i in 1:length(tabs)) {
+    tab <- tabs[i] %>% as.data.frame() %>% select(where(not_all_na)) %>% #select(!starts_with("X"))
+      mutate_all(na_if,"") %>% select(where(not_all_na))
+    
+    ## *** in some cases, there is disarrangement in the 1st column! We thus need to 
+    ##  drop the left NAs <in the 1st column> in a dataframe and left shifting the cleaned rows
+    t1 <- t(apply(tab, 1, function(x) {
+      if (is.na(x[1])) {
+        y <- x[-seq_len(which.min(is.na(x))-1)]
+        length(y) <- length(x)
+        y
+      } else x
+    })) %>%
+      as.data.frame() %>%
+      select(where(not_all_na))
+    
+    
+    ## *** but in some cases, there is disarrangement in the 2nd column too! We thus need to 
+    ##    drop all left NAs <in the 2nd column> in a dataframe and left shifting the cleaned rows. 
+    ## To do so, we first remove the 1st column as it does not have any NAs, 
+    ##    then, we use the same approach as the above
+    ## First, make sure there are non-NA in the 2nd column - I simply check if there are more NAs than 
+    ##    the full length of the dataframe
+    if (sum(is.na(t1[,2])) > nrow(t1)/2) { 
+      
+      t2 <- t(apply(t1[,-1], 1, function(x) {
+        if (is.na(x[1])) {
+          y <- x[-seq_len(which.min(is.na(x))-1)]
+          length(y) <- length(x)
+          y
+        } else x
+      })) %>%
+        as.data.frame()
+      
+      t2 <- cbind(t1[,1], t2) ## need to add the 1st column back
+        
+    } else t2 <- t1
+    
+    
+    ## clean up the table
+    tab <- t2 %>% as.data.frame() %>% 
+      mutate_all(as.character) %>%
+      mutate_all(na_if,"") %>%
+      select(where(not_all_na))
+    names(tab) <- c("No", "Country", "Police", "UNMEM", "Troops", "Total" )
+    
+    ## bind all the pages
+    tab_df <- rbind(tab_df, tab)
+  }
+  return(tab_df)
+}
+
+
+### test function 
+df <- func_list2df(tabs) %>%
+  # mutate_all(~(gsub(",", "", .))) %>% ## this also works
+  dplyr::mutate_at(.vars = 3:ncol(.), ~gsub(",", "", x = .)) %>%
+  dplyr::mutate_at(.vars = 3:ncol(.), as.numeric) %>%
+  as.data.frame()
+
+str(df)
+
+colSums(df[3:6], na.rm = T)
+
+
+
+
+pdfs <- list.files(path = './UN peacekeeping operations/pdf/', pattern = '*.pdf$', full.names = T); pdfs
+for (pdf in pdfs) {
+  tabs <- tabulizer::extract_tables(file = pdf, output = "data.frame")
+  tab_df <- data.frame()
+  df <- func_list2df(tabs) %>%
+    dplyr::mutate_at(.vars = 3:ncol(.), ~gsub(",", "", x = .)) %>%
+    dplyr::mutate_at(.vars = 3:ncol(.), as.numeric) %>%
+    dplyr::mutate(date = gsub('.pdf|_1', '', basename(pdf)),
+                  date = paste0('1', date),
+                  date = as.Date(date, '%d%b%y')) %>% 
+    as.data.frame()
+  
+  ## check if the total number is correct
+  print(colSums(df[3:6], na.rm = T))
+  ## assign a unique name to each dataframe
+  name <- paste0('df_', gsub('.pdf', '', basename(pdf))); print(name)
+  assign(name, df)
+}
+
+
+# Put them in a list
+ls <- lapply(ls(pattern = "^df_.*15_1$"), get)
+
+# or more directly
+ls <- mget(ls(pattern = "^df_.*15_1$"))
+dfs <- do.call(rbind, ls)
+rownames(dfs) <- NULL
+
+dfs_total <- dfs %>%
+  select(Country, Total, date) %>%
+  mutate(Country = gsub('Rep of Macedonia', 'Republic of Macedonia', Country)) %>%
+  pivot_wider(names_from = date, values_from = Total) %>%
+  mutate(Total_mean = rowMeans(select(., starts_with("2015")), na.rm = TRUE)) %>%
+  select(Country, Total_mean) %>%
+  left_join(., ctr_iso, by = c('Country' = 'Contributing_Country')) %>%
+  arrange(!is.na(iso3), Country) %>%
+  as.data.frame()
+```
+
+
+
+
+
+```{r test code, eval=FALSE, include=FALSE}
+### --> test code
+
+tabs[1] %>% as.data.frame() %>% select(where(not_all_na)) %>% head(3)#select(!starts_with("X"))
+tabs[2] %>% as.data.frame() %>% select(where(not_all_na)) %>% head(3)
+tabs[3] %>% as.data.frame() %>% select(where(not_all_na))# %>% head(3)
+
+tab <- tabs[3] %>% as.data.frame() %>%  mutate_all(na_if,"")
+
+## *** in some cases, there is disarrangement in the 1st column! We thus need to 
+##  drop the left NAs <in the 1st column> in a dataframe and left shifting the cleaned rows
+t1 <- t(apply(tab, 1, function(x) {
+  if (is.na(x[1])) {
+    y <- x[-seq_len(which.min(is.na(x))-1)]
+    length(y) <- length(x)
+    y
+  } else x
+})) %>%
+  as.data.frame() %>%
+  select(where(not_all_na))
+
+
+## *** but in some cases, there is disarrangement in the 2nd column too! We thus need to 
+##    drop all left NAs <in the 2nd column> in a dataframe and left shifting the cleaned rows. 
+## To do so, we first remove the 1st column as it does not have any NAs, 
+##    then, we use the same approach as the above
+## First, make sure there are non-NA in the 2nd column - I simply check if there are more NAs than 
+##    the full length of the dataframe
+if (sum(is.na(t1[,2])) > nrow(t1)/2) { 
+  
+  t2 <- t(apply(t1[,-1], 1, function(x) {
+    if (is.na(x[1])) {
+      y <- x[-seq_len(which.min(is.na(x))-1)]
+      length(y) <- length(x)
+      y
+    } else x
+  })) %>%
+    as.data.frame()
+  
+  t2 <- cbind(t1[,1], t2) ## need to add the 1st column back
+    
+} else t2 <- t1
+
+
+tab <- t2 %>% as.data.frame() %>% 
+  mutate_all(as.character) %>%
+  mutate_all(na_if,"") %>%
+  select(where(not_all_na))
+names(tab) <- c("No", "Country", "Police", "UNMEM", "Troops", "Total" )
+
+
+
+str(tab)
+tab
+```
+
+
+## SIPRI data
+  
+```{r}
+# \Data\data_01_raw\Arm trade_Peacekeeping\SIPRI peacekeeping ops\SIPRI data peace ops 2008-18_Yingjie.xlsx
+
+
+xls <- './SIPRI peacekeeping ops/SIPRI data peace ops 2008-18_Yingjie.xlsx'
+df2 <- readxl::read_excel(path = xls) %>%
+  dplyr::select(-c(month, Date, `Location single`, Region)) %>%
+  dplyr::select(Organization, location_code, year, everything()) %>%
+  rename(from    = Organization, 
+         to      = location_code,
+         to_name = location_name) %>%
+  # mutate(date = as.Date(Last_Reporting_Date, format = '%m/%d/%Y'),
+  #        year = year(date),
+  #        total= Female_Personnel + Male_Personnel) %>%
+  dplyr::filter(year == 2015) %>%
+  as.data.frame()
+
+
+names(df2)
+
+```
+
+
+
+```{r}
+library(textreadr)
+f <- read_rtf(file = 'Trade-Register-2000-2019.rtf', skip = 1)
+```
+

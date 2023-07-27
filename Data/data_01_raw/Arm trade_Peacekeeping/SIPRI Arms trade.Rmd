@@ -1,0 +1,185 @@
+---
+title: "SIPRI Arms trade"
+author: "Yingjie"
+date: "7/23/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+# Package and path
+```{r }
+rm(list=ls())
+## tidy data
+library(tidyverse)
+library(lubridate)
+library(viridis)
+# library(xlsx)
+library(readxl)
+library(writexl)
+library(textreadr) ## read .rtf file
+
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+setwd(dir)
+```
+
+
+
+# Data
+## read in and format data (a csv for example)
+```{r}
+# fname <- './SIPRI Arms trade/Trade registers/Trade-Register-2000-2019.rtf'
+# df <- read_rtf(file = fname, skip = 1)
+
+csv <- './SIPRI Arms trade/TIV/TIV-Import-AFG-1950-2019.csv'
+csv <- './SIPRI Arms trade/TIV/Downloads/TIV-Import-BAR-1950-2019.csv'
+csv <- './SIPRI Arms trade/TIV/TIV-Import-BAR-1950-2019.csv'
+
+
+### the country name of "Imports to"
+ctr_to_name <- read.csv(csv, nrows = 1, header = F, stringsAsFactors = F) %>%
+  dplyr::select(V1) %>%
+  ## remove useless words and extract the country name
+  dplyr::mutate(V1=gsub('TIV of arms exports to ', '', V1), 
+                V1=gsub(', 1950-2019', '', V1),
+                V1=trimws(V1))
+
+### read in the data and pre-clean
+df <- read_csv(csv, skip = 10) %>%
+  dplyr::filter(!X1 %in% c("", "Total"),
+                !is.na(X1)) %>%
+  dplyr::select(-Total) %>%
+  rename(supplier = X1) %>%
+  ### add the country name to the data frame
+  dplyr::mutate(recipient = ctr_to_name$V1)
+
+### re-order the column names
+names_df <- names(df)[-length(names(df))]; names_df
+# str(df)
+# unique(df$X)
+df <- df %>%
+  dplyr::select(recipient, names_df)
+```
+
+
+## loop read all csvs
+```{r}
+csvs <- list.files(path = './SIPRI Arms trade/TIV/Downloads/', 
+                   pattern = '^TIV-Import-', full.names = T); csvs
+
+dfs <- data.frame()
+
+for (csv in csvs) {
+  print(csv)
+  
+  ### the country name of "Imports to"
+  ctr_to_name <- read.csv(csv, nrows = 1, header = F, stringsAsFactors = F) %>%
+    dplyr::select(V1) %>%
+    ## remove useless words and extract the country name
+    dplyr::mutate(V1=gsub('TIV of arms exports to ', '', V1), 
+                  V1=gsub(', 1950-2019', '', V1),
+                  V1=trimws(V1))
+  
+  ### read in the data and pre-clean
+  df <- read_csv(csv, skip = 10) %>%
+    dplyr::filter(!X1 %in% c("", "Total"),
+                  !is.na(X1)) %>%
+    dplyr::select(-Total) %>%
+    rename(supplier = X1) %>%
+    ### add the country name to the data frame
+    dplyr::mutate(recipient = ctr_to_name$V1) %>%
+    dplyr::select(recipient, names_df)
+  
+  ### rbind all data in one df
+  dfs <- rbind(dfs, df)
+}
+
+```
+
+
+### clean data
+
+```{r}
+#### 1. ctr names -------------------------------------------------------------
+str(dfs)
+names(dfs)
+
+dt <- dfs %>%
+  dplyr::mutate(
+    recipient = gsub('\\*', '', recipient),
+    supplier  = gsub('\\*', '', supplier)
+  )
+### ctr names, match with iso3 code
+ctr_rec_ls <- dt %>% distinct(recipient) %>% rename(ctr = recipient)
+ctr_sup_ls <- dt %>% distinct(supplier)  %>% rename(ctr = supplier)
+ctr_all_ls <- rbind(ctr_rec_ls, ctr_sup_ls) %>% 
+  distinct(ctr) %>%
+  arrange(ctr) 
+# unique(ctr_all_ls$ctr)
+
+
+### check the ctr names, such as NA, "" and "96" -----------------------------
+###################### #
+# 1. TIV-Import-BAR-1950-2019.csv --> manual fix, not sure why the first col will auto become the row names (change from using read.csv() to read_csv() can better solve this issue)
+# 2. after changing to use read_csv(), no NA or numbers in ctr names
+###################### #
+
+
+### save to local, and manually match the iso3 code
+# writexl::write_xlsx(x = ctr_all_ls, path = './SIPRI Arms trade/_TIV_ctr_all_ls.xlsx')
+
+
+### read in the iso3, and merge/left_join to the data frame
+ctr_iso <- readxl::read_xlsx(
+  path = './SIPRI Arms trade/_TIV_ctr_all_ls_manual_Match_iso3.xlsx', 
+  range = 'A1:B300') %>%
+  dplyr::filter(!is.na(ctr))
+
+
+#### 2. look at the data -------------------------------------------------------
+dt1 <- dt  %>%
+  merge(., ctr_iso, by.x='supplier',  by.y='ctr', all.x=T) %>%    ## iso3.x
+  merge(., ctr_iso, by.x='recipient', by.y='ctr', all.x=T)%>%     ## iso3.y
+  dplyr::mutate(id = row.names(.)) %>%
+  ## year as number
+  gather(key = 'year', value = 'num', `1950`:`2019`) %>%
+  dplyr::mutate(year = gsub('X', '', year),
+                year = as.numeric(year)) %>%
+  dplyr::filter(year >= 2000) %>%
+  as.data.frame() %>%
+  ## spread to wide format
+  pivot_wider(names_from = year, values_from = num) %>%
+  as.data.frame() %>%
+  arrange(iso3.x, iso3.y)
+  
+names(dt1)
+
+### check any NA in ctr names
+dt1 %>%
+  filter_at(vars(1:4), any_vars(is.na(.)))
+
+### as we re-coded the ctr name, need to combine the data by taking the sum values of those trade between the same pair of trading ctr. 
+dt2 <- dt1 %>%
+  group_by(iso3.x, iso3.y) %>%
+  summarise_at(.vars = as.character(seq(2000, 2019)),
+               sum, na.rm = TRUE) %>%
+  arrange(iso3.x, iso3.y)
+  
+
+### change to a matrix format: rows--supplier; column--recipient
+dt.mat <- dt2 %>%
+  # dplyr::select(-c(1:2)) %>%
+  gather(key = year, value = num, `2000`:`2019`) %>%
+  pivot_wider(names_from = iso3.y, values_from = num) %>%
+  rename(iso3 = iso3.x)
+
+
+### save data to local
+writexl::write_xlsx(x = dt.mat, path = './SIPRI Arms trade/_TIV_arms_trade_2000_2019.xlsx')
+```
+
+
+
