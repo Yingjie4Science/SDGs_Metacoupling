@@ -241,6 +241,10 @@ class_detail <- F
 links_dist_type_collection <- data.frame()
 
 for (ind in unique(ft_ind$ind)) {
+  
+  ## test
+  # ind <- "Corruption"
+  
   print(ind)
   
   xls <- paste0(dir.eora_cleaned, ind, '.xlsx'); xls
@@ -273,14 +277,19 @@ for (ind in unique(ft_ind$ind)) {
     dplyr::distinct(from, to, .keep_all = T) %>%  
     as.data.frame()
   
-  links_dist <- merge(x = links, y = dist, by.x = c('from', 'to'), by.y = c('iso_o', 'iso_d'), all.x = T) %>%
-    merge(x = ., y = grp_id, by.x = 'from', by.y = 'iso_a3', all.x = T) %>%
-    merge(x = ., y = grp_id, by.x = 'to',   by.y = 'iso_a3', all.x = T) %>%
+  links_dist <- 
+    merge(x = links, y = dist, by.x = c('from', 'to'), by.y = c('iso_o', 'iso_d'), all.x = T) %>%
+    merge(x = ., y = grp_id, by.x = 'from', by.y = 'iso_a3', all.x = T) %>% dplyr::rename('group_from' = 'group_id') %>%
+    merge(x = ., y = grp_id, by.x = 'to',   by.y = 'iso_a3', all.x = T) %>% dplyr::rename('group_to'   = 'group_id') %>%
+    
+    ## check NA in iso3 matches
+    arrange(!is.na(group_from), !is.na(group_to)) %>%
+    
     dplyr::mutate(
-      group_od = paste0(group_id.x, group_id.y), ## group_od = 14, means o-1 sending; d-4 receiving 
+      group_od = paste0(group_from, group_to), ## group_od = 14, means o-1 sending; d-4 receiving 
       group_od = as.numeric(group_od)
       ) %>%
-    dplyr::select(-group_id.x, -group_id.y) %>%
+    dplyr::select(-group_from, -group_to) %>%
     arrange(to, from)
   
   
@@ -350,6 +359,7 @@ ft_d <- links_dist_type_collection %>%
   dplyr::group_by(to, type, od_direction) %>%
   dplyr::summarise(dq_sum = sum(ftd, na.rm = T),          ## total (flow * distance)
                    q_sum  = sum(weight, na.rm = T)) %>%   ## total flow
+  ungroup() %>%
   as.data.frame() %>%
   dplyr::mutate(d_avg_ft = dq_sum/q_sum/1000) %>%         ## average distance of each unit of flows
   merge(x = ., 
@@ -405,6 +415,10 @@ ft_ind_ls_labels <- ft_ind_ls_levels %>%
 
 
 ```{r plot - by ft indicator - ex6}
+
+n_plots  <- length(unique(ft_d$type))
+p_height <- ceiling(n_plots/4) * 7/8
+
 p1 <- ft_d %>% 
   # dplyr::filter(SDG_class != 'Soci') %>% ## subset for easy plot
   dplyr::mutate(od_direction = factor(x = od_direction, levels = od_direction_levels, labels = od_direction_labels)) %>%
@@ -450,7 +464,7 @@ p1 <- ft_d %>%
 ggarrange(p1, labels = '')
 fname <- paste0(dir.fig, '01main/', 'ex_6_ImpactDistance_byFT',
                 '_class', od_direction_count, '_', today, '.jpg'); fname
-ggsave(filename = fname, plot = last_plot(), width = 7, height = 7, units = 'in', dpi = 300)
+ggsave(filename = fname, plot = last_plot(), width = 7, height = p_height, units = 'in', dpi = 300)
 ```
 
 
@@ -487,7 +501,7 @@ p <- ft_d_summary %>%
   xlab(label = bquote('Distance (10'^3~'km)')) + 
   labs(fill='Impact pair')
 ggarrange(p, labels = 'd')
-fname <- paste0(dir.fig, '01main/', 'fig2d_ImpactDistance_', ind,
+fname <- paste0(dir.fig, '01main/', 'fig2d_ImpactDistance_', ind, '_',
                 od_direction_count, 'grp_', today, '.jpg'); fname
 ggsave(filename = fname, plot = last_plot(), width = 7.5/2, height = 7.5/2, units = 'in', dpi = 300)
 ```

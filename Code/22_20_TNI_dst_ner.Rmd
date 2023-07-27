@@ -115,7 +115,9 @@ spillover_name_list <- data.frame(ind = gsub('.xlsx', '', basename(xls.ls))) %>%
 f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'direction.RData')
 load(f) ## `direction`, `direction_clean`
 
-direction_use <- direction
+direction_use <- direction %>%
+  dplyr::mutate(direction = as.numeric(direction)) %>%
+  dplyr::filter(!is.na(direction))
 ```
 
 

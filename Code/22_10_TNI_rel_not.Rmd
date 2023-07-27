@@ -687,7 +687,7 @@ hist(spillover_index$index)
   To visualize each country's TNI impact (spillover impact)
   
   https://www.datanovia.com/en/lessons/heatmap-in-r-static-and-interactive-visualization/
-```{r - heat map of each indicator}
+```{r - heat map of each indicator, eval=FALSE, include=FALSE}
 
 ### - 1st approach ------------------------------------
 data <- spillover_norm %>%
@@ -1012,7 +1012,7 @@ ggplot(spillover_index_type_SDGtype,
     legend.margin=margin(0, 0, 0, 0)) +
   ylab('Impact Index') + xlab('Country')
 
-fname <- paste0(dir.fig, 'spillover/', 'spillover_index_top_bottom_ByType_', postfix, '_', today, '.jpg'); fname
+fname <- paste0(dir.fig, '01main/', 'ex_4_spillover_index_top_bottom_ByType_', postfix, '_', today, '.jpg'); fname
 ggsave(filename = fname, plot = last_plot(), width = width_2col/3*2, height = width_2col/2, units = 'cm', dpi = 600)
 ```
 

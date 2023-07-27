@@ -13,7 +13,10 @@ helper_func_plot_map <- function(data, var = 'value_rel', yr = 2015, filename_po
   
   rel_not_sf  <- data %>%
     dplyr::filter(year == yr) %>%
-    merge(x = shp, y = ., by.x = "iso_a3", by.y = "iso3",  all.x = T)
+    merge(x = shp, 
+          y = ., 
+          by.x = "iso_a3", by.y = "iso3",  
+          all.x = T)
   
   max <- max(rel_not_sf$value_rel, na.rm = T); max # 0.025
   min <- min(rel_not_sf$value_rel, na.rm = T); min # 0.000001094

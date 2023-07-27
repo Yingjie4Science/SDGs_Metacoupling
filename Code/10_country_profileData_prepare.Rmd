@@ -4511,7 +4511,8 @@ writexl::write_xlsx(x = d, path = fxls)
 
 ### Goal 17	Partnerships for the Goals
 
-```{r - ODA}
+#### - ODA
+```{r}
 ### ODA aid ----------------------------------------------------------
 # DT.ODA.DACD.GVCS.GEN.CD	 + Gross ODA aid disbursement for general government and civil society, DAC donors total (current US$)
 # DT.ODA.DACD.GVCS.CD	     - Gross ODA aid disbursement for government & civil society, DAC donors total (current US$)
@@ -4551,13 +4552,15 @@ function_format_4yrData_save(iname = iname) ## "There are 17.4% NA"
 
 
 
+####  - FDI
 
   **Foreign direct investment**, net inflows (BoP, current US$) --> https://data.worldbank.org/indicator/BX.KLT.DINV.CD.WD
   Foreign direct investment refers to direct investment equity flows in the reporting economy. It is the sum of equity capital, reinvestment of earnings, and other capital. Direct investment is a category of *cross-border investment* associated with a resident in one economy having control or a significant degree of influence on the management of an enterprise that is resident in another economy. Ownership of 10 percent or more of the ordinary shares of voting stock is the criterion for determining the existence of a direct investment relationship. Data are in current U.S. dollars.
 
   ID: BX.KLT.DINV.CD.WD
   Source: International Monetary Fund, Balance of Payments database, supplemented by data from the United Nations Conference on Trade and Development and official national sources.
-```{r - FDI}
+  
+```{r}
 # BN.KLT.DINV.DRS.GDP.ZS	-- Foreign direct investment, net inflows (% of GDP)
 # BN.KLT.DINV.DRS.GDI.ZS	-- Foreign direct investment, net inflows (% of GDI)
 # BN.KLT.DINV.CD.DRS	    -- Foreign direct investment, net inflows (US$)
@@ -4593,15 +4596,15 @@ function_format_4yrData_save(iname = iname) ## "There are 4.7% NA"
 ```
 
 
+####  - Aid flows from DAC donors
 
-  **DAC**
-  The Organisation for Economic Co-operation and Development's (OECD) Development Assistance Committee (DAC) is a forum to discuss issues surrounding aid, development and poverty reduction in developing countries. It describes itself as being the "venue and voice" of the world's major donor countries.
+  The Organisation for Economic Co-operation and Development's (OECD) *Development Assistance Committee (DAC)* is a forum to discuss issues surrounding aid, development and poverty reduction in developing countries. It describes itself as being the "venue and voice" of the world's major donor countries.
   As of early 2021 there are *30 members of DAC* (see list below), including the European Union which acts as a full member of the committee.
   -- Frome https://en.wikipedia.org/wiki/Development_Assistance_Committee
 
 
 
-```{r - Aid flows from DAC donors}
+```{r}
 # DC.DAC.USAL.CD	Net bilateral aid flows from DAC donors, United States (current US$) --> 22.5% NA
 # DC.DAC.TOTL.CD	Net bilateral aid flows from DAC donors, Total (current US$)
 # DC.DAC.SWEL.CD	Net bilateral aid flows from DAC donors, Sweden (current US$)
@@ -4658,7 +4661,7 @@ function_format_4yrData_save(iname = iname) ##
 
 
 
-```{r - }
+```{r -}
 # DP.DOD.DECT.CR.CG.Z1	-- 481.Gross Central Government Debt (PSDCG)(% of GDP)
 # DT.ODA.ALLD.XPD.ZS	  -- Aid (% of central government expenditures)
 # 9.6_PBA	           -- Aid provided through program based approaches (% of international aid to education)

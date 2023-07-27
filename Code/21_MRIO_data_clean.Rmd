@@ -615,18 +615,33 @@ writexl::write_xlsx(x = df_formatted, path = fname)
 
 ### - FDI - IMF
 
-  See `FDI_data_prep.Rmd` in "Data/data_01_raw/FDI/"
+  See `FDI_data_prep.Rmd` in "./Data/data_01_raw/FDI/"
   
 ```{r}
 ### get the indicator name
-ind <- 'FDI'
+ind <- 'FDI_matrix'
 yrs <- c(2000, 2005, 2010, 2015)
 dir.i <- './Data/data_01_raw/FDI/IMF/'
 
-fname <- paste0(dir.eora_cleaned, ind, '_matrix.xlsx'); fname
+fname <- paste0(dir.eora_cleaned, ind, '.xlsx'); fname
 df_formatted <- readxl::read_excel(fname)
 ```
 
+
+
+
+### - ODA OECD
+
+  See `FDI_data_prep.Rmd` in "./Data/data_01_raw/OECD_ODA/"
+
+```{r}
+ind <- 'ODA_OOF_oecd_matrix'
+yrs <- c(2000, 2005, 2010, 2015)
+dir.i <- './Data/data_01_raw/OECD_ODA/'
+
+fname <- paste0(dir.eora_cleaned, ind, '.xlsx'); fname
+df_formatted <- readxl::read_excel(fname)
+```
 
 
 
