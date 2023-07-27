@@ -2,7 +2,7 @@
 title: "Untitled"
 output: pdf_document
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 
@@ -193,13 +193,34 @@ writexl::write_xlsx(x = gdp, path = paste0(dir.cleaned, 'GDP (constant 2010 US$)
 
 ## Shapefile
 ```{r }
-# library(rnaturalearthdata)
+library(rnaturalearthdata)
 # library(rnaturalearth)
-# library(sf)
+library(sf)
 
-shp <- ne_countries(scale = 'medium', type = 'countries', returnclass = 'sf') %>%
-  dplyr::select(name, type, iso_a3, economy, income_grp) %>%
-  dplyr::mutate(iso_a3 = ifelse(name == 'France', 'FRA', iso_a3))
+
+##' 1. load sf data from package -- errors sometimes ...
+# shp1 <- ne_countries(scale = 'medium', type = 'countries', returnclass = 'sf') %>%
+#   dplyr::select(name, type, iso_a3, economy, income_grp)
+# names(shp1)
+
+
+##' 2. load data from local drive
+f <- 'D:/data/shp/NaturalEarthData/ne_50m_admin_0_countries_v5.1.1/ne_50m_admin_0_countries.shp'
+shp2 <- sf::st_read(dsn = f) %>%
+  dplyr::rename_all(tolower) %>%
+  dplyr::select(name, type, iso_a3, economy, income_grp)
+names(shp2)
+
+
+##' 3. select one data source for further analysis 
+shp <- shp2
+
+
+
+##' add `area` to the data
+shp$area <- sf::st_area(x = shp) #Take care of units
+
+
 # plot(shp['iso_a3'])
 shp_iso_na <- shp %>% 
   dplyr::filter(is.na(iso_a3))
@@ -208,14 +229,19 @@ shp_iso_na$name
 
 ### fill the gap 
 shp <- shp %>%
-  dplyr::mutate(iso_a3 = ifelse(name == "Norway", 'NOR', iso_a3),
-                iso_a3 = ifelse(name == "N. Cyprus", 'CYP', iso_a3)) %>%
+  dplyr::mutate(
+    iso_a3 = ifelse(iso_a3 == '-99', NA, iso_a3),
+    iso_a3 = ifelse(name == 'France' & is.na(iso_a3),    'FRA', iso_a3),
+    iso_a3 = ifelse(name == "Kosovo" & is.na(iso_a3),    'XKX', iso_a3),
+    iso_a3 = ifelse(name == "Norway" & is.na(iso_a3),    'NOR', iso_a3),
+    iso_a3 = ifelse(name == "N. Cyprus" & is.na(iso_a3), 'CYP', iso_a3)) %>%
+  arrange(!is.na(iso_a3)) %>%
   filter(name != 'Antarctica')
 ```
 
 
 
-## Country classifications
+## Country group classifications
 
 This script aims to 
   * compile the existing country classification systems 
@@ -253,12 +279,15 @@ grp0 <- shp %>%
   dplyr::mutate(iso_a3 = ifelse(name == 'Norway', 'NOR', iso_a3),
                 iso_a3 = ifelse(name == 'Kosovo', 'XXK', iso_a3)) 
 
+names(grp0)
+
 grp_add <- data.frame(
-  name = c('Netherlands Antilles'),
-  iso_a3 = c('ANT'),
-  eco_group = c('1. Developed'),
-  inc_group = c('1. High income'),
-  group     = c('High income')
+  name = c('Netherlands Antilles', 'Former USSR'),
+  iso_a3 = c('ANT', 'SUN'),
+  area = c(NA, NA),
+  eco_group = c('1. Developed',   '2. Developing'),
+  inc_group = c('1. High income', '4. Low income'),
+  group     = c('High income',    'Low income')
 )
 
 
@@ -418,8 +447,8 @@ ctr_unctad_code <- ctr_unctad %>%
 ```
 
 
-### - compare and plot
-```{r}
+### - Compare and plot
+```{r - grp_update}
 grp_update <- grp %>%
   dplyr::filter(!is.na(iso_a3)) %>%
   merge(x = ., y = ctr_wb,   by = 'iso_a3', all = T) %>%
@@ -510,9 +539,9 @@ shp <- shp %>%
     y = grp_update %>% 
       dplyr::filter(name != 'N. Cyprus') %>%
       dplyr::select(-name), 
-    by = "iso_a3")
+    by = "iso_a3") #%>%
+  # st_simplify()
 
-shp$area <- sf::st_area(x = shp) #Take care of units
 fname <- './Data/country classification/shp_prj.shp'
 sf::st_write(shp, dsn = fname, delete_layer = T)
 ```
@@ -531,7 +560,10 @@ save(iso_eora, pop, gdp, shp, grp, grp_update, file = fname)
 
 ## Plot Map 
 ```{r - Map of income - 4 group}
-grp_shp <- merge(shp %>% dplyr::select(iso_a3), grp, by = 'iso_a3') %>%
+grp_shp <- merge(
+  x = shp %>% dplyr::select(iso_a3), 
+  y = grp, 
+  by = 'iso_a3') %>%
   dplyr::mutate(group = factor(group, levels = c('High income', 'Upper middle income', 'Lower middle income', 'Low income')))
 
 theme_my <- 
@@ -662,7 +694,9 @@ names(ctr_SI) <- c("Country ISO3 Code",
 ## 1. to add flag icon, we need 'iso2c'
 ### match iso3c and iso2c
 library(countrycode)
-country_names <- ctr_SI$`Country ISO3 Code`; country_names
+country_names <- unique(ctr_SI$`Country ISO3 Code`); country_names
+length(country_names)
+
 iso2c <- countrycode(country_names,
             origin = 'iso3c',
             destination = 'iso2c')
