@@ -1,0 +1,603 @@
+---
+title: "Untitled"
+author: "Yingjie"
+date: "11/21/2019"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+#  Dirs and Packages
+
+```{r}
+# To clear your environment 
+# remove(list = ls())
+
+# set work dir
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+setwd(dir)
+getwd()
+
+dir_results <- './AidData_SDGs/_results_aiddata_sdgs/'
+
+today <- format(Sys.time(), "%Y%m%d"); print(today)
+
+library(cowplot)
+library(scales)    ## percent 
+
+# install.packages("devtools")
+library(devtools)
+# install_github("mdilorenzo/aidtools")
+library(aidtools)
+library(rgdal)
+library(rgeos)
+library(foreach)
+library(tm)
+library(tidyverse)
+# library(xlsx)
+```
+
+
+# 1. Data
+```{r}
+## read data
+dir.sdgv1 <- './AidData_SDGs/Financing_to_the_Sustainable_Development_Goals_Dataset_version_1_0/'
+csv.sdgv1 <- paste0(dir.sdgv1, 'FinancingtotheSDGsDataset_v1.0.csv')
+# sdgv1 <- read.csv(csv.sdgv1, stringsAsFactors = F)
+# save(sdgv1, file = './FinancingtotheSDGsDataset_v1.0.RData') ### save as RData
+load(file = './FinancingtotheSDGsDataset_v1.0.RData')        ### load the RData
+
+## take a subset
+sdgv1.sub <- sdgv1[1:100, ]
+str(sdgv1.sub)
+names(sdgv1.sub)
+```
+
+
+
+## 1.1 Data discription
+```{r}
+# Data discription --------------------------------------------------------
+df <- sdgv1
+
+### how many years covered in the dataset: 2000 - 2013
+yrs <- sort(unique(df$year)); print(yrs)
+
+### how many countries in the dataset - (78 donors)
+donors <- df %>%
+  distinct(donor); print(head(donors))
+
+### how many countries in the dataset - (214 receients)
+recipients <- df %>%
+  distinct(recipient); print(head(recipients))
+
+# write.xlsx(donors,     './aiddata_sdgs_country_list.xlsx', 
+#            row.names = F, sheetName = 'donors', append = T)
+# write.xlsx(recipients, './aiddata_sdgs_country_list.xlsx', 
+#            row.names = F, sheetName = 'recipients', append = T)
+
+### how much aids were distributed to each goal, by year?
+str(sdgv1)
+aid_year_goal <- sdgv1 %>%
+  group_by(year) %>%
+  summarise_at(vars(goal_1:goal_17), mean, na.rm = TRUE) %>%
+  gather(key = 'goal', value = 'value', goal_1:goal_17)
+
+aid_year_goal$goal <- 
+  factor(aid_year_goal$goal, levels = paste0('goal_', seq(1,17)))
+
+hist(aid_year_goal$value)
+
+
+
+library(ggplot2)
+library(hrbrthemes)
+library(RColorBrewer)
+library(viridis)
+
+
+library(classInt)
+library(RColorBrewer)
+nclass = 10
+classint <- classIntervals(aid_year_goal$value, n = nclass, style = "quantile") #can use "jenks" but is very slow
+brks <- as.integer(classint$brk); brks #approximate quantiles
+labs <- brks[-1]; labs
+aid_year_goal$breaks <- cut(aid_year_goal$value, breaks=brks, labels=labs)
+
+
+# myPalette <- colorRampPalette(rev(brewer.pal(11, "RdYlBu")));# myPalette
+# sc <- scale_fill_gradientn(colours = myPalette(100)) # , limits=c(1, 8)
+
+
+ggplot(aid_year_goal, aes(x=year, y=goal, 
+                          # fill= (breaks), 
+                          fill = (value))) + 
+  geom_tile() +
+  # scale_fill_gradient(low="red", high="blue") + 
+  # scale_fill_distiller(palette = "RdPu") +
+  scale_fill_viridis(discrete=FALSE, direction = -1, labels = comma) +
+  # scale_fill_brewer('Legend name', palette = "YlGnBu") +
+  # scale_fill_brewer('Legend name', palette = 'BrBG') +
+  # sc+
+  
+  # guides(fill = guide_legend(label.hjust = 1, label = T))+
+  labs(fill = 'Aids ($)') +
+  # scale_fill_continuous(labels = scales::unit_format(unit = "", scale = 10))
+  theme_minimal() +
+  xlab('') + ylab('')
+
+getwd()
+ggsave(filename = './AidData_SDGs/_results_aiddata_sdgs/aids_to_goals_overTime.png', 
+       plot = last_plot(), width = 6, height = 4, units = 'in', dpi = 300)
+# data <- sdgv1 %>%
+#   group_by(year) %>%
+#   summarise_at(vars(goal_1:goal_17), mean, na.rm = TRUE) %>% as.matrix() %>% t()
+# # Default Heatmap
+# heatmap(data)
+# # No dendrogram nor reordering for neither column or row
+# heatmap(data, Colv = NA, Rowv = NA, scale="row", color = )
+# legend(x="left", legend=c("min", "ave", "max"), 
+#      fill=colorRampPalette(brewer.pal(8, "Oranges"))(3))
+```
+
+  We need to make sure the country names are consistant with all the data we are using.
+  I will tidy and match this manually in the xlsx files. 
+
+
+
+## 1.2 Map the flow
+```{r}
+## take a subset
+names(df)
+df13 <- df %>% filter(year >= 2013) %>%
+  select(donor, recipient, goal_13) %>%
+  group_by(donor, recipient) %>% ## the data is project-by-project, so we need to combine them together
+  dplyr::summarise(goal_i = sum(goal_13, na.rm = T)) %>%
+  spread(key = recipient, value = goal_i) ## make a matrix
+```
+
+
+
+### Sankey diagram
+```{r}
+# Load package
+library(networkD3)
+library(tidyverse)
+
+### dataframe format
+' 
+---------------------------------
+       |  A  |  B  |  C  | ...
+---------------------------------
+A      |  1  |  2  |  5  | ...
+---------------------------------
+B      | 4   |  7  |  9  |
+---------------------------------
+...    | ...       | ...
+---------------------------------
+'
+
+data <- df13 %>% as.data.frame()
+row.names(data) <-data[,1] ## 1st column as row name
+data <- data[,-1]          ## remove the 1st  column
+
+# Transform it to connection data frame with tidyr from the tidyverse
+links <- data %>% 
+  as.data.frame() %>% 
+  rownames_to_column(var="source") %>% 
+  gather(key="target", value="value", -1) %>%
+  filter(value != 0) %>%
+  # filter(value >= 10^6) %>%
+  top_n(50)
+hist(links$value, breaks = 10000, xlim = c(0, 10^7))
+
+# From these flows, we need to have a "node" dataframe, which lists all the entities involved in the flow
+nodes <- data.frame(name=c(as.character(links$source), as.character(links$target)) %>% unique())
+
+names(data)
+# write.csv(links, 'links.csv')
+
+
+## With networkD3, connection must be provided using id, but not the real name like in the "links" dataframe. So we need to reformat it.
+links$IDsource=match(links$source, nodes$name)-1 
+links$IDtarget=match(links$target, nodes$name)-1
+
+
+####################################################
+# Add a 'group' column to each connection:
+links$group = as.factor(row.names(links)) 
+
+
+# Add a 'group' column to each node. Here I decide to put all of them in the same group to make them grey
+nodes$group=as.factor(nodes$name)
+
+
+# prepare color scale: I give one specific color for each node.
+# Give a color for each group:
+
+# my_color <- 'd3.scaleOrdinal().domain(["Forest_1999", "Water_1999", "BareGround_1999",
+#                                        "Forest_2013", "Water_2013", "BareGround_2013",
+#                                        "Forest_2018", "Water_2018", "BareGround_2018", 
+#                                        "f","w","b"]).range(["green", "blue", "orange", 
+#                                                             "green", "blue", "orange", 
+#                                                             "green", "blue", "orange", 
+#                                                             "lightgreen", "#6baed6", "yellow"])'
+# 
+
+# Make the Network
+sankeyNetwork(Links = links, Nodes = nodes, 
+              Source = "IDsource", Target = "IDtarget", 
+              Value = "value", NodeID = "name", 
+              # colourScale=my_color, 
+              fontSize=12,
+              LinkGroup="group", 
+              NodeGroup="group")
+
+```
+
+
+
+
+
+
+
+
+##############################################################################
+# 2. Cal aids allocation at target level
+##############################################################################
+```{r}
+# cal aids allocation at target level -------------------------------------
+old_sdg_dataset <- sdgv1.sub
+
+new_target_coded_data <- target_coder(dat = old_sdg_dataset, coalesced_purpose = T)
+new_target_coded_data <- left_join(old_sdg_dataset[, 1:11], new_target_coded_data, by = "aiddata_id")
+
+## NOT WORK
+new_goal_coded_data   <- sdg_coder(dat = old_sdg_dataset, coalesced_purpose = T)
+
+# load('./aidtools-master/data/sdgs.rda')
+# load('./aidtools-master/data/combined-target-weights.rda')
+```
+
+
+
+
+
+
+## 2.1 Explore data
+```{r}
+names(aid)
+str(aid)
+summary(aid)
+## years: 2000 - 2014
+unique(aid$year) %>% sort()
+## countries
+unique(aid$donors_iso3) %>% sort()     ## only China
+unique(aid$recipients) %>% sort()      ## 168 recipients
+unique(aid$all_recipients) %>% sort()  ## 168
+unique(aid$recipients_iso3) %>% sort() ## 172
+unique(aid$recipient_iso3) %>% sort()  ## 174
+ctr <- aid %>% distinct(recipients, recipients_iso3, recipient_iso3, all_recipients)
+getwd()
+file_ctr <- paste0(dir_results, 'recipients_in_chinese_aiddata.xlsx'); file_ctr
+# write.xlsx(x = ctr, file = file_ctr, sheetName = 'recipients', append = T, row.names = F)
+
+
+## sectors
+unique(aid$ad_sector_names) %>% sort() ## 24 secors
+unique(aid$crs_sector_name)            ## 24 secors
+sectors <- aid %>% distinct(ad_sector_names, crs_sector_name)
+
+
+unique(aid$ad_purpose_names) %>% sort() ## NA
+unique(aid$flow)
+unique(aid$loan_type)
+unique(aid$gazetteer_adm_name)
+```
+
+
+## 2.2 Aggregate data
+```{r}
+## total aids by sectors
+aid_type <- aid %>% 
+  dplyr::filter(!is.na(usd_current) & !is.na(ad_sector_names)) %>%
+  dplyr::group_by(ad_sector_codes, ad_sector_names) %>%
+  dplyr::summarise(usd_sect = sum(usd_current, na.rm = T)) %>%
+  ungroup() %>%
+  dplyr::mutate(usd_tot = sum(usd_sect)) %>%
+  dplyr::mutate(sect_pct = usd_sect / usd_tot) # percent
+
+aid_type$ad_sector_names
+
+## aid for what? - transport 1/6; health; etc.
+ggplot(data = aid, aes(x=ad_sector_names)) + 
+  geom_bar() + 
+  coord_flip() + 
+  theme_bw()
+
+ggplot(data = aid_type, aes(x = 1, y = sect_pct, 
+                            fill = ad_sector_names)) + 
+  geom_bar(width = 1, stat = 'identity') + 
+  coord_polar("y", start=0, direction = -1)+
+  theme_void()+
+  geom_text(aes(label = paste0(#ad_sector_names, '\n', 
+                               scales::percent(round(sect_pct, digits = 3)))),
+            position = position_stack(vjust = 0.5))
+
+
+ggplot(data = aid_type, aes(x = reorder(ad_sector_names, sect_pct), 
+                            y = sect_pct)) + 
+  geom_col() + 
+  coord_flip() + 
+  scale_y_continuous(labels = scales::percent) +
+  ylab('Percentage of the total') + xlab('Aid sector names') +
+  theme_bw()
+```
+
+
+## 2.3 Subset data
+```{r}
+aid_type <- aid_type %>% 
+  arrange(desc(usd_sect))
+head(aid_type)
+
+top5 <- as.vector((aid_type$ad_sector_names)[1:5]); print(top5)
+
+aid_type_top5 <- aid_type %>% dplyr::filter(ad_sector_names %in% top5)
+```
+
+
+
+
+# 4. Map aids
+
+```{r}
+nrow(aid)
+unique(aid$longitude) %>% length()
+
+names(aid)
+str(aid$usd_current)
+
+library(sf)
+library(maps)
+library(mapdata)
+```
+
+
+##  Total
+### by coords
+```{r}
+aid_agg <- aid %>% 
+  dplyr::filter(!is.na(usd_current) & !is.na(latitude) & !is.na(longitude)) %>%
+  dplyr::group_by(#project_id, 
+           # project_location_id, place_name,	, 
+           # recipients, 
+           # ad_sector_names, 
+           latitude,	longitude) %>%
+  dplyr::summarise(usd_tot = sum(usd_current, na.rm = T))
+nrow(aid_agg)
+
+shp <- map_data('world')
+geo <- aid_agg
+
+head(shp)
+head(geo)
+
+hist(geo$usd_tot)
+
+ggplot() + 
+  geom_polygon(data = shp, aes(x=long, y = lat, group = group), fill = 'gray90') + 
+  geom_point(data = geo,  # use geom_point, instead of geom_sf
+             aes(x = longitude, 
+                 y = latitude, 
+                 # size  = log10(usd_tot),
+                 color = log10(usd_tot)),
+             size = 1,
+             alpha = 0.6) +              ## transparancy
+  theme_bw() +
+  # theme_dark() +
+  theme(legend.position = c(0.1, 0.35)) +
+  # labs(size = 'Population') +          ## change 
+  xlab('') + ylab('') +
+  scale_color_gradient2(low = 'blue', mid = 'white', high = 'red', midpoint = 6, na.value = 'black')
+  # scale_color_brewer(type = 'seq', palette = 'Spectral')
+  # scale_color_viridis_c(option = "viridis", alpha = 0.6)
+  # scale_color_manual('sentiments', values=pal)
+  # theme(legend.position = "none")
+
+getwd()
+pname <- paste0(dir_results, '/map_aid_pt_', today, '.png'); pname
+ggsave(filename = pname, plot = last_plot(), width = 7, height = 4, units = 'in', dpi = 400)
+
+```
+
+
+
+### by nation
+
+```{r}
+aid_nation <- aid %>% 
+  dplyr::filter(!is.na(usd_current) & !is.na(recipients)) %>%
+  dplyr::mutate(recipients_iso3 = substr(x = recipients_iso3, start = 1, stop = 3)) %>%
+  dplyr::group_by(recipients, recipients_iso3) %>% ## , ad_sector_names
+  dplyr::summarise(usd_tot = sum(usd_current, na.rm = T))
+  
+### read in shp data
+library(sf)
+dir.shp <- "G:/My Drive/_data/shp/world_shp/ne_10m_admin_0_countries"
+shp <- st_read(dsn = dir.shp, layer = "ne_10m_admin_0_countries") %>%
+  select(ADMIN, ISO_A3, ISO_A3_EH, ISO_N3)
+
+head(shp)
+
+# ggplot() + 
+#   geom_sf(data = shp,
+#           aes(fill = ISO_A3),    ## set color for each unit
+#           size = 0.01,          ## bordor size
+#           show.legend =  T, 
+#           color = 'gray'        ## border color
+#   ) +      
+#   # color_scale +
+#   theme_bw() + labs(fill = 'SDGc score') +        ## change legend title
+#   theme(legend.position = "none") + ylab('') + xlab('')
+
+geo <- aid_nation
+geo <- merge(x = shp, y = geo, by.x = 'ISO_A3', by.y = 'recipients_iso3', all.x = T)
+
+str(shp)
+head(shp)
+head(geo)
+nrow(geo)
+
+hist(geo$usd_tot)
+
+### label - Display log tick marks
+brks1 <- sort(log10(unique(geo$usd_tot))); brks1
+min  <- round(min(log10(unique(geo$usd_tot)), na.rm=TRUE)); min
+max  <- round(max(log10(unique(geo$usd_tot)), na.rm=TRUE)); max
+
+brks <- seq(min, max, 1); brks
+labs <- parse(text=paste0("10^", brks)); labs
+
+## ref: https://stackoverflow.com/questions/10628547/use-superscripts-in-r-axis-labels
+## http://www.sthda.com/english/wiki/ggplot2-axis-scales-and-transformations#display-log-tick-marks
+
+ggplot() + 
+  geom_sf(data = geo,
+          aes(fill = log10(usd_tot)),   ## set color for each unit
+          size = 0.1,                   ## bordor size
+          show.legend =  T,
+          color = 'gray20')+            ## border color   
+  theme_bw() +
+  theme(legend.position = c(0.1, 0.35)) +
+  scale_fill_gradient2(name = "USD", 
+                       low  = 'blue', mid = 'white', high = 'red', 
+                       midpoint = 8, na.value = 'gray80', 
+                       breaks = brks, labels = labs)
+  # facet_wrap(~ad_sector_names) + 
+  # labs(size = 'Population') +          ## change 
+  # xlab('') + ylab('') +
+  # scale_fill_gradient(name   = "US $", trans = "log10", 
+  #                     breaks = brks, labels = labs)
+
+getwd()
+pname <- paste0(dir_results, '/map_aid_nation_', today, '.png'); pname
+ggsave(filename = pname, plot = last_plot(), width = 7, height = 4, units = 'in', dpi = 400)
+```
+
+
+
+##  Sector
+### by sector by nation
+
+```{r}
+aid_nation <- aid %>% 
+  dplyr::filter(!is.na(usd_current) & !is.na(recipients)) %>%
+  dplyr::filter(ad_sector_names %in% top5) %>%
+  dplyr::mutate(recipients_iso3 = substr(x = recipients_iso3, start = 1, stop = 3)) %>%
+  dplyr::group_by(recipients, recipients_iso3, ad_sector_names) %>% ## , ad_sector_names
+  dplyr::summarise(usd_tot = sum(usd_current, na.rm = T)) %>%
+  dplyr::filter(!is.na(usd_tot))
+  
+
+aid_nation$ad_sector_names <- factor(aid_nation$ad_sector_names, 
+                                     levels = top5)
+
+### read in shp data
+library(sf)
+dir.shp <- "G:/My Drive/_data/shp/world_shp/ne_10m_admin_0_countries"
+shp <- st_read(dsn = dir.shp, layer = "ne_10m_admin_0_countries") %>%
+  select(ADMIN, ISO_A3, ISO_A3_EH, ISO_N3)
+
+head(shp)
+
+# ggplot() + 
+#   geom_sf(data = shp,
+#           aes(fill = ISO_A3),    ## set color for each unit
+#           size = 0.01,          ## bordor size
+#           show.legend =  T, 
+#           color = 'gray'        ## border color
+#   ) +      
+#   # color_scale +
+#   theme_bw() + labs(fill = 'SDGc score') +        ## change legend title
+#   theme(legend.position = "none") + ylab('') + xlab('')
+
+geo <- aid_nation
+geo <- merge(x = shp, y = geo, by.x = 'ISO_A3', by.y = 'recipients_iso3', all.y = T)
+
+str(shp)
+head(shp)
+head(geo)
+nrow(geo)
+
+hist(geo$usd_tot)
+
+### label - Display log tick marks
+brks1 <- sort(log10(unique(geo$usd_tot))); brks1
+min  <- round(min(log10(unique(geo$usd_tot)), na.rm=TRUE)); min
+max  <- round(max(log10(unique(geo$usd_tot)), na.rm=TRUE)); max
+
+brks <- seq(min, max, 1); brks
+labs <- parse(text=paste0("10^", brks)); labs
+
+## ref: https://stackoverflow.com/questions/10628547/use-superscripts-in-r-axis-labels
+## http://www.sthda.com/english/wiki/ggplot2-axis-scales-and-transformations#display-log-tick-marks
+
+ggplot() + 
+  geom_sf(data = shp,
+          aes(fill = NULL),   ## set color for each unit
+          size = 0.1,                   ## bordor size
+          show.legend =  F,
+          color = 'gray30')+   
+  geom_sf(data = geo,
+          aes(fill = log10(usd_tot)),   ## set color for each unit
+          size = 0.01,                   ## bordor size
+          show.legend =  T,
+          color = 'gray70')+            ## border color   
+  
+  scale_fill_gradient2(name = "USD", 
+                       low  = 'blue', mid = 'white', high = 'red', 
+                       midpoint = 8, na.value = 'gray80', 
+                       breaks = brks, labels = labs) +
+  facet_wrap(~ad_sector_names, ncol = 2) +
+  theme_bw() +
+  theme(legend.position = c(0.8, 0.15), legend.direction = "horizontal",
+        legend.key.size = unit(0.5, "in"))
+  # labs(size = 'Population') +          ## change 
+  # xlab('') + ylab('') +
+  # scale_fill_gradient(name   = "US $", trans = "log10", 
+  #                     breaks = brks, labels = labs)
+
+getwd()
+pname <- paste0(dir_results, '/map_aid_nation_bySector_', today, '.png'); pname
+ggsave(filename = pname, plot = last_plot(), width = 7, height = 7, units = 'in', dpi = 300)
+```
+
+
+
+## Selected sectors
+210: Transport and Storage - 58.8%
+230: Energy Generation and Supply - 21.9%
+
+```{r}
+aid_infr <- aid %>% 
+  dplyr::filter(!is.na(usd_current) & !is.na(latitude) & !is.na(longitude)) %>%
+  dplyr::filter(ad_sector_codes %in% c(210, 230)) 
+
+hist(aid_infr$year)
+
+library(dplyr)
+aid_infr_yr <- aid_infr %>%
+  add_count(year) %>%
+  # group_by(year) %>%
+  # count(year) #%>%
+  # dplyr::rename(year = n.x, n = v.freq)
+  ggplot()+
+  geom_col(aes(x = year, y = n))
+
+aid_infr_yr
+```
+
+
