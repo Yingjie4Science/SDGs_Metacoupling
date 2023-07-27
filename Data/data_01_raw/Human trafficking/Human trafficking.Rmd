@@ -1,0 +1,154 @@
+---
+title: "Untitled"
+author: "Yingjie Li"
+date: "6/4/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+  This script aims to
+  - count the total number of human trafficking from one country to another
+  - it can also count the total by gender and age group
+  
+  
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Set up
+```{r Packages}
+rm(list=ls())
+
+### packages
+library(readxl)
+library(writexl)
+library(tidyverse)
+library(reshape2)
+library(stringr)
+# library(here)
+library(Rmisc)
+library(scales)
+library(sf)
+library(ggplot2)
+library(cowplot)
+library(tmap)
+library(ggpubr)
+```
+
+
+```{r Dirs}
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path; path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+
+setwd(dir)
+getwd()
+
+```
+
+
+# Raw data
+## data on human trafficking
+```{r}
+getwd()
+list.files()
+
+
+### the raw data
+###   each row is a record of human trafficking
+df <- read.csv('./The Global Dataset 14 Apr 2020.csv', stringsAsFactors = F) %>%
+  select(yearOfRegistration:ageBroad, citizenship, CountryOfExploitation)
+# load(file = './EDUN/EDUN_DATA_NATIONAL.RData')
+# lables <- read.csv('./EDUN/EDUN_LABEL.csv', stringsAsFactors = F) 
+names(df)
+names(df) <- c('year', 'datasource', 'gender', 'age', 'send', 'receive')
+
+### check the data properties
+unique(df$send)     ## '-99' [missing data]; 'ZZ' [unknown]; "00" [Unknown Country]
+unique(df$receive)  ## '-99' [missing data]; 'ZZ' [unknown]; "00" [Unknown Country]
+
+#### *** need to address these issues in ctr names, e.g., as ROW (rest of the world)
+ctr_row <- data.frame(
+  iso2    = c('-99', '00', 'ZZ'),
+  country = c('missing data', 'Unknown Country', 'unknown'),
+  iso3    = c('ROW', 'ROW', 'ROW')
+)
+
+print(paste0('Total ', length(unique(df$send)),    ' sending sys.'))
+print(paste0('Total ', length(unique(df$receive)), ' receiving sys.'))
+
+unique(df$year)
+unique(df$datasource) ## not important for this study
+unique(df$gender)     ## not important: "Female" "Male" 
+unique(df$age)        ## not important: many age group
+
+
+### given the above, we can count the total number of human trafficking from country A to country B in each year 
+dt <- df %>%
+  group_by(year, send, receive) %>%
+  tally() %>%
+  arrange(year, send, receive)
+
+```
+
+
+## country info
+```{r}
+### country info 
+#### support info (iso2 --> iso3)
+iso <- readxl::read_excel(path = '_ctr_iso2_iso3.xlsx', sheet = 'iso')
+names(iso)
+names(iso) <- c('name', 'iso2_code', 'iso3', 'iso_num')
+
+#### country info along with the data (not from the data itself)
+ctr <- readxl::read_excel(
+  path = "DATA DICTIONARY version 28 11 2017_0.xlsx", sheet = 'Lookups ', 
+  range = 'b39:c289', col_names = c('iso2', 'country')) %>%
+  as.data.frame() %>%
+  dplyr::mutate(country = str_to_title(country)) %>%
+  arrange(iso2) %>%
+  ### remove row with iso2 = '00' here
+  dplyr::filter(iso2 != '00') %>%
+  ### left join the iso3 code by iso2 code
+  left_join(., iso, by = c('iso2' = "iso2_code")) %>%
+  dplyr::select(-c(name, iso_num)) %>%
+  ### append the ctr_row data rows
+  rbind(., ctr_row) %>%
+  distinct(iso2, iso3) %>% ## remove some repeat records
+  arrange(iso2)
+
+```
+
+
+## data cleaning
+```{r}
+names(dt)
+names(ctr)
+
+### join the iso3 code to the data frame
+dt_iso <- dt %>%
+  ungroup() %>%
+  left_join(., ctr, by=c('send'    = 'iso2')) %>% ## iso3.x <--> send
+  left_join(., ctr, by=c('receive' = 'iso2')) %>% ## iso3.y <--> receive
+  dplyr::select(-c(send, receive)) %>%
+  arrange(year, iso3.x, iso3.y)
+  
+dt_mat <- dt_iso %>%
+  as.data.frame() %>%
+  pivot_wider(names_from = iso3.y, values_from = n) %>%
+  arrange(year, iso3.x) %>%
+  as.data.frame() %>%
+  dplyr::rename(`iso3` = `iso3.x`)
+
+### check data for one year
+dt_mat_yr.i <- dt_mat %>%
+  dplyr::filter(year == 2015)
+
+### save data to local
+writexl::write_xlsx(x = dt_mat, path = './_human_trafficking_2002_2019_cleaned.xlsx')
+```
+
