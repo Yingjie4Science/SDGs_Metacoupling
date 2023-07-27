@@ -1,0 +1,350 @@
+---
+title: "Untitled"
+author: "Yingjie"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+# Set up
+```{r Paths and packages}
+knitr::opts_chunk$set(echo = TRUE)
+
+### To clear your environment 
+remove(list = ls())
+
+### data path 
+source('./Code/_path of data.R')
+
+### packages
+source('./Code/_package list.R')
+
+gc()
+```
+
+
+
+## Data
+
+### - ODA OECD
+
+  Unit	US Dollar, Millions
+
+```{r - input data- which ? }
+
+###' - 1
+###' TotalOFFICIAL_Data_Total official flows by country and region (ODA+OOF).zip ----------
+f <- paste0(dir.raw, 'OECD_ODA/', 
+            'TotalOFFICIAL_ODA_OOF/', 
+            'TotalOfficial_Data_utf8.csv')
+### name the indicator
+ind <- 'ODA_OOF_oecd'
+
+
+
+###' - 2
+###' Table2a_Data_Aid (ODA) disbursements to countries and regions [DAC2a].zip ------------
+# f <- paste0(dir.raw, 'OECD_ODA/',
+#             'Table2a_DAC2a/',
+#             'Table2a_Data_utf8.csv')
+# ### name the indicator
+# ind <- 'ODA_disbursements_oecd'
+
+
+
+###' - 3
+###' DACGEO_Data_GeoBook-Geographical flows to developing countries.zip -------------------
+# f <- paste0(dir.raw, 'OECD_ODA/', 
+#             'DACGEO_Data_GeoBook-Geographical flows to developing countries/', 
+#             'DACGEO_Data_utf8.csv')
+# ### name the indicator
+# ind <- 'ODA_DACGEO_oecd'
+```
+
+
+```{r - load ODA data}
+# The 'fread' function automatically detects the delimiter (comma in this case)
+
+cols_to_remove <- c("RECIPIENT", "DONOR", 
+                    "AIDTYPE", "SERIES",
+                    "PART", 'AMOUNTTYPE', 'TIME', 'Flags')
+
+library(data.table)
+data <- data.table::fread(file = f, sep = ',')
+
+names(data)
+# unique(data$Recipient)
+# unique(data$Donor)
+unique(data$`Aid type`)
+unique(data$Series)
+
+unique(data$Part)          ## "1 : Part I - Developing Countries"     "2 : Part II - Countries in Transition"
+unique(data$`Amount type`) ## "Current Prices (USD millions)"       "Constant Prices (2021 USD millions)"
+unique(data$Year)
+
+
+if (ind == 'DACGEO_oecd'){
+  dat_ <- data %>%
+    ### rename a column to keep consistent 
+    setNames(gsub("Series", "Aid type", names(.))) %>%
+    ### Adding column if it does not exist (because `DACGEO_oecd`does not have this column)
+    rowwise() %>%
+    dplyr::mutate(
+      `Amount type` = ifelse("Amount type" %in% names(.), 
+                             `Amount type`, 
+                             "Constant Prices (2021 USD millions)")) %>%
+    as.data.frame() 
+} else {
+  dat_ <- data
+}
+
+
+data_ <- dat_ %>%
+  dplyr::select(-any_of(cols_to_remove)) %>%
+  dplyr::filter(
+    `Aid type` %in% c("Total Official, Gross", 
+                      "ODA Gross Loans", 
+                      "ODA: Total Net",
+                      "Total ODA Net"),
+    `Amount type` == "Constant Prices (2021 USD millions)",
+    Year >= 2010
+  )
+
+unique(data_$`Aid type`)
+
+### if there are > 1 `Aid type` in the data, we need to further decide which one to keep
+if( length(unique(data_$`Aid type`)) > 1) {
+  data_check <- data_ %>%
+    spread(key = 'Aid type', value = 'Value')
+  
+  data_check %>%
+    ggplot(aes(x = `ODA Gross Loans`, y = `ODA: Total Net`)) +
+    geom_point() +
+    geom_abline(slope = 1) +
+    theme_bw()
+  
+  ## check number of NA
+  sum(is.na(data_check$`ODA Gross Loans`))
+  sum(is.na(data_check$`ODA: Total Net`))  ## less NA, large values
+  
+  ## keep one of the 'Aid type' for further analysis
+  data_aidtype <- data_ %>%
+    dplyr::filter(`Aid type` == "ODA: Total Net")
+  unique(data_aidtype$`Aid type`)  
+} else {
+  data_aidtype <- data_
+}
+
+
+### aggragate data after filtering -------------------------------------------------------
+cols_to_remove2 <- c("Aid type", "Amount type", "Part")
+
+data_agg <- data_aidtype %>%
+  dplyr::select(-any_of(cols_to_remove2)) %>%
+  group_by(Recipient, Donor, Year) %>%
+  dplyr::summarise_at(c("Value"), sum, na.rm = TRUE) %>%
+  ungroup() %>%
+  as.data.frame()
+
+data_wide <- data_agg %>%
+  spread(key = 'Recipient', value = 'Value')
+
+
+names(data_agg)
+
+
+
+rm(data)
+gc()
+
+
+### 
+cat('\n Total rows of data in', ind, ': \t\t', nrow(data_agg), '\n')
+
+##' Total rows of data in ODA_OOF_oecd : 		         151609
+##' Total rows of data in ODA_disbursements_oecd : 	 164060 -- best?
+##' Total rows of data in DACGEO_oecd : 		         126893 
+```
+
+
+```{r - tidy names}
+### clean the country names and add iso3 code --------------------------------------------
+f <- "C:/Users/pc/OneDrive - Stanford/Recipient_13_266.xlsx"
+
+# List all the sheets in the Excel file
+sheet_names <- readxl::excel_sheets(f)
+sheet_names
+
+
+### test code using one sheet ------------------------------------
+# c.d <- readxl::read_excel(f, sheet = 'ODA_OOF_Donor') %>% as.data.frame()
+#   
+# c.d_cleaned <- as.data.frame(lapply(c.d, str_squish)) %>%
+#   # dplyr::filter(str_detect(c3,'Information')) %>%
+#   dplyr::mutate(across(where(is.character), ~ str_replace_all(., "Information", ""))) %>%
+#   dplyr::mutate(across(where(is.character), str_squish))
+
+
+### loop all sheets and clean the country names -------------------
+c_all <- data.frame()
+for (sheet in sheet_names) {
+  c <- readxl::read_excel(f, sheet = sheet) %>% as.data.frame()
+
+  # Remove extra spaces from all character columns using str_squish()
+  c_cleaned <- as.data.frame(lapply(c, str_squish)) %>%
+    # dplyr::filter(str_detect(c3,'Information')) %>%
+    dplyr::mutate(across(where(is.character), ~ str_replace_all(., "Information", ""))) %>%
+    dplyr::mutate(across(where(is.character), str_squish))
+  
+  ## 
+  c_all <- rbind(c_all, c_cleaned) %>%
+    dplyr::distinct_all(.keep_all = T) %>%
+    arrange(c3, c2, c1)
+}
+
+
+### a list of institutes that are not countries
+c.exlcude <- c(c_all$c1, c_all$c2) %>% 
+  unique() %>% 
+  sort()
+
+
+
+### extended country-iso3 pair list for matching
+load('./Data/Ancillary_Data_iso_eora_ex.RData')  ## ## iso_eora_ex
+iso3_code <- iso_eora_ex %>% 
+  dplyr::select(-IMF) %>%
+  dplyr::distinct_all() %>%
+  as.data.frame()
+
+c.ctr <- c_all %>% 
+  dplyr::distinct(c3) %>%
+  dplyr::filter(str_detect(
+    c3, 
+    paste('region', 'Unspecified', 'unspecified', 'Community', 'Multilateral', 'Project', 
+          'Other donor', 'Indus Basin', 'EU Institutions', sep = '|'), 
+    negate = T)) %>%
+  # dplyr::rename('name' = 'c3') %>%
+  dplyr::mutate(
+    name_clean = str_replace(c3, " \\s*\\([^\\)]+\\)", "")
+  ) %>%
+  left_join(
+    x = .,
+    y = iso3_code,
+    by = c('name_clean' = 'Row')
+  ) %>%
+  arrange(!is.na(iso3_eora)) %>%
+  dplyr::select(-name_clean) %>%
+  as.data.frame()
+
+rm(c, c_cleaned, c_all)
+```
+
+
+
+```{r - filter and tidy data}
+data_ctr <- data_agg %>%
+  dplyr::filter(!Recipient %in% c.exlcude,
+                !Donor %in% c.exlcude) %>%
+  left_join(x = .,
+            y = c.ctr, 
+            by = c('Recipient' = 'c3')) %>%
+  dplyr::rename('iso3_reci' = 'iso3_eora') %>%
+  left_join(x = .,
+            y = c.ctr, 
+            by = c('Donor' = 'c3')) %>%
+  dplyr::rename('iso3_send' = 'iso3_eora') %>%
+  arrange(!is.na(iso3_send), !is.na(iso3_reci)) %>%
+  as.data.frame()
+
+
+
+# c.check <- data_ctr %>%
+#   dplyr::distinct(Recipient, Donor) %>%
+#   # dplyr::distinct_all() %>%
+#   # dplyr::distinct_at(vars(Recipient, Donor)) %>%
+#   as.data.frame()
+# 
+# c.check.r <- c.check %>%
+#   dplyr::distinct(Recipient)
+# 
+# c.check.d <- c.check %>%
+#   dplyr::distinct(Donor)
+```
+
+
+
+
+```{r - format the same as EORA}
+
+yrs <- c(2000, 2005, 2010, 2015)
+
+### use the Eora data as the template 
+f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'template_eora.RData')
+load(f) # `temp_eora`
+
+
+## format as the same as EORA data
+dfs_flow_f <- data_ctr %>%
+  dplyr::mutate(value = Value * 10^6) %>%   ## change the unit to USD
+  rename('year' = 'Year') %>%
+  # dplyr::select(year, iso3, everything()) %>%
+  dplyr::filter(year %in% yrs) %>%
+  dplyr::select(-c(Recipient, Donor, Value)) %>%
+  ## the template can limit the years included
+  merge(x = temp_eora,
+        y = .,
+        by.x = c('year', 'iso3', 'to'),
+        by.y = c('year', 'iso3_send', 'iso3_reci'), all.x = T) %>%
+  as.data.frame()
+
+
+
+### To generate the same format as Eora in Matrix
+df_formatted <- dfs_flow_f %>%
+  ungroup() %>%
+  arrange(year, iso3, to) %>%
+  dplyr::select(year, ctr, everything()) %>%
+  spread(key = to, value = value) %>%
+  arrange(year, iso3)
+
+
+### Count NA values in the data frame ----------------------------------------------------
+cat('\n Total NA in', ind, ':\t\t', sum(is.na(df_formatted)), '\n')
+
+##' Total NA in ODA_OOF_oecd :		           136306 -- best
+##' Total NA in ODA_disbursements_oecd :		 136332
+##' Total NA in DACGEO_oecd :		             136594
+##' 
+df_formatted.check <- df_formatted %>%
+  dplyr::filter(year == 2015) %>%
+  gather(key = 'Recipient', value = 'value', 4:ncol(.)) 
+
+df_formatted.check2 <- df_formatted.check %>%
+  dplyr::filter(year == 2015, 
+                ctr == 'Australia') %>%
+  dplyr::mutate(value_million = value/10^6)
+cat('\n Total NA in', ind, 'in 2015:\t\t', sum(is.na(df_formatted.check$value)), '\n')
+
+##' Total NA in ODA_OOF_oecd in 2015:		           32351 -- best
+##' Total NA in ODA_disbursements_oecd in 2015:		 32368
+##' Total NA in DACGEO_oecd in 2015:		           32469 
+
+
+
+### save to the `eora_cleaned` folder ----------------------------------------------------
+df_formatted %>%
+  group_by(year) %>% tally()
+fname <- paste0(dir.eora_cleaned, ind, '_matrix.xlsx'); fname
+writexl::write_xlsx(x = df_formatted, path = fname)
+gc()
+```
+
+
+
+
+```{r - best data!}
+##' It seems that *ODA_OOF_oecd* is a better data source!
+```

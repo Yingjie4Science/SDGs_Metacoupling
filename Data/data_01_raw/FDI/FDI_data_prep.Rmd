@@ -1,0 +1,312 @@
+---
+title: "FDI"
+author: "Yingjie"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+# Set up
+```{r Paths and packages, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+### To clear your environment 
+remove(list = ls())
+
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+getwd()
+
+### data path 
+source('./Code/_path of data.R')
+
+
+### packages
+source('./Code/_package list.R')
+```
+
+
+# Data
+
+## Ancillary data
+```{r}
+
+### extended country-iso3 pair list for matching
+load('./Data/Ancillary_Data_iso_eora_ex.RData')  ## ## iso_eora_ex
+
+
+### use the Eora data as the template 
+f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'template_eora.RData')
+load(f) # `temp_eora`
+```
+
+
+
+## FDI
+  Based on the list by Harvard - *Foreign Direct Investment and Aid Data Resources* at https://guides.library.harvard.edu/fdi, this data -- *Coordinated Direct Investment Survey - IMF* is what we need. 
+  
+  Link to the data: https://data.imf.org/?sk=40313609-f037-48c1-84b1-e1f1ce54d6d5&sid=1410469360660 --> *CDIS Table 6: Direct lnvestment Positions by All Reporting Economies Cross-classified by Counterpart Economies*
+
+  *Meta-data*  
+  * Blank cells reflect data not available or not applicable and cells with "c" reflect data that were suppressed by the reporting economy to preserve confidentiality. “0” reflects amounts that are less than +/-$500,000, or amounts reported as “0”.
+  Totals may not be equal to the sum of their components due to rounding. 
+  
+  Based on `Metadata availability` https://data.imf.org/regular.aspx?key=60559496, *Inward* data are better. 
+
+```{r - IMF}
+### get the indicator name
+ind <- 'FDI'
+
+yrs <- c(2000, 2005, 2010, 2015)
+yrs <- c(2000, 2005, 2010, 2015, 2021)
+
+dir.i <- './Data/data_01_raw/FDI/IMF/'
+
+fdi.direction <- "inward";  column1.name  <- "Investment from:"
+# fdi.direction <- "outward"; column1.name  <- "Investment in:"
+
+
+file.pat <- paste0('CDIS_Table_6_Direct_Investment_Posi-', fdi.direction)
+xls_ls <- list.files(path = dir.i, pattern = file.pat, full.names = T); xls_ls
+
+
+dfs <- data.frame()
+dfs_flow <- data.frame()
+
+## test
+# i = 1
+# xls <- xls_ls[i]
+
+for (xls in xls_ls) {
+  
+  yr <- readxl::read_excel(path = xls, range = "A2") 
+  yr <- stringr::str_sub(string = names(yr), start = -4, end = -1)
+  cat(xls, '\n\t year:', yr, '\n')
+  
+  df <- readxl::read_excel(path = xls, skip = 3, n_max = 248) %>%
+    dplyr::mutate_all(., as.character) %>%
+    dplyr::rename("column1" = column1.name) %>%
+    as.data.frame()
+  
+  ## to check if the last row of data is correct, otherwise, we need to change `n_max` above
+  value_check <- df$column1[nrow(df)]
+  
+  if(value_check != "World") {
+    stop("Invalid value detected")
+  }
+   
+  
+  ## clean the data 
+  ## 
+  iso3_code <- iso_eora_ex %>% dplyr::select(-IMF)
+  df_ <- df %>%
+    dplyr::filter(str_detect(pattern = 'Not Specified', negate = T, string = column1)) %>%
+    pivot_longer(cols = 2:ncol(.), names_to = 'cols', values_to = 'USD_million') %>%
+    dplyr::mutate(USD_million = gsub('C', NA, USD_million),
+                  USD_million = as.numeric(USD_million)) %>%
+    
+    ### add country code ISO3
+    ### 1. for `from` ---------------------
+    # dplyr::distinct(column1, .keep_all = T) %>% ## for easy-checking
+    dplyr::mutate(column1 = gsub('\\.|\\:|\\,', '', column1),
+                  column1 = trimws(column1),
+                  column1 = str_squish(column1)) %>%
+    left_join(x = .,
+              y = iso3_code,
+              by=c('column1' = 'Row')) %>%
+    dplyr::rename("iso3" = "iso3_eora") %>%
+    arrange(!is.na(iso3)) %>%
+    
+    ### 2. for `to` ---------------------
+    # dplyr::distinct(cols, .keep_all = T) %>%  ## for easy-checking
+    dplyr::mutate(cols = gsub('\\.|\\:|\\,', '', cols),
+                  cols = trimws(cols),
+                  cols = str_squish(cols)) %>%
+    left_join(x = .,
+              y = iso3_code,
+              by=c('cols' = 'Row')) %>%
+    dplyr::rename("iso3_cols" = "iso3_eora") %>%
+    arrange(!is.na(iso3_cols)) %>%
+    
+    dplyr::mutate(year = as.numeric(yr)) %>%
+    as.data.frame()
+  
+  
+  df_flow <- df_ %>%
+    dplyr::filter(column1 != 'World') %>%
+    dplyr::filter(cols    != 'Total Investment') %>%
+    as.data.frame()
+  
+  
+  cat('\t from is NA:', sum(is.na(df_flow$iso3)), '\n',
+      '\t   to is NA:', sum(is.na(df_flow$iso3_cols)),   '\n')
+  cat('\t--- done! ---\n\n')
+  
+  ## rbind data -------------------------
+  dfs <- rbind(dfs, df_)
+  dfs_flow <- rbind(dfs_flow, df_flow)
+
+}
+  
+
+## label flow direction 
+if (fdi.direction == 'inward') {
+  dfs_flow_ <- dfs_flow %>%
+    dplyr::select(-column1, -cols) %>% ## remove the columns with country's full name (column1 = from, cols = to)
+    dplyr::rename(to    = iso3_cols,   ## 'iso3_cols' is the receiving countries 
+                  value = USD_million)
+} else {
+  dfs_flow_ <- dfs_flow %>%
+    dplyr::select(-column1, -cols) %>% ## remove the columns with country's full name (column1 = to, cols = from)
+    dplyr::rename(to    = iso3,        ## 'iso3' is the receiving countries 
+                  iso3  = iso3_cols,   ## 'iso3_cols' is the sending countries 
+                  value = USD_million)
+}
+
+
+### save IMF data to the raw data folder
+fname <- paste0(dir.i, ind, '_rawCleaned_', fdi.direction,'.xlsx'); fname
+writexl::write_xlsx(x = dfs_flow_, path = fname)
+```
+
+
+  By looking at Table 3 - https://data.imf.org/regular.aspx?key=60564262, we can also spot the different values reported by either country side. 
+  
+```{r - IMF compare inward vs outward}
+yr_comp <- c(2010, 2015, 2021)
+yr_comp <- c(2021)
+
+f <- paste0(dir.i, 'FDI_rawCleaned_inward.xlsx');
+d1 <- readxl::read_excel(path = f) %>%
+  # pivot_longer(cols = 4:ncol(.), names_to = 'to', values_to = 'value_in') %>%
+  # dplyr::select(-ctr) %>%
+  # dplyr::filter(year %in% yr_comp) %>%
+  dplyr::rename('value_in' = 'value') %>%
+  as.data.frame()
+  
+  
+
+f <- paste0(dir.i, 'FDI_rawCleaned_outward.xlsx');
+d2 <- readxl::read_excel(path = f) %>%
+  # pivot_longer(cols = 4:ncol(.), names_to = 'to', values_to = 'value_out')%>%
+  # dplyr::select(-ctr) %>%
+  # dplyr::filter(year %in% yr_comp) %>%
+  dplyr::rename('value_out' = 'value') %>%
+  as.data.frame()
+
+dcomp <- d1 %>%
+  left_join(., d2, 
+            by = c("year","iso3","to")) %>%
+  dplyr::filter(year %in% yr_comp) %>%
+  dplyr::select(year, iso3, to, everything())
+
+dcomp %>%
+  ggplot() +
+  geom_point(aes(x= value_in, y= value_out)) +
+  geom_abline(slope=1)
+
+dcomp %>%
+  dplyr::filter(iso3 == 'USA', to == 'AUS')
+
+dcomp %>%
+  dplyr::filter(iso3 == 'AUS', to == 'USA')
+```
+
+
+
+  Using both outward data to fill NA in `inward`, and use the average value if both are available. 
+  
+```{r - IMF - final 📁}
+## use both data to further clean the dataset 
+dcomp_ <- d1 %>%
+  left_join(., d2, 
+            by = c("year","iso3","to")) %>%
+  dplyr::select(year, iso3, to, everything()) %>%
+  dplyr::mutate(value = case_when(
+    !is.na(value_in) & is.na(value_out)  ~ value_in,
+    is.na(value_in) & !is.na(value_out)  ~ value_out,
+    !is.na(value_in) & !is.na(value_out) ~ (value_in + value_out)/2,
+    T ~ NA
+  )) %>%
+  dplyr::select(-value_in,-value_out)
+
+
+## format as the same as EORA data
+dfs_flow_f <- dcomp_ %>%
+  dplyr::mutate(value = value * 10^6) %>%   ## change the unit to USD
+  dplyr::select(year, iso3, everything()) %>%
+  
+  ## use data in 2009 to represent data in 2005
+  dplyr::mutate(year = ifelse(year == 2009, 2005, year)) %>%
+  dplyr::filter(year %in% yrs) %>%
+  
+  ## the template can limit the years included 
+  merge(x = temp_eora, 
+        y = ., 
+        by.x = c('year', 'iso3', 'to'), 
+        by.y = c('year', 'iso3', 'to'), all.x = T) %>%
+  as.data.frame()
+
+
+
+### To generate the same format as Eora in Matrix
+df_formatted <- dfs_flow_f %>%
+  ungroup() %>%
+  arrange(year, iso3, to) %>%
+  dplyr::select(year, ctr, everything()) %>%
+  spread(key = to, value = value) %>%
+  arrange(year, iso3)
+
+
+### save to the `eora_cleaned` folder --------------------------------------------------------------
+df_formatted %>%
+  group_by(year) %>% tally()
+fname <- paste0(dir.eora_cleaned, ind, '_matrix.xlsx'); fname
+writexl::write_xlsx(x = df_formatted, path = fname)
+```
+
+
+
+
+```{r - WB data for comparision}
+### data was compiled via `10_country_profileData_prepare.Rmd`
+
+### 1. data from WB --------------------------------------------------
+xls <- list.files(path = dir.cleaned, pattern = '^Foreign direct investment, net inflows', full.names = T); xls 
+inflow_wb_net_in <- readxl::read_excel(path = xls) %>% 
+  dplyr::select(-ctr) %>%
+  gather(key = 'year', value = 'value', `2000`:ncol(.)) %>%
+  dplyr::mutate(value     = as.numeric(value)) %>%  
+  dplyr::filter(year == 2015) %>%
+  as.data.frame()
+
+### 2. data from IMF -------------------------------------------------
+inflow_imf <- df_formatted %>%
+  dplyr::filter(year == 2015)
+  
+source('./Code/func_net_import_direction.R')
+inflow_imf_net_in <- func_net_import_direction(df = inflow_imf, direction_i = 1, frac = 0.025) %>%
+  dplyr::select(iso3, year, net_in) %>%
+  dplyr::rename('net_in_imf' = 'net_in') 
+
+
+### 3. compare
+inflow_net_in_compare <- inflow_imf_net_in %>%
+  left_join(x = ., 
+            y = inflow_wb_net_in %>%
+              dplyr::rename('net_in_wb' = 'value'), 
+            by = c('iso3', 'year'))
+
+inflow_net_in_compare %>%
+  ggplot() +
+  geom_point(aes(x= net_in_imf, y= net_in_wb)) +
+  geom_abline(slope=1, color = 'red') +
+  scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+  scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+  theme_bw()
+```
+
+
