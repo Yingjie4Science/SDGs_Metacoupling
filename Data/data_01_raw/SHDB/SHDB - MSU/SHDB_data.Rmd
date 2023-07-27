@@ -1,0 +1,131 @@
+---
+title: "Untitled"
+author: "Yingjie Li"
+date: "8/3/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Package and path
+```{r }
+# rm(list=ls())
+
+## tidy data
+library(tidyverse)
+library(lubridate)
+library(viridis)
+# library(xlsx)
+library(readxl)
+library(writexl)
+library(textreadr) ## read .rtf file
+
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+# setwd(dir)
+
+dir.shdb <- dir
+```
+
+
+
+# Data
+```{r}
+df0 <- readxl::read_excel(paste0(dir, '/Risks_in_words2015.xlsx'), skip = 1)
+df1 <- t(df0) %>% as.data.frame() %>%
+  dplyr::mutate(V1 = row.names(.)) %>%
+  separate(col = V1, into = c('ctr', 'sec'), sep = ':', extra = "merge", remove = F) %>%
+  # janitor::row_to_names(row_number = 1) %>%
+  as.data.frame()
+# str(df1)
+names(df1)
+# colnames(df1) <- df1[1,] 
+# df <- df[-1, ] 
+
+df1_check <- df0 %>% 
+  as.data.frame() %>%
+  dplyr::filter(str_detect(fixed('Female', ignore_case=TRUE), Full_css_list)) %>%
+  # dplyr::mutate(V1 = row.names(.)) %>%
+  # separate(col = V1, into = c('ctr', 'sec'), sep = ':', extra = "merge", remove = F) %>%
+  # janitor::row_to_names(row_number = 1) %>%
+  as.data.frame()
+
+
+ctr_sec <- unique(df1[, 1]) %>% as.data.frame()
+names(ctr_sec) <- 'ctr_sec'
+ctr_sec2 <- ctr_sec %>%
+  separate(col = ctr_sec, into = c('ctr', 'sector'), sep = ':', extra = "merge")
+
+# ctr <- ctr_sec2 %>%
+#   dplyr::filter(ctr != 'Full_css_list') %>%
+#   dplyr::select(ctr) %>%
+#   distinct()
+# 
+# sec <- ctr_sec2 %>%
+#   dplyr::filter(!is.na(sector)) %>%
+#   dplyr::select(sector) %>%
+#   distinct()
+```
+
+
+
+```{r - data can be used to match country names and sector names}
+df.inf  <- readxl::read_excel(paste0(dir, '/RiskinWords(20-21).xlsx')) 
+df.info <- df.inf %>%
+  dplyr::select(2:5) %>% 
+  ## Remove rows where all variables are NA 
+  dplyr::filter(if_any(everything(), ~ !is.na(.)))
+names(df.info) <- c('sec', 'ctr', 'sec_fullname', 'ctr_fullname')
+
+shdb_ctr_list <- df.info %>%
+  dplyr::distinct(ctr, ctr_fullname) %>%
+  dplyr::mutate(ctr_fullname = ifelse(ctr == 'arm' & is.na(ctr_fullname), 'Armenia', ctr_fullname)) %>%
+  dplyr::distinct(ctr, ctr_fullname)
+
+shdb_sec_list <- df.info %>%
+  dplyr::distinct(sec, sec_fullname) %>%
+  dplyr::filter(!is.na(sec))
+```
+
+
+
+
+```{r}
+shdb2019 <- readxl::read_excel(paste0(dir, '/GlobalRiskInWords2FHG2019.xlsx'), sheet = 'Risks')
+
+shdb2019.df <- shdb2019 %>%
+  as.data.frame() %>%
+  dplyr::rename(col = `...1`) %>%
+  dplyr::mutate(
+    ctr = stringr::str_sub(col, start= -3),
+    # pat = paste0('_', ctr),
+    # len = nchar(col),
+    # sec = gsub(pattern = pat, replacement='', x=col),
+    sec = stringr::str_sub(col, start=1, end=3),
+                ) %>%
+  dplyr::select(ctr, sec, everything()) %>%
+  dplyr::left_join(., shdb_ctr_list, by = 'ctr') %>%
+  dplyr::left_join(., shdb_sec_list, by = 'sec') %>%
+  dplyr::select(ctr, ctr_fullname, sec, sec_fullname, everything())
+
+
+shdb2019.df.3B <- shdb2019.df %>%
+  dplyr::select(1:4, starts_with('3.B'))
+
+shdb2019.df.3Be <- shdb2019.df %>%
+  dplyr::select(1:4, `3.B.e`) %>%
+  dplyr::filter(!is.na(ctr))
+
+
+### Save a single object to a file
+f <- paste0(dir.shdb, "/shdb2019.df.3Be.rds"); f
+saveRDS(shdb2019.df.3Be, file = f)
+### Restore it under a different name
+# shdb.data <- readRDS(file = f)
+```
+
