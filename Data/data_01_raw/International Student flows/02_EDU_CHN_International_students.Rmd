@@ -1,0 +1,176 @@
+---
+title: "Untitled"
+author: "Yingjie Li"
+date: "7/26/2020"
+output: html_document
+---
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Dir and packages
+```{r}
+rm(list=ls())
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path; path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+
+setwd(dir)
+getwd()
+
+library(readxl)
+library(writexl)
+library(tidyverse)
+library(reshape2)
+library(stringr)
+# library(here)
+library(Rmisc)
+library(scales)
+library(sf)
+library(ggplot2)
+library(cowplot)
+library(tmap)
+library(ggpubr)
+```
+
+
+#   Raw data
+##  Data cleaning
+### ctr info
+```{r}
+### fix ctr name, add iso3 ----------------------------------------------------
+ctr <- readxl::read_excel(path = '_ctr_cn_en_iso.xlsx') %>%
+  dplyr::select(id:iso3) %>%
+  dplyr::filter(!is.na(ctr_cn))%>%
+  dplyr::select(-id)
+
+```
+
+
+### data read test
+```{r}
+df0 <- readxl::read_excel(
+  path = 'data_int_student_to_China_2000_2015.xlsx',
+  sheet = '2015', skip = 0) %>%
+  dplyr::select(c(1:5))
+names(df0)
+names(df0) <- c('id', 'ctr_cn', 'num_total', 'num_degree', 'num_nondegree')
+
+### change data value to numeric
+df <- df0 %>%
+  ## remove useless rows
+  dplyr::filter(!is.na(id)) %>%
+  dplyr::filter(!is.na(ctr_cn)) %>%
+  dplyr::mutate(
+    num_total     = as.numeric(num_total),
+    num_degree    = as.numeric(num_degree),
+    num_nondegree = as.numeric(num_nondegree),
+  ) %>% 
+  ## fill na with 0, as indicated in the raw data
+  replace(is.na(.), 0) %>%
+  ## check the data by calculate the difference
+  dplyr::mutate(
+    num_nondegree_check = num_total - num_degree - num_nondegree) %>%
+  arrange(num_nondegree_check, id) %>%
+  ### merge ctr iso code info to the data
+  left_join(., ctr, by='ctr_cn') %>%
+  arrange(!is.na(iso3), iso3)
+
+### save to local
+# writexl::write_xlsx(x = df, path = 'rawdata_int_student_to_China_2015.xlsx')
+```
+
+### data read full 
+```{r}
+xlsdata <- 'data_int_student_to_China_2000_2015.xlsx'
+
+readme <- readxl::read_excel(
+    path = xlsdata,
+    sheet = 'readme', skip = 0)  %>%
+    dplyr::select(c(1:2))
+
+### loop read
+sheets <- c('2000', '2005', '2010', '2015')
+# for (sheet in sheets) {
+# }
+
+
+### function read
+func_cleandata <- function(sheet){
+  
+  df0 <- readxl::read_excel(
+    path = xlsdata,
+    sheet = sheet, skip = 0) %>%
+    dplyr::select(c(1:5))
+  names(df0) <- c('id', 'ctr_cn', 'num_total', 'num_degree', 'num_nondegree')
+  
+  df <- df0 %>%
+    ## remove useless rows
+    dplyr::filter(!is.na(id)) %>%
+    dplyr::filter(!is.na(ctr_cn)) %>%
+    dplyr::mutate(
+      num_total     = as.numeric(num_total),
+      num_degree    = as.numeric(num_degree),
+      num_nondegree = as.numeric(num_nondegree),
+    ) %>% 
+    ## fill na with 0, as indicated in the raw data
+    replace(is.na(.), 0) %>%
+    ## check the data by calculate the difference
+    dplyr::mutate(
+      num_nondegree_check = num_total - num_degree - num_nondegree) %>%
+    ## unify ctr names in Chinese
+    dplyr::mutate(
+      ctr_cn = gsub('孟加拉国', '孟加拉', ctr_cn),
+      ctr_cn = gsub('波斯尼亚和黑塞哥维那', '波斯尼亚与黑塞哥维那', ctr_cn),
+      ctr_cn = gsub('阿联酋', '阿拉伯联合酋长国', ctr_cn),
+      ctr_cn = gsub('圣多美与普林西比', '圣多美和普林西比', ctr_cn),
+      ## 塞尔维亚和黑山解体，前者面积大
+      ctr_cn = gsub('塞尔维亚和黑山', '塞尔维亚', ctr_cn), 
+      ctr_cn = gsub('百慕大群岛', '百慕大', ctr_cn), 
+      ctr_cn = gsub('\\(', '\\（', ctr_cn), 
+      ctr_cn = gsub('瓜德罗普', '瓜德罗普岛', ctr_cn),
+      ctr_cn = gsub('美国本土外小岛购', '美国', ctr_cn)  ## need to sum up !!!!
+        ) %>%
+    ### add year info to the data
+    dplyr::mutate(year = as.numeric(sheet)) %>%
+    arrange(num_nondegree_check, id) %>%
+    ### merge ctr iso code info to the data
+    left_join(., ctr, by='ctr_cn') %>%
+    arrange(!is.na(iso3), iso3)
+  
+  ### save to local
+  fname <- paste0('rawdata_int_student_to_China_', sheet, '.xlsx')
+  writexl::write_xlsx(x = df, path = fname)
+  
+  return(df)
+}
+
+
+### process the data
+df2000 <- func_cleandata(sheet = '2000')
+df2005 <- func_cleandata(sheet = '2005')
+df2010 <- func_cleandata(sheet = '2010')
+df2015 <- func_cleandata(sheet = '2015')
+
+unique(df2000$num_nondegree_check)
+unique(df2005$num_nondegree_check)
+unique(df2010$num_nondegree_check)
+unique(df2015$num_nondegree_check)
+
+names(df2015)
+dt.cn <- rbind(df2000, df2005, df2010, df2015) %>%
+  group_by(year, ctr_cn, ctr_en, iso3) %>%
+  ### need to sum up, e.g., repeated USA in the data 
+  dplyr::summarise_at(
+    .vars = c("num_total", "num_degree", "num_nondegree"),
+    sum, na.rm = TRUE) %>%
+  arrange(year, iso3)
+
+### save to local
+fname <- 'output_student_flows_2000_2015_CN.xlsx'
+writexl::write_xlsx(x = dt.cn, path = fname)
+
+```
+
+

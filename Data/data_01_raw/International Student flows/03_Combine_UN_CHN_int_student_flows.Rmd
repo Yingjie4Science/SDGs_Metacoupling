@@ -1,0 +1,88 @@
+---
+title: "Untitled"
+author: "Yingjie Li"
+date: "6/4/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Dir and packages
+```{r}
+# set work dir ------------------------------------------------------------
+
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path; path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+
+setwd(dir)
+getwd()
+
+library(readxl)
+library(writexl)
+library(tidyverse)
+library(reshape2)
+library(stringr)
+# library(here)
+library(Rmisc)
+library(scales)
+library(sf)
+library(ggplot2)
+library(cowplot)
+library(tmap)
+library(ggpubr)
+```
+
+
+# Data
+```{r}
+df.un <- readxl::read_excel('output_student_flows_1998_2019_UN_long.xlsx') %>%
+  dplyr::select(send_iso, receive_iso, `2000`, `2005`, `2010`, `2015`) %>%
+  arrange(!is.na(send_iso), !is.na(send_iso), send_iso, receive_iso)
+
+  
+### look into the data, and we confirm that no data (or the number is zero) on students who went to China 
+df.un.cn <- df.un %>% 
+  dplyr::filter(receive_iso == 'CHN')
+
+df.cn <- readxl::read_excel('output_student_flows_2000_2015_CN.xlsx') %>%
+  dplyr::mutate(
+    send_iso = 'CHN',
+    receive_iso = iso3
+  ) %>%
+  dplyr::select(year, send_iso, receive_iso, num_total) %>%
+  pivot_wider(names_from = year, values_from = num_total)
+
+### Combine df.un and df.cn
+df.all <- rbind(df.un, df.cn) %>%
+  group_by(send_iso, receive_iso) %>%
+  ### sum up data such as repeated ctr-pairs (such as the added CHN data)
+  dplyr::summarise_at(
+    .vars = as.character(seq(2000, 2015, 5)),
+    sum, na.rm = TRUE) %>%
+  ### check if any NA in ctr iso code
+  arrange(!is.na(send_iso), !is.na(receive_iso), send_iso, receive_iso)
+names(df.all)
+
+df.all.wide <- df.all %>%
+  gather(key = 'year', value = 'value', `2000`:`2015`) %>%
+  pivot_wider(names_from = receive_iso, values_from = value)
+
+
+### save to local
+writexl::write_xlsx(
+  x = df.all, 
+  path = './output_student_flows_ALL_long_2000_2005_2010_2015.xlsx')
+
+writexl::write_xlsx(
+  x = df.all.wide, 
+  path = './output_student_flows_ALL_wide_2000_2005_2010_2015.xlsx')
+```
+
+
+
+

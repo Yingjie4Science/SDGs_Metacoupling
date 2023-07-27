@@ -1,0 +1,250 @@
+---
+title: "Untitled"
+author: "Yingjie Li"
+date: "6/4/2020"
+output: html_document
+---
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Dir and packages
+```{r}
+# set work dir ------------------------------------------------------------
+
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path; path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+
+setwd(dir)
+getwd()
+
+library(readxl)
+library(writexl)
+library(tidyverse)
+library(reshape2)
+library(stringr)
+# library(here)
+library(Rmisc)
+library(scales)
+library(sf)
+library(ggplot2)
+library(cowplot)
+library(tmap)
+library(ggpubr)
+```
+
+
+# Raw data
+## Data cleaning
+```{r}
+### read data ---------------------------------------------------------------
+# df <- read.csv('./EDUN/EDUN_DATA_NATIONAL.csv', stringsAsFactors = F)
+# save(df, file = './EDUN/EDUN_DATA_NATIONAL.RData')
+load(file = './EDUN/EDUN_DATA_NATIONAL.RData')
+names(df)
+## "INDICATOR_ID": origin of the student flows
+## "COUNTRY_ID":   destination of the student flows
+## "YEAR"         
+## "VALUE"
+
+### load the indicator code and description
+lables <- read.csv('./EDUN/EDUN_LABEL.csv', stringsAsFactors = F) 
+
+
+### Data cleaning -----------------------------------------------------------
+### the country name list in the raw data
+ctr_raw <- read.csv('./EDUN/EDUN_COUNTRY.csv', stringsAsFactors = F) 
+names(ctr_raw) <- c("COUNTRY_ID", "COUNTRY_NAME_EN")
+### some ctr names are missing, we added these from other sources
+ctr_raw_add <- readxl::read_excel('./EDUN/__additional_iso3_code_EDUN_COUNTRY.xlsx')
+### append these data together
+ctr_raw <- rbind(ctr_raw, ctr_raw_add)
+
+### unify the ctr names
+ctr_raw <- ctr_raw %>%
+  mutate(COUNTRY_NAME_EN = gsub('Cabo Verde', 'Cape Verde', COUNTRY_NAME_EN),
+         COUNTRY_NAME_EN = gsub('Eswatini', 'Swaziland',    COUNTRY_NAME_EN),
+         COUNTRY_NAME_EN = gsub('United States of America', 
+                                'United States', COUNTRY_NAME_EN),
+         COUNTRY_NAME_EN = gsub('China\\, Hong Kong Special Administrative Region', 
+                                'Hong Kong\\, Special Administrative Region of China', 
+                                COUNTRY_NAME_EN),
+         COUNTRY_NAME_EN = gsub('China\\, Macao Special Administrative Region', 
+                                'Macao\\, Special Administrative Region of China', 
+                                COUNTRY_NAME_EN),
+         COUNTRY_NAME_EN = gsub('Iran \\(Islamic Republic of\\)', 
+                                'Islamic Republic of Iran', COUNTRY_NAME_EN),
+         COUNTRY_NAME_EN = gsub('Czechia', 'Czech Republic', COUNTRY_NAME_EN),
+         COUNTRY_NAME_EN = gsub('United Kingdom of Great Britain and Northern Ireland', 
+                                'United Kingdom', COUNTRY_NAME_EN),
+         COUNTRY_NAME_EN = gsub('Micronesia \\(Federated States of\\)', 
+                                'Federated States of Micronesia', COUNTRY_NAME_EN),
+         COUNTRY_NAME_EN = gsub('Venezuela \\(Bolivarian Republic of\\)', 
+                                'Bolivarian Republic of Venezuela', COUNTRY_NAME_EN)
+  )
+```
+
+
+
+
+## Sending sys
+```{r}
+### for sending sys ------------------------------------------------------------
+names(df)
+## "INDICATOR_ID": origin of the student flows
+
+ctr_send <- lables %>%
+  ### ctr_send info is in the "INDICATOR_LABEL_EN" column 
+  dplyr::filter(stringr::str_detect(INDICATOR_LABEL_EN, 'Students from')) %>%
+  ### remove unnecessary info, to extract ctr names
+  dplyr::mutate(
+    origin = gsub('South America|Asia|Europe|Oceania|Caribbean and Central America|North America|Africa\\:', 
+                  '', INDICATOR_LABEL_EN),
+    origin = gsub('\\, both sexes \\(number\\)|Students from the |Students from ', 
+                  '', origin),
+    origin = gsub('\\:', '', origin),
+    origin = gsub('former Yugoslav Republic of Macedonia', 'North Macedonia', origin),
+    origin = trimws(origin)) %>%
+  ### join the iso code by country full names
+  left_join(x = ., y = ctr_raw, by = c("origin" = "COUNTRY_NAME_EN")) %>%
+  ### any NA in the ctr iso code?
+  arrange(!is.na(COUNTRY_ID)) %>%
+  ### fix this iso3 code
+  dplyr::mutate(
+    COUNTRY_ID = ifelse(INDICATOR_ID==26433, 'CIV', COUNTRY_ID),
+    ### 'unknown countries' as 'rest of world'
+    COUNTRY_ID = ifelse(origin=='unknown countries', 'ROW', COUNTRY_ID) 
+    ) %>%
+  ### any NA in the ctr iso code?
+  arrange(!is.na(COUNTRY_ID), COUNTRY_ID) 
+
+### rename the ctr_send
+names(ctr_send)
+names(ctr_send) <- c("INDICATOR_ID", "INDICATOR_LABEL_EN", "origin", "send_iso")
+# unique(ctr_send$INDICATOR_LABEL_EN)
+# unique(ctr_send$origin)
+# head(ctr_send, 3)
+# str(ctr_send)
+
+### how many sending sys?
+n_sending <- length(unique(ctr_send$origin)); n_sending
+### the sending sys list
+ctr_send_ls <- ctr_send$INDICATOR_ID
+```
+
+
+## Receiving sys
+```{r}
+### for receiving sys -----------------------------------------------
+head(df,3)
+
+dt <- df %>%
+  ### only keep the first 3 columns that are useful
+  dplyr::select(INDICATOR_ID:VALUE) %>%
+  # filter(YEAR >= 2013) %>%
+  ### rename the col for receiving sys
+  dplyr::rename(receive_iso = COUNTRY_ID) %>%
+  # filter(INDICATOR_ID %in% c(26528)) %>% ##
+  ## filter out the internationally mobile student data, based on INDICATOR_ID, which contains the names of sending ctr
+  dplyr::filter(INDICATOR_ID %in% ctr_send_ls) %>% 
+  spread(key = YEAR, value = VALUE) 
+
+### get the unique receiving ctr name list
+ctr_receive <- dt %>% 
+  distinct(receive_iso) %>% as.data.frame() %>% 
+  arrange(!is.na(receive_iso), receive_iso)
+
+### how many receiving ctr?
+n_receiving <- length(unique(ctr_receive$receive_iso)); n_receiving
+print(paste0('There are ', n_receiving, ' receiving countries.'))
+```
+
+
+
+## Double-check on data
+  The above data is downloaded as a bulk zip file, including many indicators. Here we go to the same webpage and download a subset of the data in another way, in which we can choose certain country and indicator. 
+  We are going to use this small subset to validate and double-check on the bulk data we clearned. 
+  Here, we downloaded the data for "China (chn) --> Other 100+ rest of world countries (row)". 
+```{r}
+### subset data, which was manually downloaded, for validation
+chn_to_row <- readxl::read_excel(
+  path = './EDUN/__manual_download_China2otherCountries.xlsx', skip = 3) %>%
+  slice(-c(1, 243:288)) %>%
+  select(-2) %>%
+  dplyr::rename(country_name = Time) %>%
+  left_join(x = ., y = ctr_raw, by = c('country_name' = 'COUNTRY_NAME_EN')) %>%
+  select(COUNTRY_ID, country_name, 2:8) %>%
+  arrange(COUNTRY_ID)  ## these are the receiving countries
+
+# writexl::write_xlsx(chn_2_all, './EDUN/__country_names.xlsx')
+print(paste0('There are ', length(unique(chn_to_row$COUNTRY_ID)),' receiving countries in manually download data subset'))
+
+### compare to the receiving ctr list from the data 
+print(paste0('There are ', n_receiving,   ' sending countries.'))
+print(paste0('There are ', length(unique(chn_to_row$COUNTRY_ID)) - n_receiving, ' sending countries are missing in the bulk dataset, compared to manually downloaded data.'))
+
+
+### to check which receiving ctr is missing ------------------------------------
+ctr_receive_check <- ctr_receive %>%
+  dplyr::mutate(check = 1) %>% ## 1 means ctr names in the data
+  ### right join with the manual-download data, if check is NA, then these ctr are missing
+  right_join(chn_to_row, by = c('receive_iso' = 'COUNTRY_ID')) %>%
+  ### place NA on the top 
+  arrange(!is.na(check), desc(check), receive_iso) ## desc
+#### it seems some countries did NOT receive any students, and this is why these ctr are missing in the bulk data
+
+### to check if sending and receiving ctr are the same list --------------------
+check_sending_receiving <- ctr_receive %>%
+  dplyr::mutate(check = 1,
+                ### make a copy here
+                receive_iso3 = receive_iso) %>%
+  merge(x = ctr_send[, 3:4], y = ., 
+        by.x = 'send_iso', by.y = 'receive_iso', all = T) %>%
+  arrange(!is.na(check), desc(check), send_iso) ## desc
+```
+
+
+
+# Matrix as the output
+  All looks good, and we can change the data format to a matrix-like data frame. 
+```{r}
+dt_mx_long <- ctr_send %>%
+  right_join(x = ., y = dt, by = 'INDICATOR_ID') %>%
+  ### there are some repeated send-receive ctr pairs, need to sum up 
+  group_by(send_iso, receive_iso) %>%
+  dplyr::summarise_at(.vars = as.character(seq(1998, 2019)),
+               sum, na.rm = TRUE) %>%
+  as.data.frame() %>%
+  arrange(send_iso, receive_iso)
+str(dt_mx_long)
+
+### change to a send-receive matrix-like data frame ----------------------------
+dt_mx_wide <- dt_mx_long %>%
+  ### remove the first 3 cols, which are not useful here
+  # dplyr::select(-c(1:3)) %>%
+  ### gather years to one col
+  gather(key = 'year', 'num', `1998`:`2019`) %>%
+  as.data.frame() %>%
+  ### spread receiving ctr 
+  pivot_wider(names_from = receive_iso, values_from = num) %>%
+  as.data.frame() %>%
+  arrange(year, send_iso)
+str(dt_mx_wide)
+
+
+### take a look at the data for one year ---------------------------------------
+dt_mx_2015 <- dt_mx_wide %>%
+  # dplyr::select(send_iso, receive_iso, `2015`) %>%
+  dplyr::filter(year == 2015) %>%
+  arrange(send_iso)
+
+### save data to local
+writexl::write_xlsx(x = dt_mx_wide, path = './output_student_flows_1998_2019_UN_wide.xlsx')
+writexl::write_xlsx(x = dt_mx_long, path = './output_student_flows_1998_2019_UN_long.xlsx')
+```
+
+
+
+
