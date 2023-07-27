@@ -1,0 +1,204 @@
+---
+title: "Untitled"
+author: "Yingjie"
+date: "2023-05-15"
+output: html_document
+---
+
+
+# Setup
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+getwd()
+library(readr)
+library(dplyr)
+library(stringr)
+dir.raw     <- './Data/data_01_raw/'
+dir.ILOSTAT <- './Data/data_01_raw/ILOSTAT/'
+
+
+ctr <- 'Argentina'
+yr_ini <- 2010
+yr_end <- 2020
+```
+
+
+# Data
+
+## Fatal data
+
+```{r include=FALSE}
+### Cases of fatal occupational injury by economic activity | Annual
+fatal <- read_csv('./Data/data_01_raw/ILOSTAT/INJ_FATL_ECO_NB_A-full-2021-03-23.csv') %>%
+  filter(`ref_area.label` == ctr, 
+         # `sex.label` == 'Sex: Total',
+         time >= yr_ini,
+         time <= yr_end#, time == 2015
+  )
+names(fatal)
+str(fatal)
+```
+
+
+
+## Employees by sector
+```{r include=FALSE}
+### Employees by sex and economic activity (thousands) | Annual --------------------------
+worker1 <- read_csv('./Data/data_01_raw/ILOSTAT/EES_TEES_SEX_ECO_NB_A-full-2021-03-23.csv') %>%
+  filter(
+    # `ref_area.label` == ctr, 
+    `sex.label` == 'Sex: Total',
+    time >= yr_ini,
+    time <= yr_end#, time == 2015
+         
+         )
+
+worker2 <- read_csv('./Data/data_01_raw/ILOSTAT/EES_TEES_SEX_ECO_NB_A-filtered-2021-03-23.csv') %>% ## the numbers are the same
+  filter(
+    # `ref_area.label` == ctr, 
+    `sex.label` == 'Sex: Total',
+    time >= yr_ini,
+    time <= yr_end)
+
+
+### - compare data `worker1` and `worker2` and find the difference (it seems worker1 is better and more comprehensive)
+worker1.1 <- worker1 %>%
+  dplyr::filter(`ref_area.label` == ctr) %>%
+  dplyr::select(starts_with('ref'), starts_with('sex'), starts_with('indicator'), starts_with('classif'), time, obs_value)
+
+worker2.1 <- worker2 %>%
+  dplyr::filter(`ref_area.label` == ctr) %>%
+  dplyr::select(starts_with('ref'), starts_with('sex'), starts_with('indicator'), starts_with('classif'), time, obs_value)
+```
+
+
+```{r - test and check data}
+## Does 'Non Agriculture' include 'Industry' and 'Services'? - Yes, so we need to remove the row
+#' https://ilostat.ilo.org/resources/concepts-and-definitions/classification-economic-activities/
+#' 
+worker1.2 <- worker1.1 %>%
+  dplyr::filter(str_detect(pattern = 'ECO_SECTOR', classif1)) %>%
+  dplyr::filter(time == 2010)
+  
+
+worker_bysector <- worker1 %>%
+  dplyr::select(starts_with('ref'), starts_with('sex'), starts_with('indicator'), starts_with('classif'), time, obs_value) %>%
+  dplyr::filter(!classif1 %in% c('ECO_SECTOR_NAG')) %>%
+  # dplyr::filter(time == 2014) %>%
+  as.data.frame()
+
+
+## To also make sure there is no overlaps between sectors --------------------------------
+worker1.test2 <- worker_bysector %>%
+  dplyr::filter(`ref_area` == 'USA') %>%
+  dplyr::filter(str_detect(pattern = 'ECO_ISIC4', classif1)) %>%
+  # dplyr::filter(str_detect(pattern = 'ECO_AGGREGATE', classif1)) %>%
+  # dplyr::filter(str_detect(pattern = 'ECO_SECTOR', classif1)) %>%
+  
+  ## - only a few countries use `ECO_ISIC3` classification system
+  # dplyr::filter(`ref_area` == 'AFG') %>%
+  # dplyr::filter(str_detect(pattern = 'ECO_ISIC3', classif1)) %>%
+  as.data.frame()
+
+worker1.test2_total <- worker1.test2 %>%
+  dplyr::filter(time == 2014) %>%
+  dplyr::filter(str_detect(pattern = 'TOTAL', classif1, negate = F)) %>%
+  as.data.frame()
+worker1.test2_total_cal <- worker1.test2 %>%
+  dplyr::filter(time == 2014) %>%
+  dplyr::filter(str_detect(pattern = 'TOTAL', classif1, negate = T)) %>%
+  dplyr::summarise(across(where(is.numeric), ~ sum(.x, na.rm = TRUE))) %>%
+  as.data.frame()
+```
+
+
+```{r - data for analysis}
+#' data for analysis ---------------------------------------------------------------------
+worker_df <- worker_bysector %>%
+  dplyr::filter(str_detect(pattern = 'TOTAL', classif1, negate = T)) %>%
+  dplyr::mutate(source = gsub(".*_(.+)_.*", "\\1", classif1),
+                source_id = case_when(
+                  source == "ISIC4" ~ 1, 
+                  source == "ISIC3" ~ 2, 
+                  source == "AGGREGATE" ~ 3, 
+                  source == "SECTOR" ~ 4 
+                )) %>%
+  group_by(ref_area, time) %>%
+  dplyr::mutate(source_n = n_distinct(source)) %>%
+  as.data.frame()
+
+unique(worker_df$source)
+
+## keep unique source by filtering out with conditions of source priority
+worker_df1 <- worker_df %>%
+  group_by(ref_area, time) %>% 
+  dplyr::filter(source_id == min(source_id))
+
+```
+
+
+```{r include=FALSE}
+#' remove un-used data
+rm(worker1.1, worker2.1, 
+   # worker2,
+   worker1.test2_total, 
+   worker1.test2_total_cal, 
+   worker1.test2, worker1.2)
+```
+
+
+
+### Match sector names
+```{r}
+
+ilo_ctr_list <- worker1 %>%
+  dplyr::distinct(ref_area, ref_area.label)
+
+
+ilo_sec_list <- worker1 %>%
+  dplyr::filter(!classif1 %in% c('ECO_SECTOR_NAG')) %>%
+  dplyr::distinct(classif1, classif1.label) %>%
+  arrange(classif1.label)
+
+writexl::write_xlsx(ilo_sec_list, path = paste0(dir.ILOSTAT, 'ilo_sec_list.xlsx'))
+
+
+#' Next step --> Match the ILO sectors with SHDB's, which is based on GTAP ---------------
+#' https://www.gtap.agecon.purdue.edu/databases/contribute/detailedsector.asp
+#' https://www.gtap.agecon.purdue.edu/databases/contribute/concordinfo.asp
+#' 
+#' The sector codes included in SHDB: "Data\data_01_raw\SHDB\SHDB - MSU\SHDB_data.Rmd"
+#' 
+#' Load manually matched information 
+ilo_sec_list_matched <- readxl::read_excel(path = paste0(dir.ILOSTAT, 'ilo_sec_list_manualMatch.xlsx')) %>%
+  dplyr::select(classif1, shdb_sector)
+
+employment.df <- worker_df1 %>%
+  dplyr::select(-source_id, -source_n, -sex) %>%
+  left_join(x = ., y = ilo_sec_list_matched, by = 'classif1') %>%
+  # arrange(!is.na(obs_value)) %>%
+  arrange(!is.na(shdb_sector)) %>%
+  as.data.frame()
+
+
+
+### load SHDB risk data ------------------------------------------------------------------
+dir.shdb <- './Data/data_01_raw/SHDB/SHDB - MSU'
+f <- paste0(dir.shdb, "/shdb2019.df.3Be.rds"); f
+shdb.df <- readRDS(file = f) %>%
+  dplyr::mutate(ctr = toupper(ctr),
+                `3.B.e` = as.numeric(`3.B.e`)) %>%
+  dplyr::rename('shdb_sector' = 'sec')
+
+
+### merge the IOL and SHDB data ----------------------------------------------------------
+employment.risk <- employment.df %>%
+  dplyr::rename('ctr' = 'ref_area') %>%
+  left_join(x=., y=shdb.df, by = c('ctr', 'shdb_sector')) %>%
+  dplyr::mutate(emp.risk = obs_value * 1000 * `3.B.e`)
+
+
+
+```
+
