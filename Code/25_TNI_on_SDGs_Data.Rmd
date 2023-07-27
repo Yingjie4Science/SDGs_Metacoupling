@@ -9,7 +9,7 @@ editor_options:
 
 
 # Set up
-```{r Dirs and packages}
+```{r Dirs and packages, include=FALSE}
 
 ### To clear your environment 
 remove(list = ls())
@@ -2177,9 +2177,10 @@ score_8_8_1y <- df_score
 
 
 ### SDG 9 
-  9.4.1-1 CO2 emissions per unit of value added
+  
+#### - 9.4.1x CO2 emissions per unit of value added
 
-```{r - 9.4.1x co2/gdp}
+```{r}
 ind_sdg  <- 'co2_per_gdp' ## ton/USD
 unit_check <- 1000
 direction_sdg <- -1
@@ -2259,18 +2260,16 @@ co2_rel_not <- rel %>%
 
 
 
-
-  9.4.1-2 CO2 emissions from fuel combustion
+#### - ??? 9.4.1y CO2 emissions from fuel combustion
   
-```{r - 9.4.1y co2 in fossil ❓}
-ind_sdg  <- 'co2_in_fossil' ## ton/ha
-
+```{r}
+# ind_sdg  <- 'co2_in_fossil' ## ton/ha
 
 ```
 
 
 
-#### - ?? 9.a.1
+#### - 9.a.1 ODA to infrastructure
 
 *SDG*
   9.a Facilitate sustainable and resilient infrastructure development in developing countries through enhanced financial, technological and technical support to African countries, least developed countries, landlocked developing countries and small island developing States 
@@ -2280,7 +2279,7 @@ ind_sdg  <- 'co2_in_fossil' ## ton/ha
 *Flow*
   [x] AIDData, and Boston U's GDP center data, are both for China only (sending system). 
   
-  [] OECD - https://www.oecd.org/development/idsonline.htm 
+  [v] OECD - https://www.oecd.org/development/idsonline.htm 
   
     - “Flows by provider and recipient”, which provides comprehensive aggregate historical and forward-looking data on the volume, origin and destination of resource flows (including country programmable aid);
     
@@ -2289,7 +2288,67 @@ ind_sdg  <- 'co2_in_fossil' ## ton/ha
     
   
 ```{r}
+ind_sdg    <- 'ODA to infrastructure' ## USD
+ind_ft     <- 'ODA_OOF_oecd_matrix'
+unit_check <- ''
+direction_sdg <- 1
 
+### Check the Unit!!!
+### rel -->
+### oft --> USD
+### gdp --> USD
+
+
+### Resource consumption or emissions under the current trading world situation -------------------------
+# rel <- 
+  
+
+### Outsourced footprints (oft) flow --------------------------------------------------------------------
+oft <- net_imports_bind  %>%
+  dplyr::filter(ind == ind_ft) %>%
+  dplyr::select(ind, year, iso3, net_in, scenario) %>%
+  spread(key = scenario, value = net_in)
+
+
+
+### w/o trade, and with trade together  -----------------------------------------------------------------
+rel_not_merge <- oft %>%
+  merge(x = ., y = gdp_rel_not,  by = c('iso3', 'year'), all.x = T) %>% 
+  dplyr::mutate(
+    ##' if a country's net outflow < 0, we assume it does not have ODA to others, and assign 0 as its net outflow
+    ##' outflow = (-fromAll) = value
+    ##' add $1 to avoid zero values
+    value     = (-fromAll),
+    value_rel = ifelse( (-fromAll) > 0, (-fromAll), 0+1),  ##
+    value_not = (0 + 1),              ## under no-trade 
+    value_dst = ifelse( value-(-fromNer) >0, value-(-fromNer), 0+1), ## (total outflow) - (nearby outflow)
+    value_ner = ifelse( value-(-fromDst) >0, value-(-fromDst), 0+1), ## (total outflow) - (distant outflow)
+    
+    # value_rel = value_rel/gdp_rel,      
+    # value_not = value_not/gdp_not, 
+    # value_dst = value_dst/gdp_dst,
+    # value_ner = value_ner/gdp_ner
+    ) %>%
+  ### for easy-checking the numbers
+  dplyr::select(ind, iso3, year, value, everything())
+
+
+rel_not <- rel_not_merge %>%
+  dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
+
+hist(rel_not$value_rel)
+
+### normalization  -------------------------------------------------------
+### Be careful with **Data Direction!**
+### big - better? --> func_norm_sdg_score_good
+### big - bad?    --> func_norm_sdg_score_bad
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  # spread(key = 'scenario', value = c('value_norm')) %>%
+  dplyr::mutate(ind_sdg = ind_sdg) %>%
+  as.data.frame()
+
+score_9_a_1 <- df_score
 ```
 
 
@@ -2302,6 +2361,9 @@ ind_sdg  <- 'co2_in_fossil' ## ton/ha
 
   **10.4.1** is the labour share of GDP, comprising wages and social protection transfers.
   
+  
+#### - 10.4.1 Labour share of GDP
+
   Labour share of Gross Domestic Product = Total compensation of employees / Gross Domestic Product * 100.
   
   It provides information about the relative share of output which is paid as compensation to employees (or *labor*) as compared with the share paid to *capital* in the production process for a given reference period. 
@@ -2311,7 +2373,7 @@ ind_sdg  <- 'co2_in_fossil' ## ton/ha
   
   (Alsamawi et al. 2014b) - The Employment Footprints of Nations
   
-```{r - 10.4.1 Labour share of GDP}
+```{r}
 ind_sdg <- 'labor salary OR income share of GDP'
 ind_ft  <- 'Salary' ## wage footprint = labor salary/income footprint
 unit_sdg   <- '%'
@@ -2320,11 +2382,12 @@ direction_sdg <- 1
 ### Check the Unit!!!
 ### rel --> % of GDP
 ### ft  --> 1000 USD
-### GDP --> ?
+### GDP --> USD
 
 
 ### Resource consumption or emissions under the current trading world situation --------------------
-###  SDG_1041_NOC_RT_A -- SDG indicator 10.4.1 - Labour income share as a percent of GDP (%) -- from ILO 
+###'  SDG_1041_NOC_RT_A -- SDG indicator 10.4.1 - Labour income share as a percent of GDP (%) 
+###'  -- from ILO 
 xls <- list.files(path = dir.input1, pattern = '^SDG_1041_NOC_RT_A', full.names = T); xls
 rel <- readxl::read_excel(path = xls) %>%  
   dplyr::select(-ctr) %>%
@@ -2337,21 +2400,23 @@ rel <- readxl::read_excel(path = xls) %>%
 ### Outsourced footprints (oft) flow ---------------------------------------------------------------
 oft <- net_imports_bind  %>%
   dplyr::filter(ind == ind_ft) %>%
-  dplyr::mutate(net_in = net_in * 1000) %>% # unit: 1000 USD 
+  dplyr::mutate(net_in = net_in * 1000) %>% # unit: 1000 USD --> USD
   dplyr::select(ind, year, iso3, net_in, scenario) %>%
-  spread(key = scenario, value = net_in)
-
+  spread(key = 'scenario', value = 'net_in')
+yrs <- unique(oft$year)
 
 
 ### w/o trade, and with trade together  ------------------------------------------------------------
 rel_not_merge <- rel %>%
+  dplyr::filter(year %in% yrs) %>%
   merge(x = ., y = gdp_rel_not, by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = oft,         by = c('iso3', 'year'), all.x = T) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
-    value_lab = (value/100)*gdp_rel,               ## labor income ($)
+    value_lab = (value/100)*gdp_rel,                  ## labor income (USD)
     value_rel = (value_lab -          0)/gdp_rel*100, ## labor share of GDP (%)
-    value_not = (value_lab - (-fromAll))/gdp_not*100, ## if no trade, for an exporter, less labor salary from exports (i.e., less `-fromAll`)
+    ## if no trade, for an exporter, less labor salary from exports (i.e., less `-fromAll`)
+    value_not = (value_lab - (-fromAll))/gdp_not*100, 
     value_dst = (value_lab - (-fromNer))/gdp_dst*100,
     value_ner = (value_lab - (-fromDst))/gdp_ner*100
     ) %>%
@@ -2382,6 +2447,143 @@ helper_func_plot_map(data = rel_not, var = 'value_not', yr = 2015, filename_post
 ```
 
 
+#### - 10.b.1x FDI for development
+
+  10.b Encourage official development assistance and financial flows, including foreign direct investment,  to States where the need is greatest, in particular least developed countries, African countries, small island developing States and landlocked developing countries, in accordance with their national plans and programmes 
+  
+  10.b.1 Total resource flows for development, by recipient and donor countries and type of flow (e.g. official development assistance, foreign direct investment and other flows) 
+
+```{r}
+
+ind_sdg  <- 'FDI for development' ## 
+ind_ft   <- 'FDI_matrix'
+
+direction_sdg <- 1
+
+### Check the Unit!!!
+### rel --> USD
+### oft --> USD
+### gdp --> USD
+
+
+### Outsourced footprints (oft) flow --------------------------------------------------------------------
+#' net inflow of FDI
+oft <- net_imports_bind  %>%
+  dplyr::filter(ind == ind_ft) %>%
+  dplyr::select(ind, year, iso3, net_in, scenario) %>%
+  
+  ## we need data -- net outflow, so 
+  # dplyr::mutate(net_out = -net_in) %>%
+  # dplyr::select(-net_in) %>%
+  
+  spread(key = scenario, value = net_in) %>%
+  as.data.frame()
+yrs <- unique(oft$year)
+
+
+
+### Resource consumption or emissions under the current trading world situation -------------------------
+#' we can use two data sources, one is the `Wold Bank` data, the other is `IMF`.
+#' Here, we compared the two and decide to use `IMF` data because it offers bilateral flow data
+#' 
+#' 1. World Bank data 
+#'    Total net inflows - here we need total net outflow, so here, we need to reverse the number
+xls <- list.files(path = dir.input1, pattern = '^Foreign direct investment, net inflows', full.names = T); xls 
+rel <- readxl::read_excel(path = xls) %>% 
+  dplyr::select(-ctr) %>%
+  gather(key = 'year', value = 'value', `2000`:ncol(.)) %>%
+  dplyr::mutate(
+    value = as.numeric(value),
+    # value_abs = abs(value), ## since this indicator underline 'cooperation', the absolute value should be used.
+    #
+    ## choose the right value for next step
+    value = -value            ## calculate net outflow
+    ) %>%  
+  dplyr::filter(year %in% yrs) %>%
+  as.data.frame()
+
+
+
+#' 2. IMF data
+#'    The data can be derived from `FDI_matrix`
+#' 
+f <- paste0(dir.eora_cleaned, ind_ft, '.xlsx')
+rel_outflow <- readxl::read_excel(f) %>%
+  gather(key = 'receiving', value = value, 4:ncol(.)) %>%
+  group_by(year, ctr, iso3) %>%
+  dplyr::summarise_at(c("value"), sum, na.rm = TRUE) %>%
+  ungroup() %>%
+  dplyr::filter(year %in% yrs) %>%
+  dplyr::select(-ctr) %>%
+  as.data.frame()
+
+rel_check <- merge(
+  x = rel         %>% dplyr::rename('wb_outflow'  = 'value'),
+  y = rel_outflow %>% dplyr::rename('fdi_outflow' = 'value'), 
+  by = c('iso3', 'year')
+)
+
+rel_check %>%
+  ggplot(aes(x = wb_outflow, y = fdi_outflow)) +
+  geom_point() +
+  geom_abline(slope = 1, color = 'red') +
+  # scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+  #               labels = trans_format("log10", math_format(10^.x))) +
+  # scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+  #               labels = trans_format("log10", math_format(10^.x))) +
+  theme_bw()
+
+#'
+#' 3. also see comparison in `FDI_data_prep.Rmd` in "./Data/data_01_raw/FDI/"
+#'    The two data are very different ... not sure why. But FDI's bilateral data
+#'    make more sense. 
+  
+
+### w/o trade, and with trade together  -----------------------------------------------------------------
+rel_not_merge <- rel_outflow %>%
+  merge(x = ., 
+        y = oft,   
+        by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::mutate(
+    ind       = unique(oft$ind),
+    ## if a country's net outflow < 0, we assume it does not have FDI, and assign 0 as its net outflow
+    value_rel = ifelse(value > 0, value, 0+1),  ##
+    value_not = (0+1),                          ## under no-trade ## add $1 to avoid zero values
+    value_dst = ifelse( (value-(-fromNer)) >0, (value-(-fromNer)), 0+1), ## (total outflow) - (nearby outflow)
+    value_ner = ifelse( (value-(-fromDst)) >0, (value-(-fromDst)), 0+1), ## (total outflow) - (distant outflow)
+    ) %>%
+  ### for easy-checking the numbers
+  dplyr::select(ind, iso3, year, value, everything())
+
+rel_not <- rel_not_merge %>%
+  dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
+
+hist(rel_not$value_rel)
+
+### 
+rel_not_merge %>%
+  ggplot(aes(x = value, y = -fromAll)) +
+  geom_point() +
+  geom_abline(slope = 1, color = 'red') +
+  scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+  scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+  theme_bw()
+
+
+### normalization  -------------------------------------------------------
+### Be careful with **Data Direction!**
+### big - better? --> func_norm_sdg_score_good
+### big - bad?    --> func_norm_sdg_score_bad
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  # spread(key = 'scenario', value = c('value_norm')) %>%
+  dplyr::mutate(ind_sdg = ind_sdg) %>%
+  as.data.frame()
+
+score_10_b_1x <- df_score
+```
 
 
 
@@ -2389,6 +2591,7 @@ helper_func_plot_map(data = rel_not, var = 'value_not', yr = 2015, filename_post
 ### SDG 11
 
   11.6.2-1 Annual mean levels of fine particulate matter (e.g., PM2.5 and PM10) in cities (population weighted)
+  
 ```{r - 11.6.21 pm25/pop}
 ind_sdg  <- 'pm25_per_pop' ## ton/pop
 unit_check <- 1000
@@ -2522,7 +2725,6 @@ score_11_6_22 <- df_score
 
 
 ### SDG 12
-
 
 #### - 12.2.1x = 8.4.2x Material footprint per capita
 
@@ -3543,9 +3745,11 @@ score_16_5 <- df_score
 
 #### - 17.3.1x FDI/GDP
 
-  **17.3.1** Foreign direct investment as a proportion of gross national income
+  **17.3.1** Foreign direct investment as a proportion of gross national income (GNI)
   
   Based on description at [link](https://sdg-tracker.org/global-partnerships), foreign direct investment refers to direct investment equity flows in an economy. It is the sum of equity capital, reinvestment of earnings, and other capital. This series shows *net outflows of investment* from the reporting economy to the rest of the world, and is divided by GDP.
+  
+  *GNI* GNI (formerly GNP) is the sum of value added by all resident producers plus any product taxes (less subsidies) *not included* in the valuation of output plus net receipts of primary income (compensation of employees and property income) from abroad. Data are in current U.S. dollars. 
 
 ```{r}
 
@@ -3642,7 +3846,7 @@ score_17_3_1x <- df_score
 
 ```{r}
 ind_sdg  <- 'ODA per GDP' ## 
-# ind_ft   <- ''
+# ind_ft     <- 'ODA_OOF_oecd_matrix'
 direction_sdg <- 1
 
 ### Check the Unit!!!
