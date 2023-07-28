@@ -10,12 +10,16 @@
 # ### data path
 # source('./Code/_path of data.R')
 
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+dir.root <- dirname(dir)
 
 ## raw data ------------------------------------------------------------------------------
 dir.raw          <- './Data/data_01_raw/'
 dir.arm          <- './Data/data_01_raw/Arm trade_Peacekeeping/SIPRI Arms trade/'
 dir.traffick     <- './Data/data_01_raw/Human trafficking/'
 dir.student_flow <- './Data/data_01_raw/International Student flows/'
+dir.oecd         <- './Data/data_01_raw/OECD/'
 
 
 #
@@ -27,9 +31,10 @@ dir.fish  <- paste0('D:/data/', 'FAOSTAT/Jessica Gephart/')
 
 
 
+
 ## intermediate data ❗❗ ------------------------------------------------------------------
-dir.process      <- './Data/data_02_intermediate/dt01_ctr_profile/xlsx/'
-dir.cleaned      <- './Data/data_02_intermediate/dt01_ctr_profile/xlsx/cleaned/'
+dir.process      <- paste0(dir.root, '/Data/data_02_intermediate/dt01_ctr_profile/xlsx/')
+dir.cleaned      <- paste0(dir.root, '/Data/data_02_intermediate/dt01_ctr_profile/xlsx_cleaned/')
 
 ### EORA data by Mengyu, 
   

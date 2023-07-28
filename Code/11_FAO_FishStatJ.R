@@ -11,14 +11,11 @@ dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
 setwd(dir)
 setwd('..') # set directory by one folder up
 getwd()
+source('./Code/_path of data.R')
 
+dir.fishstat <- paste0(dir.fao, 'FishStatJ_exportCSV/')
 
-dir.raw      <- './Data/data_01_raw/'
-dir.fishstat <- './Data/data_01_raw/FAOSTAT/FishStatJ_exportCSV/'
-dir.cleaned      <- './Data/data_02_intermediate/dt01_ctr_profile/xlsx/cleaned/'
-getwd()
 source('./Code/_package list.R')
-
 library(janitor) ## Simple Tools for Examining and Cleaning Dirty Data
 
 
@@ -51,7 +48,7 @@ ctr_p <- readxl::read_excel(paste0(dir.fishstat, 'Metadata_Production_Country.xl
 ### data 1 - Global production by production source ----------------------------------
 
 csv <- 'Global production by production source - Quantity (1950 - 2019).csv'
-p1 <- readr::read_csv(file = paste0('./Data/data_01_raw/FAOSTAT/FishStatJ_exportCSV/', csv)) %>%
+p1 <- readr::read_csv(file = paste0(dir.fishstat, csv), show_col_types = FALSE) %>%
   gather(key = 'year', value = 'value', 6:ncol(.)) 
 
 p1 <- p1 %>%
@@ -144,7 +141,7 @@ pmarine_4yr <- pmarine %>%
 
 
 ### compare with World Bank data
-xlsx <- "./Data/data_02_intermediate/dt01_ctr_profile/xlsx/cleaned/Total fisheries production (metric tons)_4yrs.xlsx"
+xlsx <- paste0(dir.cleaned, "Total fisheries production (metric tons)_4yrs.xlsx")
 fish_wb_fao <- readxl::read_excel(xlsx) %>%
   gather(key = year, value = value, 3:ncol(.)) 
 

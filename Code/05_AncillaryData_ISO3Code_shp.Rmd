@@ -128,7 +128,7 @@ pop <- readxl::read_excel(
 
 ```{r}
 gdp1 <- readxl::read_excel(
-  path = paste0(dir.cleaned, 'GDP (constant 2010 US$)_4yrs.xlsx')) %>%
+  path = paste0(dir.cleaned, 'GDP (constant 2015 US$)_4yrs.xlsx')) %>%
   # dplyr::select(-ctr) %>%
   # merge(x = ., y = ctr_eora, by.x = 'iso3', by.y = 'iso3_eora', all.y = T) %>%
   dplyr::mutate(`2000` = ifelse(iso3 == 'SUN', 2748*(289*10^6), `2000`), ## GDP per capita * population

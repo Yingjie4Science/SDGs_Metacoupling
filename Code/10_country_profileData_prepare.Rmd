@@ -1,7 +1,7 @@
 ---
 output: html_document
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 
@@ -26,6 +26,10 @@ source('./Code/_path of data.R')
 source('./Code/_package list.R')
 ## data package
 library(wbstats)
+
+library(remotes)
+# remotes::install_gitlab(repo = "paulrougieux/faostatpackage/FAOSTAT")
+# install.packages("FAOSTAT")
 library(FAOSTAT)
 ## https://github.com/expersso/WHO
 # From Github
@@ -54,6 +58,7 @@ load('./Data/Ancillary_Data_iso_eora_ex.RData')  ## ## iso_eora_ex
 
 load('./Data/Ancillary_Data_ISO3code_shp.RData') ## iso_eora, pop, gdp, shp, grp
 
+iso_eora_ex <- iso_eora_ex %>% select(-IMF)
 ```
 
 
@@ -78,6 +83,7 @@ function_format_4yrData_save <- function(iname){
     dplyr::select(iso3_eora, country_eora, `2000`, `2005`, `2010`, `2015`)  %>%
     arrange(iso3_eora)
   names(dfwb_fillna_4yrs) <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+  
   fname <- paste0(dir.cleaned, iname, '_4yrs.xlsx'); print(fname) 
   writexl::write_xlsx(x = dfwb_fillna_4yrs, path = fname)
   
@@ -890,7 +896,7 @@ function_fill_na_wb(dfwb)
 
 ```{r - Cropland - FAO}
 
-FAOsearch(dataset="Land Use", full = FALSE)
+# FAOsearch(dataset="Land Use", full = FALSE)
 
 ### Load crop production data
 # dir.fao <- paste0(dir.raw, 'FAOSTAT/'); 
@@ -900,42 +906,106 @@ fao_dataset <- get_faostat_bulk(code = "RL",   data_folder = dir.fao); ## Fertil
 
 names(fao_dataset)
 
-unique(fao_dataset$item)
-unique(fao_dataset$element)
+unique(fao_dataset$item) %>% sort()
+unique(fao_dataset$element) %>% sort()
 
 
 item_name    <- "Cropland"
-element_name <- "Area"
+element_name <- "area"
 
 dt1 <- fao_dataset %>%
   dplyr::filter(item    == item_name) %>%
   dplyr::filter(element == element_name) %>%
+  dplyr::filter(area_code < 5000) %>%
   as.data.frame()
+
+dt1_ <- dt1 %>%
+  dplyr::filter(area == 'Sudan')
 
 dt2 <- dt1 %>%
   dplyr::filter(year>=1990) %>%
   ### link with country code
-  merge(x = ., y = ctr.fao, by.x = 'area_code', by.y = 'FAOSTAT', all.x = T) %>%
+  merge(x = ., 
+        y = ctr.fao, 
+        by.x = 'area_code', by.y = 'FAOSTAT', 
+        all.x = T) %>%
   dplyr::select(-area_code, -item_code, -element_code, -year_code, -flag) %>% 
-  dplyr::select('area', 'Short name', 'ISO3', everything()) 
+  dplyr::select('area', 'Short name', 'ISO3', everything()) %>%
+  as.data.frame() %>%
+  # dplyr::distinct(ISO3, year, .keep_all = T) %>%
+  arrange(ISO3, year) %>%
+  as.data.frame()
 
+
+###' data check --------------------------------------------------------------------------
+###' 
+###' iso3 match, and fix un-matched ISO3 ----------
+###' 
+dt2_iso3NA <- dt2 %>%
+  dplyr::filter(is.na(ISO3)) %>%
+  dplyr::distinct(area, .keep_all = T) %>%
+  left_join(
+    x = .,
+    y = iso_eora_ex %>% dplyr::select(-IMF),
+    by = c('area' = 'Row')
+  ) %>%
+  arrange(!is.na(iso3_eora)) 
+
+
+dt2_addMissingISO <- dt2 %>%
+  dplyr::filter(is.na(ISO3)) %>%
+   left_join(
+    x = .,
+    y = iso_eora_ex %>% dplyr::select(-IMF),
+    by = c('area' = 'Row')
+  ) %>%
+  arrange(!is.na(iso3_eora)) %>%
+  dplyr::select(-ISO3) %>%
+  dplyr::rename('ISO3' = 'iso3_eora') %>%
+  dplyr::select(names(dt2))
+
+
+### update `dt2`
+dt2_update <- rbind(
+  dt2 %>% dplyr::filter(!is.na(ISO3)),
+  dt2_addMissingISO
+)
+
+# dt2_ <- dt2 %>% dplyr::filter(ISO3 == 'SDN')
+# dt2_ <- dt2 %>% dplyr::filter(area == 'China')
+#'
+#'
+#'check duplicated rows
+#'
+dd <- dt2_update
+# Find duplicated rows in the dataframe
+duplicated_rows <- dd[duplicated(dd) | duplicated(dd, fromLast = TRUE), ]
+duplicated_rows <- dd[duplicated(dd[, c("ISO3", "year")]),]
+unique(duplicated_rows$area)
+
+names(dt2)
 unit <- unique(dt2$unit); unit
 
-dt <- dt2 %>%
+dt <- dt2_update %>%
+  dplyr::mutate(area = gsub('Sudan \\(former\\)', 'Sudan', area)) %>%
   left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "ISO3")) %>%
-  dplyr::select(-`Short name`, -unit, -area, -item) #%>%
-  
+  dplyr::select(-`Short name`, -unit, -area, -item, -`area_code__m49_`) %>%
+  group_by(across(c(-value))) %>%
+  dplyr::summarise_at(vars(value), mean, na.rm = TRUE)
+
+# dt_ <- dt %>% dplyr::filter(iso3_eora == 'SDN')
+# dt_ <- dt %>% dplyr::filter(iso3_eora == 'CHN')  
 
 
 ### 1. format data
 df <- dt %>%
   spread(key = 'year', value = 'value') %>%
   # dplyr::select(-ncol(.)) %>%
-  
   dplyr::mutate(indicatorID = item_name, indicator = indicatorID, iso2c = '', country = '') %>%
   dplyr::select("country_eora", "iso3_eora","indicatorID","indicator","iso2c","country", everything()) %>%
   as.data.frame() %>%
   dplyr::select(where(not_all_na)) %>%
+  dplyr::select(-c("element")) %>%
   as.data.frame() 
 names(df)  
 
@@ -1074,7 +1144,7 @@ df <- dt %>%
   dplyr::select("country_eora", "iso3_eora","indicatorID","indicator","iso2c","country", everything()) %>%
   as.data.frame() 
 names(df)  
-iname <- unique(df$indicator)[!is.na(unique(dfwb$indicator))]; iname
+iname <- unique(df$indicator)[!is.na(unique(df$indicator))]; iname
 ### 2. fill NA
 function_fill_na_wb(df)
 ### 3. get a cleaned data and save to dir
@@ -1094,7 +1164,7 @@ df <- dt %>%
   dplyr::select("country_eora", "iso3_eora","indicatorID","indicator","iso2c","country", everything()) %>%
   as.data.frame()
 names(df)    
-iname <- unique(df$indicator)[!is.na(unique(dfwb$indicator))]; iname
+iname <- unique(df$indicator)[!is.na(unique(df$indicator))]; iname
 ### 2. fill NA
 function_fill_na_wb(df)
 ### 3. get a cleaned data and save to dir
@@ -1110,7 +1180,7 @@ df <- dt %>%
   dplyr::select("country_eora", "iso3_eora","indicatorID","indicator","iso2c","country", everything()) %>%
   as.data.frame()
 names(df)    
-iname <- unique(df$indicator)[!is.na(unique(dfwb$indicator))]; iname
+iname <- unique(df$indicator)[!is.na(unique(df$indicator))]; iname
 ### 2. fill NA
 function_fill_na_wb(df)
 ### 3. get a cleaned data and save to dir
@@ -1377,8 +1447,8 @@ touch, while others are designed to target one species.
 ```{r}
 ### 1. download data --------------------------------------------------------
 ###   1.1 download data via Package
-FAOsearch(dataset="Pesticide", full = FALSE)
-
+# FAOsearch(dataset="Pesticide", full = FALSE)
+# FAOsearch("Pesticide")
 
 ### Load crop production data
 dir.fao <- paste0(dir.raw, 'FAOSTAT/'); dir.fao
@@ -1394,7 +1464,7 @@ fname <- paste0(dir.fao, datasetname, ".rds"); fname
 
 ###   1.2. alternatively, download data via webpage
 csv <- "Inputs_Pesticides_Trade_E_All_Data_(Normalized).csv"
-csv <- paste0(dir.fao, 'Inputs_Pesticides_Trade/', csv); csv
+csv <- paste0(dir.fao, 'Inputs_Pesticides_Trade_E_All_Data_(Normalized)/', csv); csv
 dt_fao <- readr::read_csv(csv) %>% as.data.frame()
 names(dt_fao) <- tolower(names(dt_fao))
 names(dt_fao) <- gsub(' ', '_', names(dt_fao))
@@ -1541,7 +1611,7 @@ names(df1) <- colnames_formal
 ### - use sum 
 wld <- df0 %>% 
   dplyr::select(ISO_A3, Name, `2000`, `2005`, `2010`, `2015`) %>%
-  mutate_at(vars(`2000`:`2015`), .funs = as.numeric) %>%
+  dplyr::mutate_at(vars(`2000`:`2015`), .funs = as.numeric) %>%
   # dplyr::summarize_if(is.numeric, sum, na.rm=TRUE) #%>%
   dplyr::summarise_at(.vars = vars(`2000`:`2015`), sum, na.rm=TRUE)
 dat <- df1 %>%
@@ -1561,7 +1631,7 @@ df4 <- df1 %>%
 
 
 ### 5, save to results
-fname <- paste0(dir.process, 'cleaned/', iname, '_4yrs.xlsx'); fname
+fname <- paste0(dir.cleaned, iname, '_4yrs.xlsx'); fname
 writexl::write_xlsx(x = df4, path = fname)
 ```
 
@@ -1617,7 +1687,7 @@ df4 <- df1 %>%
 
 
 ### 5, save to results
-fname <- paste0(dir.process, 'cleaned/', iname, '_4yrs.xlsx'); fname
+fname <- paste0(dir.cleaned, iname, '_4yrs.xlsx'); fname
 writexl::write_xlsx(x = df4, path = fname)
 ```
 
@@ -1673,13 +1743,13 @@ df4 <- df1 %>%
 
 
 ### 5, save to results
-fname <- paste0(dir.process, 'cleaned/', iname, '_4yrs.xlsx'); fname
+fname <- paste0(dir.cleaned, iname, '_4yrs.xlsx'); fname
 writexl::write_xlsx(x = df4, path = fname)
 ```
 
 
 
-#### - Mortality NCD
+#### - NCD - Mortality
   
   SDG 3.4.1 - Mortality rate attributed to cardiovascular disease, cancer, diabetes, or chronic respiratory disease
   
@@ -1786,7 +1856,7 @@ C030b01 <- wb(indicator = ind, country = "countries_only",
 
 
 getwd()
-dir.gbd <- './Data/data_01_raw/GBD 2016 Health-related SDGs Indicators 1990-2030 Scaled and Unscaled Values/'
+dir.gbd <- './Data/data_01_raw/Health/GBD 2016 Health-related SDGs Indicators 1990-2030 Scaled and Unscaled Values/'
 csv <- 'IHME_GBD_2016_HEALTH_RELATED_SDG_1990_2030_UNSCALED_VALUES_Y2017M09D25.CSV'
 df <- read.csv(paste0(dir.gbd, csv), 
                # skip = 1, 
@@ -2218,10 +2288,12 @@ ind <- 'SL.UEM.TOTL.FE.ZS'
 csv <- paste0(dir.raw, 'FAO_aquastat/aquastat-Total freshwater withdrawal (10^9 m3_yr).csv'); csv
 dfao <- read_csv(file = csv) %>%
   dplyr::select(2, seq(4, 24, by = 4)) 
+names(dfao)
 names(dfao) <- c('ctr', 1990, 1995, 2000, 2005, 2010, 2015)
 dfao_total <- dfao %>%
   dplyr::filter(!is.na(ctr)) %>%
-  merge(x = ., y = iso_eora_ex, by.x = 'ctr', by.y = 'Row', all.x = T) %>%
+  merge(x = ., y = iso_eora_ex %>% select(-IMF), 
+        by.x = 'ctr', by.y = 'Row', all.x = T) %>%
   arrange(!is.na(iso3_eora)) %>%
   as.data.frame() %>%
   left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3_eora")) %>%
@@ -2378,7 +2450,7 @@ dfs <-
   spread(key = year, value = val)
 
 ### save to results
-fname <- paste0(dir.process, 'cleaned/', iname, '_4yrs.xlsx'); fname
+fname <- paste0(dir.cleaned, iname, '_4yrs.xlsx'); fname
 # writexl::write_xlsx(x = dfs, path = fname)
 # function_fill_na(dfs)
 ```
@@ -2731,11 +2803,11 @@ ind <- 'GFDD.AI.01'
 ind <- 'GFDD.AI.02'     ## 2001 - 
 ind <- 'FB.CBK.BRCH.P5' ## 2004 - 
 ind <- "WP14889.1"
-C081001 <- wb(indicator = ind, country = "countries_only",
-              startdate = yr_start, enddate = yr_end) %>%
-  as.data.frame() %>%
-  spread(key = date, value = value) %>%
-  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+# C081001 <- wb(indicator = ind, country = "countries_only",
+#               startdate = yr_start, enddate = yr_end) %>%
+#   as.data.frame() %>%
+#   spread(key = date, value = value) %>%
+#   left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
 
 ```
 
@@ -3195,7 +3267,7 @@ dat1 <- get_ilostat(id = 'SDG_F881_SEX_MIG_RT_A', segment = 'indicator', time_fo
                 classif1.label,
                 time, obs_value) %>%
   dplyr::filter(str_detect(classif1.label, "Total|total"))
-unique(dat2$classif1.label)
+unique(dat1$classif1.label)
 
 ft1 <- dat1 %>%
   dplyr::filter(classif1 == 'MIG_STATUS_TOTAL') %>%
@@ -3532,7 +3604,7 @@ df4 <- df3 %>%
 
 
 ### 5, save to results
-fname <- paste0(dir.process, 'cleaned/', iname, '_4yrs.xlsx'); fname
+fname <- paste0(dir.cleaned, iname, '_4yrs.xlsx'); fname
 writexl::write_xlsx(x = df4, path = fname)
 ```
 
@@ -3570,7 +3642,7 @@ print(paste0('There are ', round(sum(is.na(dfwb_fillna_4yrs))/(190*4)*100, digit
 
 
 
-```{r - other}
+```{r - other, eval=FALSE, include=FALSE}
 # IS.RRS.PASG.KM	   + Railways, passengers carried (million passenger-km)
 # IS.RRS.GOOD.MT.K6	 + Railways, goods transported (million ton-km)
 # IS.AIR.PSGR	      ++ Air transport, passengers carried
@@ -3627,7 +3699,7 @@ fname <- paste0(dir.process, iname, '.csv'); fname
 
 ind <- "IE.PPI.ENGY.CD"
 ind <- "IE.PPI.TRAN.CD"       
-ind <- 'DAK.INFR.H2O.CR' 
+# ind <- 'DAK.INFR.H2O.CR' 
 
 C090a01 <- wb(indicator = ind, country = "countries_only",
               startdate = yr_start, enddate = yr_end) %>%
@@ -3706,9 +3778,11 @@ id_indicator <- 'SDG_1041_NOC_RT_A'
 
 dt0 <- get_ilostat(id = id_indicator, segment = 'indicator', time_format = 'num', type = 'both') 
 
+var_remove <- c('source', 'source.label', 'indicator', 'indicator.label', 
+                'obs_status', 'obs_status.label')
+
 dt1 <- dt0 %>%
-  dplyr::select(-source, -source.label, -indicator, -indicator.label, 
-                -obs_status, -obs_status.label 
+  dplyr::select(-any_of(var_remove)
                 #-note_indicator, -note_indicator.label, -note_source, -note_source.label
                 ) %>%
   # dplyr::filter(str_detect(classif1.label, "Total|total")) %>%
@@ -3948,10 +4022,10 @@ S1102 <- wb(indicator = ind, country = "countries_only",
   
 ```{r}
 
-dir.plus <- './Data/data_02_intermediate/dt02_flows/Global Material Flows Database_unep_irp/'
+dir.mf <- './Data/data_02_intermediate/dt02_flows/Global Material Flows Database_unep_irp/'
 
 ### Resource consumption or emissions under the current trading world situation -------------------------
-xls <- paste0(path = dir.plus, 'DE.csv'); xls 
+xls <- paste0(path = dir.mf, 'DE.csv'); xls 
 var_w <- readr::read_csv(file = xls) %>% as.data.frame() %>% 
   dplyr::filter(!is.na(`Flow Type`)) %>%
   # dplyr::select(Country, `Flow Type`, `2000`:`2015`) %>%
@@ -3978,7 +4052,7 @@ function_format_4yrData_save(iname = iname) ## "There are 14.7% NA"
 
 ```{r }
 
-xls <- paste0(path = dir.plus, 'MF.csv'); xls 
+xls <- paste0(path = dir.mf, 'MF.csv'); xls 
 var_w <- read_csv(file = xls) %>% as.data.frame() %>% 
   dplyr::filter(!is.na(`Flow Type`)) %>%
   # dplyr::select(Country, `Flow Type`, `2000`:`2015`) %>%
@@ -3991,9 +4065,10 @@ var_w <- read_csv(file = xls) %>% as.data.frame() %>%
   dplyr::mutate(indicatorID = NA, iso2c = NA) %>%
   dplyr::select(country_eora, iso3_eora, indicatorID, indicator, iso2c, country, everything()) %>%
   as.data.frame()
+
 iname <- 'Material footprint'; iname
 ### 2. fill NA
-function_fill_na_wb(var_w)
+function_fill_na_wb(var_w, year_from = 1995)
 ### 3. get a cleaned data and save to dir
 function_format_4yrData_save(iname = iname) ## "There are 14.7% NA"
 ```
@@ -4272,7 +4347,7 @@ print(paste0('There are ', round(sum(is.na(dfwb_fillna_4yrs))/(190*4)*100, digit
 
 
 
-```{r - other }
+```{r - other, eval=FALSE, include=FALSE}
 ### urban waste water --------------------------------------------------------
 # ind <- './aquastat__wastewater_fao.csv' ## too many missing years
 # ind0 <- read.csv(ind, header = T, strip.white = T) %>% #, row.names = F, col.names = T, sep = '.\t')
@@ -4310,7 +4385,7 @@ ind <- 'ER.FSH.CAPT.MT'
 ind <- 'ER.FSH.PROD.MT'
 
 ind <- 'DT.ODA.DACD.PROD.AGRI.FISH.CD'
-ind <- 'DAK.FSH.CR'
+# ind <- 'DAK.FSH.CR'
 C140701 <- wb(indicator = ind, country = "countries_only",
               startdate = yr_start, enddate = yr_end) %>%
   as.data.frame() %>%
@@ -4341,28 +4416,40 @@ C140701 <- wb(indicator = ind, country = "countries_only",
 
   Fertilizers Use per area of cropland (kg/ha), which can be a proxy of coastal *eutrophication*.
   
+  `FAOsearch()`, this function is deprecated, please got to the FAOSTAT website and  copy the bulk download url. For example on the crop production page the file is called "Production_Crops_Livestock_E_All_Data_(Normalized).zip" make sure to choose the file in long format (normalized), then use the functions in https://gitlab.com/paulrougieux/faostatpackage/-/blob/master/FAOSTAT/R/faostat_bulk_download.R#L67
+to load and read the data. By default it renames columns to lower case to make programming with column names easier.
+
+  https://www.fao.org/faostat/en/#data/RFN
+  
 ```{r }
-
-FAOsearch(dataset="Fertilizers", full = FALSE)
-
 ### Load crop production data
-dir.fao <- paste0(dir.raw, 'FAOSTAT/'); dir.fao
+dir.fao
 
-fao_ef  <- get_faostat_bulk(code = "EF",   data_folder = dir.fao); ## Fertilizers indicators
-fao_rfn <- get_faostat_bulk(code = "RFN",  data_folder = dir.fao); ## Fertilizers by Nutrient
 
-names(fao_ef)
-names(fao_rfn)
+###' The R package does not work any more, updated on 2023-07-28 -------------------------
+###' 
+# FAOsearch(dataset="Fertilizers", full = FALSE)
+# fao_ef  <- get_faostat_bulk(code = "EF",   data_folder = dir.fao); ## Fertilizers indicators
+# fao_rfn <- get_faostat_bulk(code = "RFN",  data_folder = dir.fao); ## Fertilizers by Nutrient
+# 
+# names(fao_ef)
+# names(fao_rfn)
+# 
+# unique(fao_ef$item)
+# unique(fao_ef$element)
 
-unique(fao_ef$item)
-unique(fao_ef$element)
 
+###' We now use the downloaded data ------------------------------------------------------
 datasetname <- 'Fertilizers Use per area of cropland'
 ### Cache the file i.e. save the data frame in the serialized RDS format for fast reuse later.
 fname <- paste0(dir.fao, datasetname, ".rds"); fname
 # saveRDS(fao_ef, fname)
+
 ### Now you can load your local version of the data from the RDS file
-# FAO_FBS <- readRDS(fname)
+f <- paste0(dir.fao, 'Inputs_FertilizersNutrient_E_All_Data_(Normalized)_v202307/',
+            "Inputs_FertilizersNutrient_E_All_Data_(Normalized).csv");
+fao_ef  <- readRDS(fname)
+fao_rfn <- readr::read_csv(f, show_col_types = FALSE)
 
 str(fao_ef)
 unique(fao_ef$item)
@@ -4469,25 +4556,25 @@ function_format_4yrData_save(iname = iname) ## "There are 18.4% NA"
     *Capture fisheries production (metric tons)* measures the volume of fish catches landed by a country for all commercial, industrial, recreational and subsistence purposes.
     *FAO FishStatJ* Capture production by sources provides a better data that distinguish inland and marine production, as well we wild captured and farmed (or called mariculture, aquaculture). In this study, we chose to use this data for analysis. 
   
-```{r }
-# ind <- 'ER.FSH.PROD.MT'; ## Total fisheries production (metric tons)
-# ind <- 'ER.FSH.CAPT.MT'; ## Capture fisheries production (metric tons)
-# ### 1. download data from WB
-# dfwb  <- wb(indicator = ind, country = "countries_only",
-#             startdate = yr_start, enddate = yr_end) %>%
-#   as.data.frame() %>%
-#   spread(key = date, value = value) %>%
-#   left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
-# unique(dfwb$indicator)
-# iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
-# ### 2. fill NA
-# function_fill_na_wb(dfwb)
-# ### 3. get a cleaned data and save to dir
-# function_format_4yrData_save(iname = iname) # "There are 2.1% NA"
+```{r - FAO + WB}
+ind <- 'ER.FSH.CAPT.MT'; ## Capture fisheries production (metric tons)
+ind <- 'ER.FSH.PROD.MT'; ## Total fisheries production (metric tons)
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+unique(dfwb$indicator)
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(dfwb)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) # "There are 2.1% NA"
 
 
 
-
+## Using FAO data ------------------------------------------------------------------------
 source('./Code/11_FAO_FishStatJ.R')
 ```
 
@@ -4880,8 +4967,6 @@ fname <- paste0(dir.process, gsub('.csv', '_FILLNA.csv', csv)); fname
 fname <- paste0(dir.process, gsub('.csv', '_tidy.csv', csv)); fname
 write.csv(x = undp_tidy, file = fname, row.names = F)
 
-
-
 ```
 
 
@@ -4889,13 +4974,12 @@ write.csv(x = undp_tidy, file = fname, row.names = F)
 ```{r}
 getwd()
 dir.undata <- './Data/data_01_raw/UNdata/'
-csv <- 'UNdata_Total wastewater generated.csv' ## only 31 countries
-csv <-paste0(dir.undata, csv); csv
-df <- read.csv(csv, stringsAsFactors = F) %>%
+csv <- 'UNdata_Total wastewater generated/UNdata_Total wastewater generated.csv' ## only 31 countries
+csv <- paste0(dir.undata, csv); csv
+df <- read_csv(file = csv, show_col_types = FALSE) %>%
   filter(!is.na(Value))
-ctr_undata <- unique(df$Country.or.Area) %>% as.data.frame()
-
-
+names(df)
+ctr_undata <- unique(df$`Country or Area`) %>% as.data.frame()
 
 ```
 
@@ -4908,7 +4992,6 @@ ctr_undata <- unique(df$Country.or.Area) %>% as.data.frame()
 ### OECD
 ```{r eval=FALSE, include=FALSE}
 getwd()
-dir.oecd <- './Data/data_01_raw/OECD/'
 csv <- 'BUILT_UP_16022020191532631.csv'; iname <- 'built_up_area_OECD'
 csv <- 'MATERIAL_RESOURCES_16022020202331503.csv'; iname <- 'material_consumption_oecdstat'
 csv <- 'SNA_TABLE11_16022020221726299.csv'; iname <- 'Government expenditure by function'
@@ -5010,28 +5093,25 @@ unique(oecd$Unit)
 
 
 *wastewater*
-```{r}
+```{r eval=FALSE, include=FALSE}
 csv  <- 'WATER_DISCHARGE_Generation and discharge of wastewater.csv'
-oecd <- read.csv(file = paste0(dir.oecd, csv), stringsAsFactors = F) #%>%
-  select(1:2, 4, 6, 8, 10, 15) %>%
-  filter(Time >= 1990,
-         # Indicator != "Balance per hectare", 
-         Indicator == 'Nutrient inputs',
-         ) %>%
-  rename('COU' = 1, Year = Time) %>%
-  arrange(COU, Year) %>%
-  spread(key = Year, value = Value)  %>%
-  left_join(x  = ctr_eora, y = ., by = c("iso3_eora" = "COU"))
+oecd <- read_csv(file = paste0(dir.oecd, csv), show_col_types = FALSE) #%>%
+  # select(1:2, 4, 6, 8, 10, 15) %>%
+#   filter(Year >= 1990,
+#          # Indicator != "Balance per hectare", 
+#          Variable == 'Nutrient inputs',
+#          ) #%>%
+#   rename('COU' = 1, 'Year' = 'Time') %>%
+#   arrange(COU, Year) %>%
+#   spread(key = Year, value = Value)  %>%
+#   left_join(x  = ctr_eora, y = ., by = c("iso3_eora" = "COU"))
+#   
+# names(oecd)
+# unique(oecd$Variable)  
+# unique(oecd$Nutrients)  
+# unique(oecd$Unit)
   
-names(oecd)
-unique(oecd$Indicator)  
-unique(oecd$Nutrients)  
-unique(oecd$Unit)
-  
-```
 
-
-```{r - fill na, eval=FALSE, include=FALSE}
 ### fill na
 df <- oecd
 source('function_fill_na_oecd.R')
