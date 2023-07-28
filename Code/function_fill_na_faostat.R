@@ -2,7 +2,7 @@
 
 ### fill na function for fao data
 
-function_fill_na_faostat <- function(df) {
+function_fill_na_faostat <- function(df, year_from = 1990) {
   library(imputeTS)
   dfs <- data.frame()
   
@@ -18,6 +18,8 @@ function_fill_na_faostat <- function(df) {
       gather(key = 'year', value =  'value', -c(1:6)) %>%
       mutate(year = gsub('X', '', year)) %>%
       mutate(year = year(as.Date(year, format="%Y"))) %>%
+      ## filter out old years, due to many NA in earlier years
+      dplyr::filter(year >= year_from) %>%
       mutate(value = as.numeric(value)) %>%
       arrange(year) # %>% ## order by date
    

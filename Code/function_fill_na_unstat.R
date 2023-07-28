@@ -7,7 +7,7 @@ library(writexl)
 library(tidyverse)
 
 
-function_fill_na_unstat <- function(df) {
+function_fill_na_unstat <- function(df, year_from = 1990) {
   dfs <- data.frame()
   
   n <- length(unique(df$iso3_eora))
@@ -28,6 +28,8 @@ function_fill_na_unstat <- function(df) {
       # mutate(year = gsub('X', '', year)) %>%
       mutate(year = year(as.Date(year, format="%Y"))) %>%
       mutate(value = as.numeric(value)) %>%
+      ## filter out old years, due to many NA in earlier years
+      dplyr::filter(year >= year_from) %>%
       arrange(year) # %>% ## order by date
    
     

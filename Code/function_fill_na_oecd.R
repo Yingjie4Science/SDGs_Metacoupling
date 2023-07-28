@@ -2,7 +2,7 @@
 
 ### fill na function for OECD data
 
-function_fill_na_oecd <- function(df) {
+function_fill_na_oecd <- function(df, year_from = 1990) {
   dfs <- data.frame()
   
   n <- length(unique(df$iso3_eora))
@@ -17,6 +17,8 @@ function_fill_na_oecd <- function(df) {
       gather(key = 'year', value =  'value', -c(1:5)) %>%
       # mutate(year = gsub('X', '', year)) %>%
       mutate(year = year(as.Date(year, format="%Y"))) %>%
+      ## filter out old years, due to many NA in earlier years
+      dplyr::filter(year >= year_from) %>%
       mutate(value = as.numeric(value)) %>%
       arrange(year) # %>% ## order by date
 

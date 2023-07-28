@@ -7,7 +7,7 @@ library(imputeTS) ### for na_locf fuction
 library(writexl)
 library(tidyverse)
 
-fill_na_owid <- function(df) {
+fill_na_owid <- function(df, year_from = 1990) {
   dfs <- data.frame()
   
   n <- length(unique(df$iso3_eora))
@@ -23,6 +23,8 @@ fill_na_owid <- function(df) {
       gather(key = year, value = value, -c(1:3)) %>%
       mutate(year = gsub('X', '', year)) %>%
       mutate(year = year(as.Date(year, format="%Y"))) %>%
+      ## filter out old years, due to many NA in earlier years
+      dplyr::filter(year >= year_from) %>%
       mutate(value = as.numeric(value)) %>%
       arrange(year) # %>% ## order by date
     ### if too many NA, then NA; if less, use interpolation

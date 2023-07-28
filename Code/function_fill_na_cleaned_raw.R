@@ -9,7 +9,7 @@ library(tidyverse)
 library(lubridate)
 
 
-function_fill_na <- function(df) {
+function_fill_na <- function(df, year_from = 1990) {
   dfss <- data.frame()
   
   n <- length(unique(df$iso3))
@@ -23,6 +23,8 @@ function_fill_na <- function(df) {
       gather(key = 'year', value =  'value', 3:ncol(.)) %>%
       dplyr::mutate(year = gsub('X', '', year)) %>%
       dplyr::mutate(year = year(as.Date(year, format="%Y"))) %>%
+      ## filter out old years, due to many NA in earlier years
+      dplyr::filter(year >= year_from) %>%
       dplyr::mutate(value = as.numeric(value)) %>%
       arrange(year) # %>% ## order by date
    
