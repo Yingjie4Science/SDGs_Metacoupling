@@ -2462,13 +2462,109 @@ df_score <- func_norm_sdg_score_auto(
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
 
-score_10_4_1 <- df_score
+score_10_4_1x <- df_score
 
 
 ### plot to compare ----------------------------------------------------------------------
 helper_func_plot_map(data = rel_not, var = 'value_rel', yr = 2015, filename_postfix = ind_sdg)
 helper_func_plot_map(data = rel_not, var = 'value_not', yr = 2015, filename_postfix = ind_sdg)
 ```
+
+
+#### - 10.4.x Social protection
+
+  *SDG* - 10.4 Adopt policies, especially fiscal, wage and social protection policies, and progressively achieve greater
+equality
+  
+  *FT*  - 1.I Social Benefits - 1.I.n Overall risk of no or limited social benefits
+
+```{r}
+ind_sdg <- 'Risk of social benefits'
+ind_ft  <- 'SHDB8_1In' 
+
+direction_sdg <- -1
+
+### Check the Unit!!!
+### rel -->           10^3 person
+### ft  -->           10^3 person
+### total workers --> 10^3 person
+
+
+### Resource consumption or emissions under the current trading world situation ----------
+### --> use the EORA data to calculate `total risk-weighted employment`
+f <- paste0(dir.eora_cleaned, ind_ft, '.xlsx')
+rel <- readxl::read_excel(f) %>%
+  ### use SHDB 2019 for 2015 --------------------!!!
+  dplyr::mutate(
+    year = ifelse(year == 2019, 2015, year)) %>%
+  gather(key = 'to', value = 'value', 4:ncol(.)) %>%
+  group_by(year, iso3, ctr) %>%
+  dplyr::summarise(value = sum(value, na.rm = F)) %>%
+  ungroup() %>%
+  dplyr::mutate(value = as.numeric(value),
+                value = ifelse(value == 0, NA, value)) %>%
+  dplyr::mutate(value = ifelse(iso3 == 'GRL', NA, value)) %>%   ## only for data from EORA - remove "Greenland"
+  dplyr::select(-ctr) %>%
+  arrange(iso3, year) %>%
+  as.data.frame()
+
+
+### Outsourced footprints (oft) flow -----------------------------------------------------
+oft <- net_imports_bind  %>%
+  dplyr::filter(ind == ind_ft) %>%
+  # dplyr::mutate(net_in = format(net_in, scientific = F)) %>%
+  dplyr::select(ind, year, iso3, net_in, scenario) %>%
+  dplyr::mutate(net_in = ifelse(year == 2000, NA, net_in)) %>%  ## for SHDB data only, as no data for 2000
+  spread(key = scenario, value = net_in) %>%
+  arrange(ind, iso3, year)
+
+
+
+### w/o trade, and with trade together  --------------------------------------------------
+rel_not_merge <- rel %>%
+  merge(x = ., y = total_labor, by = c('iso3', 'year'), all.x = T) %>%
+  merge(x = ., y = oft,         by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::mutate(
+    ind       = ind_ft,
+    ## total at-risk/total worker
+    value_rel = (value - 0)/(total_workers + 1),                          
+    ## [(total at-risk) - (at-risk workers working for exports)] / total workers
+    value_not = (value - (-fromAll)) / (total_workers),  
+    ## [(total at-risk) - (at-risk workers working for nearby exports)] / total workers
+    value_dst = (value - (-fromNer)) / (total_workers),
+    value_ner = (value - (-fromDst)) / (total_workers)) %>% 
+  dplyr::select(ind, iso3, year, value, everything())
+
+
+# rel_not_merge1 <- 
+  rel_not_merge %>%
+  dplyr::select(iso3, starts_with('value_')) %>%
+  gather(key = 'scenario', value = 'value', value_rel:value_ner) %>%
+  ggplot(data = ., aes(x=scenario, y=value)) + 
+  geom_violin(trim=FALSE)
+
+
+check1 <- rel_not_merge %>% 
+  dplyr::filter(year == 2015) %>%
+  arrange(desc(value_rel)) %>%
+  dplyr::mutate(rank=dense_rank(dplyr::desc(value_rel))) %>%
+  as.data.frame()
+
+
+rel_not <- rel_not_merge %>%
+  dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
+
+
+### normalization  -------------------------------------------------------
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  dplyr::mutate(ind_sdg = ind_sdg) %>%
+  as.data.frame()
+
+score_10_4_x <- df_score
+```
+
+
 
 
 #### - 10.b.1x FDI for development
@@ -3539,6 +3635,78 @@ df_score <- func_norm_sdg_score_auto(
 score_15_2_1 <- df_score
 ```
 
+
+#### - 15.5.1 Biodiversity footprint 
+
+  - Potentially disappeared fraction of species (PDF) on annual crops
+
+  15.5 Take urgent and significant action to reduce the degradation of natural habitats, halt the loss of biodiversity and, by 2020, protect and prevent the extinction of threatened species
+
+```{r}
+ind_sdg    <- 'Biodiversity - PDF on annual crops' ## 
+ind_ft     <- 'biodiversity_Annual crops' ## 
+unit_check <- ''
+direction_sdg <- -1
+
+### Check the Unit!!!
+### rel --> 
+### oft --> PDF
+
+
+### Resource consumption or emissions under the current trading world situation --------------------
+xls   <- paste0(dir.eora_cleaned, 'biodiversity_Annual crops.xlsx'); xls 
+rel_w <- readxl::read_excel(path = xls) %>% as.data.frame() ## the status data 
+rel <- rel_w %>%
+  gather(key = 'to', value = 'value', 4:ncol(.)) %>%
+  dplyr::select(-ctr) %>%
+  group_by(year, iso3) %>%
+  dplyr::summarise_at(c("value"), sum, na.rm = TRUE) %>%
+  ungroup() %>%
+  # dplyr::filter(year %in% yrs) %>%
+  as.data.frame()
+# hist(rel$value)
+  
+
+### Outsourced footprints (oft) flow ---------------------------------------------------------------
+oft <- net_imports_bind  %>%
+  dplyr::filter(ind == ind_ft) %>%
+  dplyr::select(ind, year, iso3, net_in, scenario) %>%
+  spread(key = scenario, value = net_in)
+
+
+
+### w/o trade, and with trade together  ------------------------------------------------------------
+rel_not_merge <- rel %>%
+  merge(x = ., y = oft, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::mutate(
+    ind       = unique(oft$ind),
+    value_rel = (value +       0),
+    value_not = (value + fromAll),
+    value_dst = (value + fromNer),
+    value_ner = (value + fromDst)
+    ) %>%
+  ### for easy-checking the numbers
+  dplyr::select(ind, iso3, year, value, everything())
+
+rel_not <- rel_not_merge %>%
+  dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
+
+hist(rel_not$value_rel)
+
+### normalization  -------------------------------------------------------
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  dplyr::mutate(ind_sdg = ind_sdg) %>%
+  as.data.frame()
+
+
+score_15_5_1 <- df_score
+
+
+### plot to compare ----------------------------------------------------------------------
+helper_func_plot_map(data = rel_not, var = 'value_rel', yr = 2015, filename_postfix = ind_sdg)
+helper_func_plot_map(data = rel_not, var = 'value_not', yr = 2015, filename_postfix = ind_sdg)
+```
 
 
 

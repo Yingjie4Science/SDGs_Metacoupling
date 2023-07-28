@@ -1111,7 +1111,7 @@ map_each_p <- map_each %>%
   scale_fill_distiller(palette = "Spectral", direction = -1, na.value = 'gray70', name= 'Effect Score') +
   facet_wrap(~ShortName, ncol = n_col, nrow = n_row) +
   # ggtitle(yr)+
-  theme(legend.position = c(0.9, 0.08)) +
+  theme(legend.position = c(0.9, 0.07)) +
   theme(panel.grid = element_blank(),
         axis.ticks = element_blank(),
         axis.text  = element_blank(),
@@ -1121,7 +1121,7 @@ map_each_p <- map_each %>%
         ) 
 map_each_p
 fname <- paste0(dir.fig, 'spillover/', 'map_spillover_norm_each_', yr, '_long_', today, '.jpg'); #fname
-ggsave(filename = fname, plot = map_each_p, width = 7, height = 7, units = 'in', dpi = 300)
+ggsave(filename = fname, plot = map_each_p, width = 7, height = n_row*7.2/8, units = 'in', dpi = 300)
 ```
 
 
