@@ -193,7 +193,7 @@ keywords <- c(
   # 'slum' 
   # 'public'
   # 'land area'
-  'Labor force'
+  # 'Labor force'
   # 'urban|rural'
   # 'urban|city|cities'
   # 'male|female'
@@ -210,6 +210,7 @@ keywords <- c(
   # 'Passenger'
   # 'transport'
   # 'GDP',
+  'GNI'
   # 'trade'
   # 'export'
   # 'bank|ATM|account|financial'
@@ -601,6 +602,37 @@ function_format_4yrData_save(iname = iname)
 ```
 
 
+
+  GNI (formerly GNP) is the sum of value added by all resident producers plus any product taxes (less subsidies) not included in the valuation of output plus net receipts of primary income (compensation of employees and property income) from abroad. Data are in current U.S. dollars. GNI, calculated in national currency, is usually converted to U.S. dollars at official exchange rates for comparisons across economies, although an alternative rate is used when the official exchange rate is judged to diverge by an exceptionally large margin from the rate actually applied in international transactions.
+```{r - GNI}
+# NY.GNP.MKTP.KD	    GNI (constant 2010 US$)                  18.8% NA
+# NY.GNP.MKTP.CN	    GNI (current LCU)                         4.2% NA
+# NY.GNP.MKTP.CD	    GNI (current US$)                         4.2% NA
+# NY.GNP.ATLS.CD	    GNI, Atlas method (current US$)           4.2% NA --> use this one
+# NY.GNP.MKTP.PP.KD	  GNI, PPP (constant 2017 international $) 23.2% NA
+# NY.GNP.MKTP.PP.CD	  GNI, PPP (current international $)        7.9% NA
+# NY.GNP.MKTP.CN.AD	  GNI: linked series (current LCU)          4.7% NA
+
+#' In `GNI, Atlas method (current US$)` - To smooth fluctuations in prices and exchange rates, a special Atlas method of conversion is used by the World Bank.
+#' 
+ind <- 'NY.GNP.MKTP.CN.AD'; 
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+unique(dfwb$indicator)
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; 
+iname <- gsub('\\:', '', iname)
+
+### 2. fill NA
+function_fill_na_wb(dfwb)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname)
+
+
+```
 
 
 ```{r - Poverty headcount}
