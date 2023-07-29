@@ -30,6 +30,24 @@ gc()
 
 ### - ODA OECD
 
+  OECD offers several data sources for ODA data. 
+  
+  * *An overview* 
+    https://www.oecd.org/dac/financing-sustainable-development/development-finance-data/
+    
+  * *Data* 
+    - Geographical Distribution of Financial Flows to Developing Countries, a report, and also a collection of data at https://doi.org/10.1787/20743149 --> the data can be extracted and downloaded from https://stats.oecd.org/Index.aspx?datasetcode=TABLE7B# 
+    
+    - [Flows by Provider and Recipient](https://stats.oecd.org/Index.aspx?datasetcode=TABLE7B#) -- *BEST* data sources
+      There are several options to download data. 
+      To download all and do data cleaning locally, you can click Export/Related files/ and then click on the link to bulk download the tables. 
+    
+  * *Others*
+    - Frequently asked questions on ODA https://www.oecd.org/dac/financing-sustainable-development/development-finance-data/faq.htm
+    - Development finance institutions and private sector development https://www.oecd.org/development/development-finance-institutions-private-sector-development.htm 
+  
+
+
   Unit	US Dollar, Millions
 
 ```{r - input data- which ? }
