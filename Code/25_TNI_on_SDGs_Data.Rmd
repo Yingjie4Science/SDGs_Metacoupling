@@ -136,20 +136,27 @@ Note1 <- "please refer to `_SDG_ind_upper_lower_bounds_edited.xlsx` -- but still
 ```{r FT data -- choose input ❓}
 
 ### load 1: trade vs no-trade scenarios
-ls_f <- list.files(path = dir.input2, pattern = '^net_imports_fromAll', full.names = T); ls_f
+ls_f <- list.files(path = dir.input2, pattern = '^net_imports_fromAll', full.names = T); 
+# ls_f
 f <- tail(ls_f, n = 1); cat('\n Here, we load this version as input: \n\t', f, '\n\n')
 load(file = f) ## load the latest data `net_imports_fromAll`
 
 
 ### load 2: distant trade vs. nearby trade scenarios
-ls_f <- list.files(path = dir.input2, pattern = '^net_imports_fromDst_fromNer', full.names = T); ls_f
+ls_f <- list.files(path = dir.input2, pattern = '^net_imports_fromDst_fromNer', full.names = T); 
+# ls_f
 f <- tail(ls_f, n = 1); cat('\n Here, we load this version as input: \n\t', f, '\n\n')
 load(file = f) 
 
 
 ### combine 
 net_imports_bind <- rbind(net_imports_fromAll, net_imports_fromDst_fromNer) 
+
+###' Need to specify the number of year's data included in the analysis 
+###' This can ensure all other data considered are in the same time frame. 
+yrs <- unique(net_imports_bind$year)
 ```
+
 
 
 ```{r Pop gdp shp}
@@ -330,6 +337,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = pop_l,  by = c('iso3', 'year'), all.x = T) %>% 
   merge(x = ., y = oft,    by = c('iso3', 'year'), all.x = T) %>% 
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     net_ex    = - fromAll,        ## number of employment at poverty associated with exports
@@ -408,6 +416,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = pop_l,  by = c('iso3', 'year'), all.x = T) %>% 
   merge(x = ., y = oft,    by = c('iso3', 'year'), all.x = T) %>% 
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value)/(pop/1000), 
@@ -462,7 +471,7 @@ rel <- readxl::read_excel(path = xls) %>%
 
 
 ### --> cropland (ha)
-xls <- list.files(path = dir.input1, pattern = '^Cropland_Area', full.names = T); xls 
+xls <- list.files(path = dir.input1, pattern = '^Cropland_area', full.names = T); xls 
 cropland_area <- readxl::read_excel(path = xls) %>% 
   dplyr::select(-ctr) %>%
   gather(key = 'year', value = 'cropland_area', `2000`:ncol(.)) %>%
@@ -482,6 +491,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = oft,         by = c('iso3', 'year'), all.x = T) %>% 
   merge(x = ., y = land_total,  by = c('iso3', 'year'), all.x = T) %>% ## total land
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value +       0)/(land_total_km2*100), ## 
@@ -564,6 +574,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- total_Cereals %>%
   merge(x = ., y = pop_l, by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = oft,   by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::rename(value = total_Cereals) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
@@ -632,6 +643,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = oft,         by = c('iso3', 'year'), all.x = T) %>% 
   merge(x = ., y = land_total,  by = c('iso3', 'year'), all.x = T) %>% ## total land
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value + 0)/(land_total_km2*100),           ## 
@@ -699,6 +711,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = oft,         by = c('iso3', 'year'), all.x = T) %>% 
   merge(x = ., y = land_total,  by = c('iso3', 'year'), all.x = T) %>% ## total land
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value + 0)/(land_total_km2*100),           ## 
@@ -791,6 +804,7 @@ rel_not_merge <- rel %>%
   # merge(x = land_total %>%  distinct(iso3, year), y = ., by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = oft,   by = c('iso3', 'year'), all.x = T) %>% 
   merge(x = ., y = pop_l, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value)/pop,
@@ -897,6 +911,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = pop_l,  by = c('iso3', 'year'), all.x = T) %>% 
   merge(x = ., y = oft,    by = c('iso3', 'year'), all.x = T) %>% 
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value)/(pop/1000), 
@@ -963,6 +978,7 @@ length(unique(oft$iso3))
 ### w/o trade, and with trade together  -----------------------------------------------------------------
 rel_not_merge <- oft %>%
   merge(x = ., y = pop_l, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     # value_ex  = total_ex/pop,  ## net exports as the measurement
@@ -1017,6 +1033,7 @@ length(unique(oft$iso3))
 ### w/o trade, and with trade together  -----------------------------------------------------------------
 rel_not_merge <- oft %>%
   merge(x = ., y = pop_l, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = fromAll,     ## more out-flow, the better
@@ -1098,6 +1115,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = total_workers, by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = oft,           by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = ind_ft,
     value_rel = (value*total_workers)/(total_workers + 0), 
@@ -1206,6 +1224,7 @@ rel_not_merge <- rel %>%
   # merge(x = ., y = total_workers, by = c('iso3', 'year'), all.x = T) %>% ## data interpolation issue in this data
   merge(x = ., y = total_labor, by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = oft,         by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = ind_ft,
     ## total at-risk/total worker
@@ -1305,7 +1324,8 @@ oft <- net_imports_bind  %>%
 ### w/o trade, and with trade together  --------------------------------------------------
 rel_not_merge <- rel %>%
   merge(x = ., y = total_labor, by = c('iso3', 'year'), all.x = T) %>%
-  merge(x = ., y = oft,           by = c('iso3', 'year'), all.x = T) %>%
+  merge(x = ., y = oft,         by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = ind_ft,
     ## total at-risk/total worker
@@ -1396,6 +1416,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = oft,         by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = gdp_rel_not, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = gdp_rel/(value +      0),
@@ -1474,6 +1495,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = oft,          by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = total_water,  by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value +       0)/total_water,
@@ -1553,6 +1575,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- total_ft %>%
   merge(x = ., y = total_water, by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = oft,         by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (total_ft +       0)*unit_check/total_water,
@@ -1629,6 +1652,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = oft,   by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = pop_l, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value +      0)/pop,       
@@ -1704,6 +1728,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = oft,         by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = gdp_rel_not, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value +       0)/gdp_rel,
@@ -1781,6 +1806,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = oft,                 by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = totalenergy_rel_not, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value +       0)/var_rel,       ## var_rel --> total energy use under real world
@@ -1847,6 +1873,7 @@ base <- gdp_rel_not %>%
 rel_not_merge <- gdp_rel_not %>%
   merge(x = ., y = base,  by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = pop_l, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (gdp_rel - base)/pop,
@@ -1953,6 +1980,7 @@ ft   <- ft_w %>%
 rel_not_merge <- mat %>%
   merge(x = ., y = ft,    by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = pop_l, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     # ind       = 'material',
     value_rel = (value + 0)/pop,
@@ -2007,6 +2035,7 @@ direction_sdg <- -1
 rel_not_merge <- mat %>%
   merge(x = ., y = ft,          by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = gdp_rel_not, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     value_rel = (value +       0)/gdp_rel,
     value_not = (value + fromAll)/gdp_not,
@@ -2093,6 +2122,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = total_workers, by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = oft,           by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value +       0)/total_workers*10^5,
@@ -2169,6 +2199,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = total_workers, by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = oft,           by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value +       0)/total_workers*10^5,
@@ -2238,6 +2269,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = gdp_rel_not, by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = oft,         by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value +       0)/gdp_rel,
@@ -2338,6 +2370,7 @@ oft <- net_imports_bind  %>%
 ### w/o trade, and with trade together  -----------------------------------------------------------------
 rel_not_merge <- oft %>%
   merge(x = ., y = gdp_rel_not,  by = c('iso3', 'year'), all.x = T) %>% 
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ##' if a country's net outflow < 0, we assume it does not have ODA to others, and assign 0 as its net outflow
     ##' outflow = (-fromAll) = value
@@ -2427,14 +2460,13 @@ oft <- net_imports_bind  %>%
   dplyr::mutate(net_in = net_in * 1000) %>% # unit: 1000 USD --> USD
   dplyr::select(ind, year, iso3, net_in, scenario) %>%
   spread(key = 'scenario', value = 'net_in')
-yrs <- unique(oft$year)
 
 
 ### w/o trade, and with trade together  ------------------------------------------------------------
 rel_not_merge <- rel %>%
-  dplyr::filter(year %in% yrs) %>%
   merge(x = ., y = gdp_rel_not, by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = oft,         by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_lab = (value/100)*gdp_rel,                  ## labor income (USD)
@@ -2524,6 +2556,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = total_labor, by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = oft,         by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = ind_ft,
     ## total at-risk/total worker
@@ -2664,6 +2697,7 @@ rel_not_merge <- rel_outflow %>%
   merge(x = ., 
         y = oft,   
         by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     ## if a country's net outflow < 0, we assume it does not have FDI, and assign 0 as its net outflow
@@ -2748,6 +2782,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = oft,   by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = pop_l, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value +       0)/pop,
@@ -2814,6 +2849,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = oft,   by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = pop_l, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value +      0)/pop,
@@ -2926,6 +2962,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = oft,   by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = pop_l, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value +       0)*1000/pop, ## (ton of SO2)*1000 per capita = kg/person
@@ -3003,6 +3040,7 @@ rel_not_merge <- rel %>%
   merge(x = ., y = cropland_area, by = c('iso3', 'year'), all.x = T) %>%  
   merge(x = ., y = oft,           by = c('iso3', 'year'), all.x = T) %>% 
   merge(x = ., y = gdp_rel_not,   by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     N_used    = value*cropland_area,         ## kg/ha * ha
@@ -3094,6 +3132,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = oft,           by = c('iso3', 'year'), all.x = T) %>% 
   merge(x = ., y = gdp_rel_not,   by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value +       0)/gdp_rel*1000,   
@@ -3168,6 +3207,7 @@ oft <- net_imports_bind  %>%
 ### w/o trade, and with trade together  ------------------------------------------------------------
 rel_not_merge <- rel %>%
   merge(x = ., y = oft, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value +       0),
@@ -3237,6 +3277,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%  # forest area in real world
   merge(x = ., y = oft,          by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = co2_rel_not,  by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = var_rel/(value - 0),   ## (co2 in real world) / (forest area in real world)
@@ -3325,6 +3366,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = cropland_area, by = c('iso3', 'year'), all.x = T) %>%  
   merge(x = ., y = oft,           by = c('iso3', 'year'), all.x = T) %>% 
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     N_used    = value*cropland_area,
@@ -3396,6 +3438,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = cropland_area, by = c('iso3', 'year'), all.x = T) %>%  
   merge(x = ., y = oft,           by = c('iso3', 'year'), all.x = T) %>% 
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     P_used    = value*cropland_area,
@@ -3473,6 +3516,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = oft,   by = c('iso3', 'year'), all.x = T) %>% 
   merge(x = ., y = pop_l, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value +       0)/pop*10^3,  ## value = marine capture in tons --> kg per capita
@@ -3523,7 +3567,9 @@ direction_sdg <- 1
 ### --> forest footprint: `forest_rel_not`
 
 ### w/o trade, and with trade together  -----------------------------------------------------------------
-rel_not_merge <- merge(x = land_total, y = forest_rel_not,  by = c('iso3', 'year'), all.x = T) %>%
+rel_not_merge <- 
+  merge(x = land_total, y = forest_rel_not,  by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     value_rel = var_rel/(land_total_km2 * 100),      ## forest area/ total land area
     value_not = var_not/(land_total_km2 * 100),
@@ -3606,6 +3652,7 @@ base <- rel %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = base,           by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = forest_rel_not, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (var_rel - base)/base,
@@ -3678,6 +3725,7 @@ oft <- net_imports_bind  %>%
 ### w/o trade, and with trade together  ------------------------------------------------------------
 rel_not_merge <- rel %>%
   merge(x = ., y = oft, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value +       0),
@@ -3740,6 +3788,7 @@ oft <- net_imports_bind  %>%
 ### w/o trade, and with trade together  -----------------------------------------------------------------
 rel_not_merge <- oft %>%
   merge(x = ., y = pop_l, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     victims   = 0 - fromAll,                      ## the number of victims of human trafficking that were 'exported' from this country
@@ -3805,6 +3854,7 @@ oft <- net_imports_bind  %>%
 ### w/o trade, and with trade together  -----------------------------------------------------------------
 rel_not_merge <- oft %>%
   merge(x = ., y = pop_l, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     arms_sent = 0 - fromAll,
@@ -3875,6 +3925,7 @@ oft <- net_imports_bind  %>%
 rel_not_merge <- rel %>%
   merge(x = ., y = oft,   by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = pop_l, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value)/pop,              ## for a exporter with corruption risk
@@ -4138,6 +4189,7 @@ rel <- readxl::read_excel(path = xls) %>%
 ### w/o trade, and with trade together  -----------------------------------------------------------------
 rel_not_merge <- rel %>%
   merge(x = ., y = gdp_rel_not,  by = c('iso3', 'year'), all.x = T) %>% ## total land
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = 'ODA',
     value_rel = (value_abs             + 1)/gdp_rel,      ## 

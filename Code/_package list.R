@@ -46,11 +46,14 @@ library(circlize)  ## for circlize plot
 library(Cairo)
 
 library(conflicted)
-conflict_prefer("filter", "dplyr")
-conflict_prefer("arrange", "dplyr")
-conflict_prefer("mutate", "dplyr")
-conflict_prefer("select", "dplyr")
-conflicts_prefer(dplyr::desc)
+conflicts_prefer(
+  dplyr::desc,
+  dplyr::rename,
+  dplyr::filter, 
+  dplyr::mutate, 
+  dplyr::select, 
+  .quiet = T
+)
 conflict_prefer("print", "base")
 conflict_prefer("save", "base")
 

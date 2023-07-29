@@ -610,6 +610,7 @@ function_format_4yrData_save(iname = iname)
 
 
   GNI (formerly GNP) is the sum of value added by all resident producers plus any product taxes (less subsidies) not included in the valuation of output plus net receipts of primary income (compensation of employees and property income) from abroad. Data are in current U.S. dollars. GNI, calculated in national currency, is usually converted to U.S. dollars at official exchange rates for comparisons across economies, although an alternative rate is used when the official exchange rate is judged to diverge by an exceptionally large margin from the rate actually applied in international transactions.
+  
 ```{r - GNI}
 # NY.GNP.MKTP.KD	    GNI (constant 2010 US$)                  18.8% NA
 # NY.GNP.MKTP.CN	    GNI (current LCU)                         4.2% NA
@@ -621,7 +622,7 @@ function_format_4yrData_save(iname = iname)
 
 #' In `GNI, Atlas method (current US$)` - To smooth fluctuations in prices and exchange rates, a special Atlas method of conversion is used by the World Bank.
 #' 
-ind <- 'NY.GNP.MKTP.CN.AD'; 
+ind <- 'NY.GNP.ATLS.CD'; 
 ### 1. download data from WB
 dfwb  <- wb(indicator = ind, country = "countries_only",
             startdate = yr_start, enddate = yr_end) %>%
@@ -4117,6 +4118,25 @@ d <- readxl::read_excel(f) %>%
   dplyr::summarise(sum = sum(value, na.rm = T)) %>%
   spread(key = 'year', value = 'sum')
 
+# Add new columns '2000', ..., '2015' if it does not exist
+if (!"2000" %in% names(d)) {
+  d <- d %>%
+    dplyr::mutate(`2000` = NA)
+}
+
+if (!"2005" %in% names(d)) {
+  d <- d %>%
+    dplyr::mutate(`2005` = NA)
+}
+
+if (!"2010" %in% names(d)) {
+  d <- d %>%
+    dplyr::mutate(`2010` = NA)
+}
+
+
+d <- d %>% dplyr::select(iso3, ctr, `2000`, `2005`, `2010`, `2015`)
+
 f <- paste0(dir.cleaned, 'NitrogenTotal_ton_4yrs.xlsx'); f
 writexl::write_xlsx(x = d, path = f)
 ```
@@ -4619,6 +4639,25 @@ d <- readxl::read_excel(f) %>%
   group_by(year, iso3, ctr) %>%
   dplyr::summarise(sum = sum(value, na.rm = T)) %>%
   spread(key = 'year', value = 'sum')
+
+# Add new columns '2000', ..., '2015' if it does not exist
+if (!"2000" %in% names(d)) {
+  d <- d %>%
+    dplyr::mutate(`2000` = NA)
+}
+
+if (!"2005" %in% names(d)) {
+  d <- d %>%
+    dplyr::mutate(`2005` = NA)
+}
+
+if (!"2010" %in% names(d)) {
+  d <- d %>%
+    dplyr::mutate(`2010` = NA)
+}
+
+
+d <- d %>% dplyr::select(iso3, ctr, `2000`, `2005`, `2010`, `2015`)
 
 fxls <- paste0(dir.cleaned, gsub('\\.xlsx', '_4yrs.xlsx', basename(f))); fxls
 writexl::write_xlsx(x = d, path = fxls)
