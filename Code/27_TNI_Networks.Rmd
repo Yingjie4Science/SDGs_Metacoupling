@@ -1748,6 +1748,7 @@ but you would use borders() to plot the map and geom_path() for the edges.
 
 library("maps")
 library("geosphere")
+ conflicts_prefer(maps::map)
 
 # Package 'maps' has built-in maps it can plot for you. For example:
 # ('col' is map fill, 'border' is  border color, 'bg' is  background color)

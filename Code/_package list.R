@@ -47,6 +47,7 @@ library(Cairo)
 
 library(conflicted)
 conflicts_prefer(
+  dplyr::arrange,
   dplyr::desc,
   dplyr::rename,
   dplyr::filter, 

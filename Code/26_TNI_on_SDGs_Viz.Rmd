@@ -579,7 +579,7 @@ dfs_score_goal_snr <- dfs_score %>%
   dplyr::mutate_at(vars(score, sd, se, ci), list(~ round(., 2))) %>%
   ## for viz purpose, change `NaN` to a very small value
   dplyr::mutate_at(vars(score), ~ifelse(is.nan(.), 10e-9, .)) %>%
-  arrange(goal, scenario, year)
+  dplyr::arrange(goal, scenario, year)
 
 
 p <- dfs_score_goal_snr %>%
@@ -975,7 +975,7 @@ p <- tm_shape(df_chg_sf) +
     legend.reverse = T,
     textNA = 'NA', 
     colorNA = 'gray90',
-    title  = 'Impact on\nSDG Index'
+    title  = 'Transnational\nimpact on\nSDG Index'
     ) +
   tm_borders(col = "grey", lwd = 0.1, lty = "solid", alpha = 0.99) +
   tm_credits(text = "a", fontface = "bold", size = 1.2, position = c(0, 0.9)) +
