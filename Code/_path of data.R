@@ -9,14 +9,14 @@
 
 # ### data path
 # source('./Code/_path of data.R')
-
-path <- rstudioapi::getSourceEditorContext()$path
-dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
-dir.root <- dirname(dir)
+# dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+# dir.root <- dirname(dir)
+dir.root <- "D:/_papers/SDGs/SDGs_Metacouplings_private/"
 
 ## raw data ------------------------------------------------------------------------------
 dir.raw          <- './Data/data_01_raw/'
 dir.arm          <- './Data/data_01_raw/Arm trade_Peacekeeping/SIPRI Arms trade/'
+dir.peace        <- './Data/data_01_raw/Arm trade_Peacekeeping/UN peacekeeping operations/'
 dir.traffick     <- './Data/data_01_raw/Human trafficking/'
 dir.student_flow <- './Data/data_01_raw/International Student flows/'
 dir.oecd         <- './Data/data_01_raw/OECD/'

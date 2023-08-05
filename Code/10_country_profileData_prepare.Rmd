@@ -2714,6 +2714,9 @@ function_format_4yrData_save(iname = iname)
 # EG.ELC.RNWX.KH	             + Electricity production from renewable sources, excluding hydroelectric (kWh)
 
 ind <- '3.1_RE.CONSUMPTION';  
+#' Renewable energy consumption (TJ): This indicator includes energy consumption from all renewable resources: hydro, solid biofuels, wind, solar, liquid biofuels, biogas, geothermal, marine and waste
+#' https://databank.worldbank.org/source/sustainable-energy-for-all/Series/3.1_RE.CONSUMPTION
+#' 
 ### 1. download data from WB
 dfwb  <- wb(indicator = ind, country = "countries_only",
             startdate = yr_start, enddate = yr_end) %>%
@@ -4663,7 +4666,9 @@ fxls <- paste0(dir.cleaned, gsub('\\.xlsx', '_4yrs.xlsx', basename(f))); fxls
 writexl::write_xlsx(x = d, path = fxls)
 ```
 
+#### - peacekeeping 
 
+  Refer to `UN_peacekeeping.Rmd` under "./Data/data_01_raw/Arm trade_Peacekeeping/"
 
 
 
