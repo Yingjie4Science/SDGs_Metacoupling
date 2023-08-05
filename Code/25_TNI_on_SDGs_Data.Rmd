@@ -166,6 +166,17 @@ pop_l <- pop %>% as.data.frame() %>%
   dplyr::select(-ctr) %>%
   as.data.frame()
 
+
+mark <- 'option2Chung'
+shp_ctr_list <- grp_update %>% 
+  dplyr::mutate(
+    group = tm::removeNumbers(group_income2),
+    group = factor(x = group, levels = c("High income", "Low income")),
+    group = fct_rev(group)
+    ) %>%
+  as.data.frame()
+
+
 ### extended country-iso3 pair list for matching
 load('./Data/Ancillary_Data_iso_eora_ex.RData')  ## `iso_eora_ex`
 
@@ -279,7 +290,7 @@ gni_gdp <- merge(
 ) %>%
   ggplot(aes(x = `2015.x`, y = `2015.y`)) +
   geom_point() +
-  geom_abline(slope = 1) +
+  geom_abline(slope = 1, color = 'red') +
   scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
                 labels = trans_format("log10", math_format(10^.x))) +
   scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
@@ -1615,14 +1626,15 @@ score_6_3_2 <- df_score
 ### SDG 7 
 
   7.1.2 Proportion of population with primary reliance on clean fuels and technology
+  
 ```{r - 7.1.2 renewable/pop}
-ind_sdg  <- 'renewable_per_pop' ## TJ/pop
+ind_sdg    <- 'renewable_per_pop' ## TJ/pop
 unit_check <- 1
 direction_sdg <- 1
 
 ### Check the Unit!!!
 ### rel    --> TJ;        
-### oft    --> GJ = /10^3 TJ; 
+### oft    --> GJ = TJ/10^3; ??? --> seems wrong, double-check with Mengyu, PJ?
 ### pop    --> 1 
 
 ### PJ = 10^3 TJ
@@ -1635,7 +1647,7 @@ rel_w <- readxl::read_excel(path = xls) %>% as.data.frame()  ## the status data
 rel <- rel_w %>%
   dplyr::select(-ctr) %>%
   gather(key = 'year', value = 'value', `2000`:ncol(.)) %>%
-  dplyr::mutate(value = value) %>%  
+  dplyr::mutate(value = ifelse(value == 0, NA, value)) %>%  ## 0 values cause large changes in the calculation 
   as.data.frame()
   
 
@@ -1655,7 +1667,7 @@ rel_not_merge <- rel %>%
   dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
-    value_rel = (value +      0)/pop,       
+    value_rel = (value +       0)/pop,       
     value_not = (value + fromAll)/pop,
     value_dst = (value + fromNer)/pop,
     value_ner = (value + fromDst)/pop
@@ -1666,7 +1678,7 @@ rel_not_merge <- rel %>%
 rel_not <- rel_not_merge %>%
   dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
 
-hist(rel_not$value_rel)
+hist(rel_not$value_rel, breaks = 100)
 
 
 ### normalization  -------------------------------------------------------
@@ -1679,9 +1691,9 @@ df_score <- func_norm_sdg_score_auto(
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
 
-
 score_7_1_2 <- df_score
 ```
+
 
 
   7.3.1 Energy intensity measured in terms of primary energy and GDP (low energy intensity indicates high SDG ind_sdg score)
@@ -1695,8 +1707,8 @@ unit_check <- 1
 direction_sdg <- -1
 
 ### Check the Unit!!!
-### rel    --> TJ = 10^6 MJ => MJ
-### oft    --> GJ = 10^3 MJ => MJ --> need to double check the unit with Mengyu: TJ*1000 or TJ or GJ (now assume the later)???       
+### rel    --> TJ 
+### oft    --> GJ???       
 ### gdp    --> USD 
 
 ### PJ = 10^3 TJ
@@ -1710,14 +1722,14 @@ rel_w <- readxl::read_excel(path = xls) %>% as.data.frame()  ## the status data
 rel <- rel_w %>%
   dplyr::select(-ctr) %>%
   gather(key = 'year', value = 'value', `2000`:ncol(.)) %>%
-  dplyr::mutate(value = value*10^6) %>%  
+  dplyr::mutate(value = value) %>%  
   as.data.frame()
   
 
 ### Outsourced footprints (oft) flow --------------------------------------------------------------------
 oft <- net_imports_bind  %>%
   dplyr::filter(ind == ind_ft) %>%
-  dplyr::mutate(net_in = net_in*10^3) %>%    ## fix the unit issue, only for energy related indicators
+  dplyr::mutate(net_in = net_in/10^3) %>%    ## fix the unit issue, only for energy related indicators
   dplyr::select(ind, year, iso3, net_in, scenario) %>%
   spread(key = scenario, value = net_in) %>%
   as.data.frame()
@@ -1758,8 +1770,9 @@ df_score <- func_norm_sdg_score_auto(
 
 ### for later use ---------------
 totalenergy_rel_not <- rel %>%
-  merge(x = ., y = oft, by = c('iso3', 'year'), all.x = T) %>%
+  merge(x = ., y = oft,         by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = gdp_rel_not, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind     = unique(oft$ind),
     var_rel = (value +       0),
@@ -1767,21 +1780,28 @@ totalenergy_rel_not <- rel %>%
     var_dst = (value + fromNer),
     var_ner = (value + fromDst)) %>%
   ### for easy-checking the numbers
-  dplyr::select(iso3, year, var_rel, var_not, var_dst, var_ner)
+  dplyr::select(iso3, year, var_rel, var_not, var_dst, var_ner) %>%
+  dplyr::rename(
+    EnergyTotal_rel = var_rel,
+    EnergyTotal_not = var_not,
+    EnergyTotal_dst = var_dst,
+    EnergyTotal_ner = var_ner
+  )
 
 score_7_3_1 <- df_score
 ```
 
   7.2.1 Renewable energy share in the total final energy consumption
+  
 ```{r - 7.2.1 renewable/total}
 ind_sdg    <- 'renewable_share' ## TJ/TJ
-unit_check <- 10^3
+unit_check <- ''
 direction_sdg <- 1
 
 ### Check the Unit!!!
-### rel    --> TJ = 10^6 MJ    
-### oft    --> TJ*1000;        <? need to confirm ???> 
-### total  --> TJ = 10^6 MJ
+### rel    --> TJ
+### oft    --> TJ/1000; 
+### total  --> TJ
 
 ### Resource consumption or emissions under the current trading world situation -------------------------
 xls <- list.files(path = dir.input1, pattern = '^Renewable energy consumption', full.names = T); xls 
@@ -1789,14 +1809,14 @@ rel_w <- readxl::read_excel(path = xls) %>% as.data.frame()  ## the status data
 rel <- rel_w %>%
   dplyr::select(-ctr) %>%
   gather(key = 'year', value = 'value', `2000`:ncol(.)) %>%
-  dplyr::mutate(value = value*10^6) %>%  
+  dplyr::mutate(value = value) %>%  
   as.data.frame()
   
 
 ### Outsourced footprints (oft) flow --------------------------------------------------------------------
 oft <- net_imports_bind  %>%
   dplyr::filter(ind == 'Energy_renewable') %>%
-  dplyr::mutate(net_in = net_in*unit_check) %>%       ## fix the unit issue, only for energy related indicators
+  dplyr::mutate(net_in = net_in/10^3) %>%       ## fix the unit issue, only for energy related indicators
   dplyr::select(ind, year, iso3, net_in, scenario) %>%
   spread(key = scenario, value = net_in)
 
@@ -1809,10 +1829,10 @@ rel_not_merge <- rel %>%
   dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
-    value_rel = (value +       0)/var_rel,       ## var_rel --> total energy use under real world
-    value_not = (value + fromAll)/var_not,
-    value_dst = (value + fromNer)/var_dst,
-    value_ner = (value + fromDst)/var_ner
+    value_rel = (value +       0)/EnergyTotal_rel,
+    value_not = (value + fromAll)/EnergyTotal_not,
+    value_dst = (value + fromNer)/EnergyTotal_dst,
+    value_ner = (value + fromDst)/EnergyTotal_ner
     ) %>%
   ### for easy-checking the numbers
   dplyr::select(ind, iso3, year, value, everything())
@@ -1839,6 +1859,99 @@ score_7_2_1 <- df_score
 
 
 
+```{r --------- check - normalization, eval=FALSE, include=FALSE}
+# Robust Scaling using scale()
+library(scales)
+# Robust Scaling for specific columns while ignoring NA values
+# Custom Robust Scaling function with NA handling
+robust_scale <- function(x) {
+  median_val <- median(x, na.rm = TRUE)
+  iqr_val <- IQR(x, na.rm = TRUE)
+  scaled_val <- (x - median_val) / iqr_val
+  scaled_val
+}
+
+# Apply the custom function to specific columns in the dataframe
+# rel_not_scaled <- rel_not %>%
+#   mutate_at(vars('value_rel', 'value_not', 'value_dst', 'value_ner'), 
+#             ~ robust_scale(.))
+
+df_score_scaled_robust <- df_score %>%
+  mutate_at(vars('val'), 
+            ~ robust_scale(.)) %>% 
+  dplyr::filter(scenario == 'value_rel')
+
+# Z-Score normalization for specific columns
+df_score_scaled_z <- df_score %>%
+  mutate_at(vars('val'), ~ scale(., center = TRUE, scale = TRUE)) %>% 
+  dplyr::filter(scenario == 'value_rel')
+
+df_score_rel <- df_score %>% 
+  dplyr::filter(scenario == 'value_rel')
+
+hist(rel_not$value_rel, breaks = 1000)
+hist(rel_not_scaled$value_rel, breaks = 1000)
+hist(df_score_rel$value_norm, breaks = 1000)
+hist(df_score_scaled_robust$val, breaks = 1000)
+hist(df_score_scaled_z$val, breaks = 1000)
+```
+
+
+
+```{r --------- check - change}
+# df_score_chg <- df_score_scaled_robust %>%
+# df_score_chg <- df_score_scaled_z %>%
+df_score_chg <- df_score %>%
+  dplyr::select(-val) %>%
+  dplyr::rename(score = value_norm) %>%
+  spread(key = scenario, value = score) %>%
+  dplyr::mutate(
+    value_chg = value_rel - value_not, 
+    value_chg = ifelse(iso3 =='GRL', NA, value_chg)) %>%    ## Greenland
+  dplyr::filter(year == 2015) %>%
+  as.data.frame()
+
+
+## merge the two data for plot
+df_shp <- shp_ctr_list %>%
+  merge(x = ., 
+        y = df_score_chg, 
+        by.x = 'iso_a3', by.y = 'iso3', all.x = T) %>%
+  as.data.frame()
+
+
+chg_err_group  <- df_shp %>% 
+  dplyr::filter(year != 'na') %>%
+  dplyr::mutate(goal = 7) %>%
+  summarySE(measurevar= "value_chg", groupvars = c("year", 'group', "goal"), na.rm = T)
+
+# str(chg_err_group)
+levels(chg_err_group$group)
+color_grp <- c('#F26463', '#2371A6') 
+
+ggplot(data = chg_err_group, 
+       aes(x = as.factor(goal),
+           y = value_chg,
+           fill = group)) +
+  geom_bar(position = position_dodge(0.8), stat="identity", width = 0.8, show.legend = T)+
+  geom_errorbar(aes(ymin=value_chg-se, ymax=value_chg+se), 
+                width=.3, 
+                position=position_dodge(.8)) +
+  ylab("Impact on SDG score") + xlab('SDGs') + labs(fill = "Group")+
+  # scale_fill_brewer(palette = "Blues", direction = -1) +
+  scale_fill_manual(values = color_grp, guide = guide_legend(reverse = T)) +
+  scale_y_continuous(n.breaks = 6) +
+  coord_flip()+
+  
+  theme(
+    legend.position = c(0.86, 0.16),    ## 0.15, 0.06
+    # legend.key.size = unit(0.2,"cm"), 
+    legend.box.background = element_rect(colour = "black"),
+    legend.key.width  = unit(0.4,"cm"), 
+    legend.key.height = unit(0.4,"cm"), 
+    legend.text=element_text(size=rel(.9)),
+    panel.grid.minor = element_blank())
+```
 
 
 
@@ -2432,7 +2545,7 @@ score_9_a_1 <- df_score
   
 ```{r}
 ind_sdg <- 'labor salary OR income share of GDP'
-ind_ft  <- 'Salary' ## wage footprint = labor salary/income footprint
+ind_ft  <- 'Salary' ## wage footprint = labor salary = income footprint
 unit_sdg   <- '%'
 direction_sdg <- 1
 
@@ -3685,10 +3798,12 @@ score_15_2_1 <- df_score
 
 #### - 15.5.1 Biodiversity footprint 
 
-  - Potentially disappeared fraction of species (PDF) on annual crops
-
+**SDG**
   15.5 Take urgent and significant action to reduce the degradation of natural habitats, halt the loss of biodiversity and, by 2020, protect and prevent the extinction of threatened species
 
+**Impact**
+  - Potentially disappeared fraction of species (*PDF*) on annual crops
+  
 ```{r}
 ind_sdg    <- 'Biodiversity - PDF on annual crops' ## 
 ind_ft     <- 'biodiversity_Annual crops' ## 
@@ -3696,11 +3811,11 @@ unit_check <- ''
 direction_sdg <- -1
 
 ### Check the Unit!!!
-### rel --> 
+### rel --> PDF
 ### oft --> PDF
 
 
-### Resource consumption or emissions under the current trading world situation --------------------
+### Resource consumption or emissions under the current trading world situation ----------
 xls   <- paste0(dir.eora_cleaned, 'biodiversity_Annual crops.xlsx'); xls 
 rel_w <- readxl::read_excel(path = xls) %>% as.data.frame() ## the status data 
 rel <- rel_w %>%
@@ -3729,7 +3844,7 @@ rel_not_merge <- rel %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
     value_rel = (value +       0),
-    value_not = (value + fromAll),
+    value_not = (value + fromAll), ## for a net importer, no trade means more PDF would occur in the country
     value_dst = (value + fromNer),
     value_ner = (value + fromDst)
     ) %>%
@@ -3739,7 +3854,8 @@ rel_not_merge <- rel %>%
 rel_not <- rel_not_merge %>%
   dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
 
-hist(rel_not$value_rel)
+hist(rel_not$value_rel, nclass = 100)
+hist(rel_not$value_not, nclass = 100)
 
 ### normalization  -------------------------------------------------------
 df_score <- func_norm_sdg_score_auto(
@@ -3747,6 +3863,7 @@ df_score <- func_norm_sdg_score_auto(
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
 
+hist(df_score$value_norm, nclass = 100)
 
 score_15_5_1 <- df_score
 
