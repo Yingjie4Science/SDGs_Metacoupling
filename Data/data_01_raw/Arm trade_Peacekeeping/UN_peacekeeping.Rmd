@@ -4,19 +4,19 @@ author: "Yingjie"
 date: "2/23/2020"
 output: html_document
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 
 
 Troop and Police Contributions
-  UN police and military personnel are "contributed" to serve under the blue flag from over 100 countries to carry out the mandates defined by the Security Council. Military operations aim to protect populations against threats and contribute to a secure environment. Policing is central in preventing, mitigating and resolving violent conflict and contributing to early peace-building and reconciliation. Uniformed personnel are contributed and deployed under several different types of arrangements.
+
+  UN police and military personnel are "contributed" to serve under the blue flag from over 100 countries to carry out the mandates defined by the Security Council. Military operations aim to protect populations against threats and contribute to a secure environment. Policing is central in *preventing, mitigating and resolving violent conflict* and contributing to early peace-building and reconciliation. Uniformed personnel are contributed and deployed under several different types of arrangements.
 
 # Package and path
-```{r }
-
+```{r}
 ### To clear your environment 
-# remove(list = ls())
+remove(list = ls())
 
 ## tidy data
 library(tidyverse)
@@ -27,10 +27,30 @@ library(readxl)
 library(readr)
 
 ### set work dir
-path <- rstudioapi::getSourceEditorContext()$path
-dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
-setwd(dir)
+dir_this  <- dirname(rstudioapi::getSourceEditorContext()$path); dir_this
+
+
+dir_root <- dirname(dir_this) %>% dirname() %>% dirname()
+dir_root
+source(file = paste0(dir_root, '/Code/_path of data.R'))
+
+# setwd(dir_this)
+getwd()
+dir.cleaned
 ```
+
+
+```{r Ancillary data}
+
+### extended country-iso3 pair list for matching
+# f <- paste0(dir.root, '/Data/Ancillary_Data_ISO3code_shp.RData')
+# load(file = f) ## iso_eora, pop, gdp, shp, grp
+
+f <- paste0(dir_root, '/Data/_eora_190country_iso3.xlsx')
+ctr_eora <- readxl::read_xlsx(f) %>% as.data.frame()
+str(ctr_eora)
+```
+
 
 ## Functions
 ```{r}
@@ -44,13 +64,19 @@ not_all_na <- function(x) any(!is.na(x))
 
 ## UN data
 
-### clean _contributions_ data
+### Data on *troop-and-police-contributions*
+
 ```{r }
 ### data
-# download from https://peacekeeping.un.org/en/data-troop-and-police-contributions
+#' download from https://peacekeeping.un.org/en/data-troop-and-police-contributions
+#' The "BY GENDER CSV FILE" is very comprehensive 
+#' 
+
+yrs <- c(2015) ## used for testing
+yrs <- c(2001, 2005, 2010, 2015)
 
 getwd()
-xls <- './UN peacekeeping operations/odp_contributionranks_fixCountryName.xlsx'
+xls <- paste0(dir.peace, 'odp_contributionranks_fixCountryName.xlsx')
 ctr_iso  <- readxl::read_excel(path = xls, sheet = 1) %>%
   ungroup() %>%
   distinct(ISOCode3, Contributing_Country)
@@ -58,9 +84,9 @@ names(ctr_iso) <- c('iso3', 'Contributing_Country')
 
 
 
-# 'BY GENDER' dataset has the most comprehensive vars
-csv <- './UN peacekeeping operations/odp_contributionsbygender.csv'
-df <- read_csv(file = csv) %>%
+# 'BY GENDER' dataset has the most comprehensive vars ------------------------------------
+csv <- paste0(dir.peace, 'odp_contributionsbygender.csv')
+df <- read_csv(file = csv, show_col_types = F) %>%
   mutate(date = as.Date(Last_Reporting_Date, format = '%m/%d/%Y'),
          year = year(date),
          total= Female_Personnel + Male_Personnel) %>%
@@ -71,9 +97,9 @@ names(df)
 unique(df$Personnel_Type)
 
 
-### to calculate the total contribution, by each specific date
+### to calculate the total contribution, by each specific date ---------------------------
 df_ym <- df %>% as.data.frame() %>%
-  dplyr::filter(year == 2015) %>%
+  dplyr::filter(year %in% yrs) %>%
   dplyr::select(ISOCode3, 
                 Contributing_Country,
                 Personnel_Type,
@@ -83,32 +109,68 @@ df_ym <- df %>% as.data.frame() %>%
                 year,
                 total, date) %>%
   # filter(date == as.Date('2015-12-31')) %>%
-  group_by(ISOCode3, Contributing_Country, Mission_Acronym, year, date, Personnel_Type) %>%
-  summarise(value = sum(total)) %>%
-  spread(key = Personnel_Type, value = value) %>%
-  dplyr::mutate(total_contr = sum(`Experts on Mission`, Troops, `Individual Police`, `Formed Police Units`, na.rm = T))
-
-### to calculate the total contribution, by year
-df_yr <- df_ym %>%
+  group_by(ISOCode3, Contributing_Country, Mission_Acronym, Personnel_Type, year, date) %>%
+  summarise_if(is.numeric, sum, na.rm = TRUE) %>%
   ungroup() %>%
+  as.data.frame()
+
+df_ym_agg <- df_ym %>%
+  # spread(key = Personnel_Type, value = value) %>%
+  # dplyr::mutate(total_contr = sum(`Experts on Mission`, Troops, `Individual Police`, `Formed Police Units`, na.rm = T)) %>%
+  group_by(ISOCode3, Contributing_Country, year, date) %>%
+  summarise_if(is.numeric, sum, na.rm = TRUE) %>%
+  as.data.frame()
+  
+df_yr_byMission <- df_ym %>%
   dplyr::select(-date) %>%
   group_by(ISOCode3, Contributing_Country, Mission_Acronym, year) %>%
-  summarise_all(list( ~ sum(., na.rm = TRUE)))
-
+  summarise_if(is.numeric, sum, na.rm = TRUE) %>%
+  as.data.frame()
 
 ### to list all the `Mission` names
-unique(df_yr$Mission_Acronym)
+# unique(df_yr_byMission$Mission_Acronym)
+
+
+### to calculate the total contribution, by year -----------------------------------------
+df_yr_agg <- df_ym %>%
+  dplyr::select(-date) %>%
+  group_by(ISOCode3, Contributing_Country, year) %>%
+  summarise_if(is.numeric, sum, na.rm = TRUE) %>%
+  ungroup()
+
+### format for further analysis ----------------------------------------------------------
+df_formated <- df_yr_agg %>%
+  dplyr::select(-Contributing_Country) %>%
+  # dplyr::mutate(year = ifelse(year == 2001, 2000, year)) %>%
+  spread(key = year, value = total) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "ISOCode3")) %>%
+  dplyr::rename('iso3' = 'iso3_eora', 'ctr' = 'country_eora') %>%
+  as.data.frame()
+
+## Check if the column "2001" exists in the dataframe
+## the earliest year is 2001. To use NA for 2000
+if (!exists("2000", df_formated)) {
+  # Add the column "age" with default values to the dataframe
+  df_formated <- df_formated %>%
+    dplyr::mutate(`2000` = NA) %>%
+    dplyr::select(iso3, ctr, `2000`, everything()) %>%
+    arrange(iso3)
+}
+
+f <- paste0(dir.cleaned, 'UN peacekeeping_ppl_4yrs.xlsx')
+f
+writexl::write_xlsx(x = df_formated, path = f)
 ```
 
 
 
-### clean _peacekeeping operations_
+  *peacekeeping operations*
 
   Not sure where this data comes from...
-```{r}
+```{r eval=FALSE, include=FALSE}
 ### where is the data from? ------------------------------------------------------------------------
 getwd()
-xls <- './UN peacekeeping operations/UN peacekeeping operations.xlsx'
+xls <- paste0(dir.peace, 'UN peacekeeping operations.xlsx')
 df  <- readxl::read_excel(path = xls, sheet = 1) 
 df_op <- df %>%
   separate(col = 'MISSION NAME', into = c('name1', 'region'), 
@@ -124,20 +186,36 @@ names(df_op)
 ```
 
 
-  More accurate data. 
-```{r}
+
+### Data from pdf 
+
+#### data by Mission 
+
+  The same data as `odp_contributionsbygender.csv`
+  
+```{r eval=FALSE, include=FALSE}
 ###
+# if (!require("remotes")) {
+#     install.packages("remotes")
+# }
+# # on 64-bit Windows
+# remotes::install_github(c("ropensci/tabulizerjars", "ropensci/tabulizer"), INSTALL_opts = "--no-multiarch")
+
 library(tabulizer)
-pdf <- './UN peacekeeping operations/pdf_byMission/dec15_3.pdf'
+pdf <- './UN peacekeeping operations/pdf_TBD/dec15_3.pdf'
 tabs <- tabulizer::extract_tables(file = pdf, output = "data.frame", guess = T)
 
 tab_df <- data.frame()
 
 for (i in 1:length(tabs)) {
   
-  tab <- tabs[i] %>% as.data.frame() %>% select(where(not_all_na)) %>% #select(!starts_with("X"))
-    mutate_all(na_if,"") %>% 
-    select(where(not_all_na))
+  tab <- tabs[i] %>% 
+    as.data.frame() %>%
+    select(where(not_all_na)) %>% #select(!starts_with("X"))
+    # dplyr::mutate_all(na_if(.,"")) %>%
+    mutate(across(where(is.character), ~na_if(., ""))) %>%
+    select(where(not_all_na)) %>%
+    as.data.frame()
   
   print(ncol(tab))
   
@@ -190,8 +268,9 @@ tab_df1 <- tab_df %>%
          ctr2 = gsub(',|[[:digit:]]+', '', Male),
          ctrM = gsub(',|[[:digit:]]+', '', Female),
                   ) %>%
-  mutate_all(na_if,"") %>% 
-  dplyr::select(-Male, -Female)%>%
+  # mutate_all(na_if(., "")) %>% 
+  mutate(across(where(is.character), ~na_if(., ""))) %>% 
+  dplyr::select(-Male, -Female) %>%
   as.data.frame()
 
 
@@ -241,8 +320,8 @@ tab_df3 <- tab_df2 %>%
   dplyr::mutate(Mission3 = ifelse(is.na(Mission2) & !is.na(UN_Mission2), paste0('999', UN_Mission2), Mission2)) %>%
   # select(Mission, Mission2, m1, everything()) %>%
   select(-m1) %>%
-  mutate_all(na_if,"") %>% 
-  
+  # mutate_all(na_if,"") %>% 
+  mutate(across(where(is.character), ~na_if(., ""))) %>% 
   
   ### --> fix `Total`: 2. -----------------------------
   mutate(Total2 = ifelse(is.na(Total2), t1, Total2)) %>%
@@ -296,10 +375,13 @@ str(tab_df4)
 
 
 
-### read pdf - contribution 
-```{r}
+#### data by contribution 
+
+  There is no need to use the PDF data, as we can use `odp_contributionsbygender.csv` directly. 
+
+```{r - one example}
 library(tabulizer)
-pdf <- './UN peacekeeping operations/pdf/aug15_1.pdf'
+pdf <- paste0(dir.peace, 'pdf/aug15_1.pdf')
 tabs <- tabulizer::extract_tables(file = pdf, output = "data.frame", guess = T) 
 
 
@@ -307,8 +389,11 @@ tab_df <- data.frame()
 
 func_list2df <- function(tabs){
   for (i in 1:length(tabs)) {
-    tab <- tabs[i] %>% as.data.frame() %>% select(where(not_all_na)) %>% #select(!starts_with("X"))
-      mutate_all(na_if,"") %>% select(where(not_all_na))
+    tab <- tabs[i] %>% as.data.frame() %>% 
+      select(where(not_all_na)) %>% #select(!starts_with("X"))
+      # mutate_all(na_if,"") %>% 
+      mutate(across(where(is.character), ~na_if(., ""))) %>% 
+      select(where(not_all_na))
     
     ## *** in some cases, there is disarrangement in the 1st column! We thus need to 
     ##  drop the left NAs <in the 1st column> in a dataframe and left shifting the cleaned rows
@@ -350,6 +435,16 @@ func_list2df <- function(tabs){
       mutate_all(as.character) %>%
       mutate_all(na_if,"") %>%
       select(where(not_all_na))
+    
+    # Check if the column "age" exists in the dataframe
+    if (!exists("No", tab)) {
+      # Add the column "age" with default values to the dataframe
+      tab <- tab %>%
+        dplyr::mutate(No = NA) %>%
+        dplyr::select(No, everything())
+    }
+
+    
     names(tab) <- c("No", "Country", "Police", "UNMEM", "Troops", "Total" )
     
     ## bind all the pages
@@ -360,20 +455,25 @@ func_list2df <- function(tabs){
 
 
 ### test function 
-df <- func_list2df(tabs) %>%
-  # mutate_all(~(gsub(",", "", .))) %>% ## this also works
-  dplyr::mutate_at(.vars = 3:ncol(.), ~gsub(",", "", x = .)) %>%
-  dplyr::mutate_at(.vars = 3:ncol(.), as.numeric) %>%
-  as.data.frame()
+# df <- func_list2df(tabs) %>%
+#   # mutate_all(~(gsub(",", "", .))) %>% ## this also works
+#   dplyr::mutate_at(.vars = 3:ncol(.), ~gsub(",", "", x = .)) %>%
+#   dplyr::mutate_at(.vars = 3:ncol(.), as.numeric) %>%
+#   as.data.frame()
+# 
+# str(df)
+# 
+# colSums(df[3:6], na.rm = T)
+```
 
-str(df)
-
-colSums(df[3:6], na.rm = T)
 
 
+  There is no need to use the PDF data, as we can use `odp_contributionsbygender.csv` directly. 
+```{r - loop all, eval=FALSE, include=FALSE}
+library(tabulizer)
+yr <- '02'
+pdfs <- list.files(path = paste0(dir.peace, 'pdf/'), pattern = paste0('*', yr, '_1.pdf$'), full.names = T); pdfs
 
-
-pdfs <- list.files(path = './UN peacekeeping operations/pdf/', pattern = '*.pdf$', full.names = T); pdfs
 for (pdf in pdfs) {
   tabs <- tabulizer::extract_tables(file = pdf, output = "data.frame")
   tab_df <- data.frame()
@@ -394,29 +494,48 @@ for (pdf in pdfs) {
 
 
 # Put them in a list
-ls <- lapply(ls(pattern = "^df_.*15_1$"), get)
+pat <- paste0('^df_.*', yr, '_1$')
+ls <- lapply(ls(pattern = pat), get)
 
 # or more directly
-ls <- mget(ls(pattern = "^df_.*15_1$"))
+ls <- mget(ls(pattern = pat))
 dfs <- do.call(rbind, ls)
 rownames(dfs) <- NULL
 
-dfs_total <- dfs %>%
-  select(Country, Total, date) %>%
-  mutate(Country = gsub('Rep of Macedonia', 'Republic of Macedonia', Country)) %>%
-  pivot_wider(names_from = date, values_from = Total) %>%
-  mutate(Total_mean = rowMeans(select(., starts_with("2015")), na.rm = TRUE)) %>%
-  select(Country, Total_mean) %>%
+## fix country names
+dfs <- dfs %>%
+  mutate(Country = gsub('Rep of Macedonia', 'Republic of Macedonia', Country))
+
+dfs_yearly <- dfs %>%
+  dplyr::mutate(year = year(date), 
+                month = month(date)) %>%
+  # dplyr::filter(month == 8) %>%
+  group_by(Country, year) %>%
+  dplyr::summarise_if(is.numeric, sum, na.rm = T) %>%
+  dplyr::select(-month) %>%
   left_join(., ctr_iso, by = c('Country' = 'Contributing_Country')) %>%
   arrange(!is.na(iso3), Country) %>%
+  dplyr::select(iso3, Country, everything()) %>%
   as.data.frame()
+
+### `dfs_total` is the same as `dfs_yearly`
+# dfs_total <- dfs %>%
+#   select(Country, Total, date) %>%
+#   pivot_wider(names_from = date, values_from = Total) %>%
+#   # mutate(Total_mean = rowMeans(select(., starts_with("2015")), na.rm = TRUE)) %>%
+#   mutate(Total_mean = rowSums(select(., starts_with("2015")), na.rm = TRUE)) %>%
+#   select(Country, Total_mean) %>%
+#   left_join(., ctr_iso, by = c('Country' = 'Contributing_Country')) %>%
+#   arrange(!is.na(iso3), Country) %>%
+#   dplyr::select(iso3, Country, everything()) %>%
+#   as.data.frame()
 ```
 
 
 
 
-
-```{r test code, eval=FALSE, include=FALSE}
+  *test code*
+```{r eval=FALSE, include=FALSE}
 ### --> test code
 
 tabs[1] %>% as.data.frame() %>% select(where(not_all_na)) %>% head(3)#select(!starts_with("X"))
@@ -476,10 +595,8 @@ tab
 ## SIPRI data
   
 ```{r}
-# \Data\data_01_raw\Arm trade_Peacekeeping\SIPRI peacekeeping ops\SIPRI data peace ops 2008-18_Yingjie.xlsx
 
-
-xls <- './SIPRI peacekeeping ops/SIPRI data peace ops 2008-18_Yingjie.xlsx'
+xls <- paste0(dirname(dir.peace), '/SIPRI peacekeeping ops/SIPRI data peace ops 2008-18_Yingjie.xlsx')
 df2 <- readxl::read_excel(path = xls) %>%
   dplyr::select(-c(month, Date, `Location single`, Region)) %>%
   dplyr::select(Organization, location_code, year, everything()) %>%
@@ -500,7 +617,7 @@ names(df2)
 
 
 ```{r}
-library(textreadr)
-f <- read_rtf(file = 'Trade-Register-2000-2019.rtf', skip = 1)
+# library(textreadr)
+# f <- read_rtf(file = 'Trade-Register-2000-2019.rtf', skip = 1)
 ```
 
