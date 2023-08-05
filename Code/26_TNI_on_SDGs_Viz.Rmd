@@ -12,7 +12,7 @@ editor_options:
 ```{r Dirs and packages, include=FALSE}
 
 ### To clear your environment 
-# remove(list = ls())
+remove(list = ls())
 
 ### set work dir
 path <- rstudioapi::getSourceEditorContext()$path
@@ -149,7 +149,7 @@ dfs_score <- dfs %>%
   dplyr::filter(year == 2015) %>%
   dplyr::filter(!iso3 %in% c('SUN', 'ROW')) %>%
   group_by(iso3, year, scenario, goal) %>%
-  dplyr::summarise(score = mean(value_norm, na.rm = TRUE)) %>%  ungroup() %>%
+  dplyr::summarise(score = mean(value_norm, na.rm = TRUE)) %>% ungroup() %>%
   dplyr::mutate(score = as.numeric(score)) %>%
   dplyr::mutate(goal     = factor(x = goal, levels = seq(1, 17, 1)),
                 scenario = factor(x = scenario, levels = snr_levels)) %>%
@@ -167,27 +167,54 @@ cat('The final data include', length(unique(dfs_score$iso3)), 'countries.') ## 1
 
 
 ### for each country, to what extent each goal was impacted by metacouplings? ------------
-value_chg_max <- 20
-value_chg_max <- 50 ## 6/15/2022, do we really need to limit the change range?
-
 dfs_score_chg <- dfs_score %>%
   # dplyr::select(-group) %>%
   spread(key = scenario, value = score) %>%
   dplyr::mutate(
     value_chg = value_rel - value_not, 
-    # value_chg = ifelse(value_chg >= value_chg_max,  value_chg_max, value_chg),
-    # value_chg = ifelse(value_chg <=-value_chg_max, -value_chg_max, value_chg),
     value_chg = ifelse(iso3 =='GRL', NA, value_chg)) %>%    ## Greenland
-  dplyr::mutate(value_chg_pct = value_chg/value_rel * 100) %>%    ## % of change
-  # dplyr::select(-value_not, -value_rel) %>%
   dplyr::filter(year == 2015) %>%
   as.data.frame()
 
-# hist(dfs_score_chg$value_chg)
+### outliers? ----------------------------------------------------------------------------
+hist(dfs_score_chg$value_chg, nclass = 100)
+library(remotes)
+# Source the function from GitHub
+url_link <- "https://raw.githubusercontent.com/Yingjie4Science/functionX/main/func_find_outliers_bounds.R"
+source(url_link)
+# find_outlier_bounds_Rosner(x = dfs_score_chg$value_chg)
+find_outlier_bounds_Hampel(x = dfs_score_chg$value_chg)
+find_outlier_bounds_iqr(x = dfs_score_chg$value_chg)
+# lower     upper 
+# -15.69421  24.36477 
+
+
+### deal with these outliers by reducing the magnitude -----------------------------------
+outlier_bounds<- find_outlier_bounds_iqr(x = dfs_score_chg$value_chg)
+outlier_lower <- outlier_bounds[1]
+outlier_upper <- outlier_bounds[2]
+
+dfs_score_chg <- dfs_score_chg %>%
+  dplyr::mutate(
+    value_chg0 = value_chg,
+    value_chg = ifelse(value_chg > outlier_upper,  
+                       value_chg - (value_chg-outlier_upper)*0.75, 
+                       value_chg),
+    value_chg = ifelse(value_chg < outlier_lower, 
+                       value_chg - (value_chg-outlier_lower)*0.75, 
+                       value_chg),
+    ) %>% 
+  dplyr::mutate(value_chg_pct = value_chg/value_rel * 100) %>%    ## % of change
+  # dplyr::select(-value_not, -value_rel) %>%
+  as.data.frame()
+
+hist(dfs_score_chg$value_chg, nclass = 100)
+### check Goal id
 vars <- unique(dfs_score_chg$goal) %>% as.numeric() %>% sort() %>% as.character(); vars
 
 
-### for each country, how many goals improved from metacouplings?
+
+### for each country, how many goals improved from metacouplings? ------------------------
 dfs_score_chg_count <- dfs_score_chg %>%
   # dplyr::filter() %>%
   dplyr::group_by(iso3) %>%
@@ -238,7 +265,7 @@ p <- chg_err %>%
                 position=position_dodge(.8)) +
   # scale_fill_manual(values = mycols) +
   scale_fill_manual(values = c('#ffeda0', '#6baed6')) +
-  xlab("Impact on SDG score")+ ylab('SDGs') + labs(fill = "Goal")+
+  xlab("Transnational impact on SDG score")+ ylab('SDGs') + labs(fill = "Goal")+
   theme_bar_my +
   theme(plot.margin = unit(c(0.1, 0, 0.1, -.5), "cm"))+ 
   theme(legend.position = c(0.1, 0.85), 
@@ -297,7 +324,7 @@ p_icon <- ggdraw(insert_yaxis_grob(plot = p, grob = icons, grid::unit(.1, "null"
 
 fig <- ggarrange(p_icon, labels = "b", font.label = list(size = 20), vjust = 1, hjust = 0)
 fname <- paste0(dir.fig, '01main/fig1b_SDG_score_chg_Bar_Icon_', today, '.jpg'); fname
-ggsave(filename = fname, plot = fig, width = 6, height = 8, units = 'in', dpi = 600)
+# ggsave(filename = fname, plot = fig, width = 6, height = 8, units = 'in', dpi = 600)
 
 ## ref: https://www.rdocumentation.org/packages/cowplot/versions/1.1.1/topics/axis_canvas
 ```
@@ -333,7 +360,7 @@ ggplot(data = chg_err_group,
   geom_errorbar(aes(ymin=value_chg-se, ymax=value_chg+se), 
                 width=.3, 
                 position=position_dodge(.8)) +
-  ylab("Impact on SDG score") + xlab('SDGs') + labs(fill = "Group")+
+  ylab("Transnational impact on SDG score") + xlab('SDGs') + labs(fill = "Group")+
   # scale_fill_brewer(palette = "Blues", direction = -1) +
   scale_fill_manual(values = color_grp, guide = guide_legend(reverse = TRUE)) +
   coord_flip()+
@@ -403,7 +430,7 @@ ggplot(data = chg_err_group,
   geom_errorbar(aes(ymin=value_chg-se, ymax=value_chg+se), 
                 width=.3, 
                 position=position_dodge(.8)) +
-  ylab("Impact on SDG score") + xlab('SDGs') + labs(fill = "Group")+
+  ylab("Transnational impact on SDG score") + xlab('SDGs') + labs(fill = "Group")+
   # scale_fill_brewer(palette = "Blues", direction = -1) +
   scale_fill_manual(values = color_grp, guide = guide_legend(reverse = TRUE)) +
   scale_y_continuous(n.breaks = 6) +
@@ -421,7 +448,7 @@ ggplot(data = chg_err_group,
 
 ggarrange(p, labels = "c", font.label = list(size = 20), vjust = 1)
 fname <- paste0(dir.fig, '01main/fig1c_SDG_score_chg_Bar_byGroup2grp_', today, '_', mark, '.jpg'); fname
-ggsave(filename = fname, plot = last_plot(), width = 6, height = 8, units = 'in', dpi = 300)
+# ggsave(filename = fname, plot = last_plot(), width = 6, height = 8, units = 'in', dpi = 300)
 ```
 
 
@@ -450,7 +477,7 @@ p <- chg_err_groups %>%
   geom_errorbar(aes(ymin=value_chg-se, ymax=value_chg+se), 
                 width=.3, 
                 position=position_dodge(.8)) +
-  ylab("Impact on SDG score") + xlab('SDGs') + labs(fill = "Group")+
+  ylab("Transnational impact on SDG score") + xlab('SDGs') + labs(fill = "Group")+
   # scale_fill_brewer(palette = "Blues", direction = -1) +
   scale_fill_manual(values = color_grp, guide = guide_legend(reverse = TRUE)) +
   scale_y_continuous(n.breaks = 6) +
@@ -1041,7 +1068,7 @@ dfs_index_chg1 %>%
   scale_colour_manual(values = brewer.pal(n = 6, "Blues")[6:3]) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   geom_hline(yintercept = 0, color="red", linetype="dashed") +
-  xlab('') + ylab('Impact on SDG Index')
+  xlab('') + ylab('Transnational impact on SDG Index')
   
 fname <- paste0(dir.fig, '01main/ex_2_SDG_Index_chg_byGroup_4grp_', today, '.jpg'); fname
 ggsave(filename = fname, plot = last_plot(), width = 6, height = 6, units = 'in', dpi = 300)
@@ -1070,7 +1097,7 @@ dfs_index_chg %>%
     scale_colour_manual(values = color_grp2) +
     # theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
     geom_hline(yintercept = 0, color="red", linetype="dashed") +
-    xlab('') + ylab('Impact on SDG Index')
+    xlab('') + ylab('Transnational impact on SDG Index')
   
 fname <- paste0(dir.fig, '01main/ex_2_SDG_Index_chg_byGroup_2grp_', today, '.jpg'); fname
 ggsave(filename = fname, plot = last_plot(), width = 6, height = 6, units = 'in', dpi = 300)
