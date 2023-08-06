@@ -134,23 +134,30 @@ func_norm_sdg_score_auto <- function(df, trim = 0.025, bottom = 0.05, top = 0.95
   max <- quantile(all.val$val, probs = top,    na.rm = T); max
   
   
+  ##' would be a better idea to keep the score between 1-100, because 0 can lead to Inf 
+  ##'     in the further analysis steps
   if (direction_sdg == -1) {
     all.val.norm <- all.val %>%
       dplyr::mutate(
         value_norm = ifelse(
-          val > max, 0, ifelse(
-            val > min, (val-max)/(min-max)*100, 100))
+          val > max, 0+1, ifelse(
+            val > min, ((val-max)/(min-max)*100+1), 100+1))
       )
   } else if (direction_sdg == 1) {
     all.val.norm <- all.val %>%
       dplyr::mutate(
         value_norm = ifelse(
-          val < min, 0, ifelse(
-            val < max, (val-min)/(max-min)*100, 100))
+          val < min, 0+1, ifelse(
+            val < max, ((val-min)/(max-min)*100+1), 100+1))
       )
   } else {
     print('\t\t Please specify `direction_sdg` for SDG score normalization! ...')
   }
+  
+  
+  ## set max = 100
+  all.val.norm <- all.val.norm %>%
+    dplyr::mutate(value_norm = ifelse(value_norm>100, 100, value_norm))
   
   return(all.val.norm)
 }
