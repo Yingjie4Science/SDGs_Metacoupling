@@ -785,7 +785,7 @@ map1 <- spillover_index_shp %>%
   dplyr::filter(year == 2015) %>%
   ggplot()+
   geom_sf(aes(fill = index), color='gray80', size = 0.1) +
-  scale_fill_distiller(palette = "Reds", direction = 1, na.value = 'black', name = 'Impact\nIndex') +
+  scale_fill_distiller(palette = "Reds", direction = 1, na.value = 'black', name = 'Transnational\nImpact\nIndex') +
   # scale_fill_viridis(direction = -1, option = 'C', discrete = F, name = 'Impact\nIndex') +
   
   scale_y_continuous(expand = c(0, 0)) + ## reduce the space between plot and border
@@ -876,7 +876,7 @@ spillover_index_top_bottom %>%
   # scale_shape_manual(values=c(19, 1), labels = c("high income", "low income"))+
   scale_shape_manual(values=c(17, 15, 0, 6))+
   scale_fill_hue(direction = -1) +
-  ylab('Impact Index') +
+  ylab('Transnational Impact Index') +
   coord_flip() +
   theme(axis.title.y=element_blank(), 
         legend.key.size   = unit(.3, 'cm'),  #change legend key size
@@ -910,7 +910,7 @@ spillover_index_top_bottom %>%
   scale_fill_manual(values=c('#fee6ce', '#f16913'))+
   scale_color_manual(values=c('#2c7bb6', '#abd9e9', '#fdae61', '#d7191c'))+
   # scale_fill_hue(direction = -1) +
-  ylab('Impact Index') +
+  ylab('Transnational Impact Index') +
   coord_flip() +
   theme(axis.title.y=element_blank(), 
         text = element_text(size = 10),
@@ -940,7 +940,7 @@ p <- spillover_index_top_bottom %>%
   scale_fill_brewer(palette = "Reds") +
   # scale_fill_manual(values = brewer.pal(n = 5, "Reds")[c(2,4)]) +
   scale_color_manual(values=c('#2371A6', '#F26463'))+
-  ylab('Impact Index') +
+  ylab('Transnational Impact Index') +
   coord_flip() +
   theme(axis.title.y=element_blank(), 
         text = element_text(size = 10),
@@ -1010,7 +1010,7 @@ ggplot(spillover_index_type_SDGtype,
     legend.key.size = unit(0.4,"cm"),
     panel.grid.major.y = element_blank(),
     legend.margin=margin(0, 0, 0, 0)) +
-  ylab('Impact Index') + xlab('Country')
+  ylab('Transnational Impact Index') + xlab('Country')
 
 fname <- paste0(dir.fig, '01main/', 'ex_4_spillover_index_top_bottom_ByType_', postfix, '_', today, '.jpg'); fname
 ggsave(filename = fname, plot = last_plot(), width = width_2col/3*2, height = width_2col/2, units = 'cm', dpi = 600)
@@ -1108,7 +1108,8 @@ map_each_p <- map_each %>%
   dplyr::filter(!is.na(ShortName)) %>%  ## remove un-matched 
   ggplot()+
   geom_sf(aes(fill = spillover_norm), color='gray80', size = 0.1) +
-  scale_fill_distiller(palette = "Spectral", direction = -1, na.value = 'gray70', name= 'Effect Score') +
+  scale_fill_distiller(palette = "Spectral", direction = -1, na.value = 'gray70', 
+                       name= 'Transnational Impact Score') +
   facet_wrap(~ShortName, ncol = n_col, nrow = n_row) +
   # ggtitle(yr)+
   theme(legend.position = c(0.9, 0.07)) +
@@ -1120,7 +1121,7 @@ map_each_p <- map_each %>%
         strip.text.x = element_text(size = 6)
         ) 
 map_each_p
-fname <- paste0(dir.fig, 'spillover/', 'map_spillover_norm_each_', yr, '_long_', today, '.jpg'); #fname
+fname <- paste0(dir.fig, '01main/', 'ex_5_map_spillover_norm_each_', yr, '_long_', today, '.jpg'); #fname
 ggsave(filename = fname, plot = map_each_p, width = 7, height = n_row*7.2/8, units = 'in', dpi = 300)
 ```
 

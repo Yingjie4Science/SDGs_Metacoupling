@@ -226,12 +226,25 @@ dfs_score_chg_count <- dfs_score_chg %>%
 ```
 
 
-```{r - bar - change by Goal - fig 1b}
-### Bar plot - Goal score change - by goal ---------------------------------------------------------
+```{r - % change by Goal - MS ✏️📝}
 
-chg_err  <- dfs_score_chg %>% 
-  # dplyr::filter(group_2 != 'na') %>%
-  Rmisc::summarySE(measurevar= "value_chg", groupvars = c("year", "goal"), na.rm = T)
+### deal with these outliers by reducing the magnitude -----------------------------------
+outlier_bounds<- find_outlier_bounds_iqr(x = dfs_score_chg$value_chg_pct)
+outlier_lower <- outlier_bounds[1]; outlier_lower
+outlier_upper <- outlier_bounds[2]; outlier_upper
+dfs_score_chg <- dfs_score_chg %>%
+  dplyr::mutate(value_chg_pct = winsor(value_chg_pct, trim = 0.01, na.rm = TRUE)) %>% 
+  dplyr::mutate(
+    value_chg_pct = ifelse(value_chg_pct > outlier_upper,
+                       value_chg_pct - (value_chg_pct-outlier_upper)*0.75,
+                       value_chg_pct),
+    value_chg_pct = ifelse(value_chg_pct < outlier_lower,
+                       value_chg_pct - (value_chg_pct-outlier_lower)*0.75,
+                       value_chg_pct)
+    ) %>%
+  as.data.frame()
+hist(dfs_score_chg$value_chg_pct, nclass = 100)
+
 
 chg_pct_err  <- dfs_score_chg %>% 
   dplyr::filter_if(~is.numeric(.), all_vars(!is.infinite(.))) %>%
@@ -239,11 +252,17 @@ chg_pct_err  <- dfs_score_chg %>%
   Rmisc::summarySE(measurevar= "value_chg_pct", groupvars = c("year", "goal"), na.rm = T) %>%
   as.data.frame()
 
-
 chg_pct_err %>%
-  Rmisc::summarySE(measurevar= "value_chg_pct", groupvars = c("year"), na.rm = T) 
+  Rmisc::summarySE(measurevar= "value_chg_pct", groupvars = c("year"), na.rm = T)
+```
 
 
+```{r - bar - change by Goal - fig 1b}
+
+### Bar plot - Goal score change - by goal ---------------------------------------------------------
+chg_err  <- dfs_score_chg %>% 
+  # dplyr::filter(group_2 != 'na') %>%
+  Rmisc::summarySE(measurevar= "value_chg", groupvars = c("year", "goal"), na.rm = T)
 # mycol  <-  scale_fill_manual(values = mycols)
 
 
@@ -254,17 +273,19 @@ chg_pct_err %>%
 # levels(chg_err$breaks)
 # unique(chg_err$breaks)
 # mycols <- colors_changes[4:8]
+levels(chg_err$value_chg)
 
 p <- chg_err %>%
-  
+  dplyr::mutate(chg_direction = ifelse(value_chg > 0, 1, -1),
+                chg_direction = factor(chg_direction, levels = c(1,-1))) %>%
   ggplot(data = ., 
-         aes(y = factor(goal, levels = rev(vars)), x = value_chg, fill = value_chg > 0)) +
+         aes(y = factor(goal, levels = rev(vars)), x = value_chg, fill = chg_direction)) +
   geom_bar(position = position_dodge(0.8), stat="identity", width = 0.8, show.legend = F, alpha = .9)+
   geom_errorbar(aes(xmin=value_chg-se, xmax=value_chg+se), 
                 width=.3, 
                 position=position_dodge(.8)) +
   # scale_fill_manual(values = mycols) +
-  scale_fill_manual(values = c('#ffeda0', '#6baed6')) +
+  scale_fill_manual(values = c('#6baed6', '#ffeda0')) +
   xlab("Transnational impact on SDG score")+ ylab('SDGs') + labs(fill = "Goal")+
   theme_bar_my +
   theme(plot.margin = unit(c(0.1, 0, 0.1, -.5), "cm"))+ 
@@ -405,7 +426,7 @@ shp_ctr_list <- grp_update %>%
 ```
 
 
-```{r}
+```{r - change by group - MS ✏️📝}
 ## merge the two data for plot
 df_shp <- shp_ctr_list %>%
   merge(x = ., 
@@ -418,6 +439,23 @@ chg_err_group  <- df_shp %>%
   dplyr::filter(year != 'na') %>%
   summarySE(measurevar= "value_chg", groupvars = c("year", 'group', "goal"), na.rm = T)
 
+
+chg_err_group_text <- chg_err_group %>%
+  dplyr::select(year, group, goal, value_chg) %>%
+  spread(key = group, value = value_chg) %>%
+  mutate(good4who = ifelse(`High income` > `Low income`, 'better for High', 'better for Low')) 
+
+chg_err_group_text %>%
+  group_by(good4who) %>%
+  tally()
+
+cat('Low income - the number of SDGs that decreased:',  sum(chg_err_group_text$`Low income` < 0), '\n')
+cat('High income - the number of SDGs that decreased:', sum(chg_err_group_text$`High income` < 0), '\n')
+
+```
+
+
+```{r}
 color_grp <- c('#2371A6', '#F26463') ## high, low
 color_grp <- rev(color_grp)
 
@@ -739,6 +777,8 @@ dfs_index_snr <- dfs_index %>%
   summarySE(measurevar= "index", groupvars = c("year", 'scenario', 'group'), na.rm = T) %>%
   as.data.frame() 
 
+y_upper <- ceiling(max(dfs_index_snr$index) + max(dfs_index_snr$se) + 1)
+y_lower <- floor(min(dfs_index_snr$index) - max(dfs_index_snr$se) - 1)
 
 ### plot ------------------
 p <- dfs_index_snr %>%
@@ -776,8 +816,8 @@ p <- dfs_index_snr %>%
   
   geom_errorbar(position=position_dodge(.9), width=.4, color = 'gray50') +
   scale_y_continuous(
-    breaks = seq(50, 80, 10),
-    limits = c(50, 80),
+    breaks = seq(y_lower, y_upper, 5),
+    limits = c(y_lower, y_upper),
     oob = rescale_none
     ) +
   scale_x_discrete(labels = snr_labels) +
@@ -802,7 +842,7 @@ ggsave(filename = fname, plot = last_plot(), width = 6, height = 8, units = 'in'
 
 
 
-```{r - Index change - MS}
+```{r - Index change - MS ✏️📝}
 ### SDG Index change ---------------------------------------------------------------------
 dfs_index_chg <- dfs_index %>%
   # dplyr::select(-group) %>%
