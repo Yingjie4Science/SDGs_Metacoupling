@@ -401,7 +401,7 @@ ggplot(data = chg_err_group,
 
 
 
-```{r - bar - change by Goal by 2 county group - fig 1c - !!?}
+```{r - bar - change by Goal by 2 county group - fig 1c - !!}
 ## classify the country list into 2 groups
 ## -- option 1: high = high + upper middle; low = low + lower middle
 mark <- 'option1'
@@ -496,7 +496,9 @@ chg_err_groups <- rbind(
   chg_err %>% dplyr::mutate(group = 'Global') %>% dplyr::select(names(chg_err_group)),
   chg_err_group
 ) %>%
-  dplyr::mutate(group = factor(x = group, levels = c("Global", "High income", "Low income")),
+  dplyr::mutate(group = factor(x = group, 
+                               levels = c("Global", "High income", "Low income"), 
+                               labels = c("Global", "High-income", "Low-income")),
                 group = fct_rev(group))
   
 
