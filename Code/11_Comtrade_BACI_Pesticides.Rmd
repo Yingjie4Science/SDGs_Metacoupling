@@ -125,27 +125,38 @@ f <- paste0(dir.baci, 'BACI_HS07_07_10_15.RData')
 load(file = f) # `bacis`
 
 head(bacis)
-ks <- bacis %>% distinct(k, .keep_all = F) %>%
+
+##' `k`:	Product category (HS 6-digit code)
+##' here we need to get an unique product code/name list
+ks <- bacis %>% 
+  dplyr::distinct(k, .keep_all = F) %>%
   dplyr::filter(str_starts(k, '3808'))
 
+
+##' filter the products we are interested in 
 pst_ij <- bacis %>% 
   # dplyr::filter(t == year) %>%
-  ### - filter based on fishery code
+  ### - filter based on product code
   dplyr::filter(k %in% c('380850', '380859')) %>%
   ### - total flows among countries
   group_by(t, i, j) %>%
   dplyr::summarise_at(vars(v:q), sum, na.rm = TRUE) %>%
+  ungroup() %>%
   ### - add country code 
-  merge(., baci_ctr %>% dplyr::select(country_code, iso_3digit_alpha), by.x = 'i', by.y = 'country_code', all.x = T) %>%
+  merge(., baci_ctr %>% dplyr::select(country_code, iso_3digit_alpha), 
+        by.x = 'i', by.y = 'country_code', all.x = T) %>%
   dplyr::rename(o = iso_3digit_alpha) %>%
-  merge(., baci_ctr %>% dplyr::select(country_code, iso_3digit_alpha), by.x = 'j', by.y = 'country_code', all.x = T) %>%
+  merge(., baci_ctr %>% dplyr::select(country_code, iso_3digit_alpha), 
+        by.x = 'j', by.y = 'country_code', all.x = T) %>%
   dplyr::rename(d = iso_3digit_alpha) %>%
   dplyr::select(-i, -j, -v) #%>%
 
 
 ### - To generate the same format as Eora in Matrix
 df_formatted <- pst_ij %>%
-  merge(x = temp_eora, y = ., by.x = c('year', 'iso3', 'to'), by.y = c('t', 'o', 'd'), all.x = T) %>%
+  merge(x = temp_eora, y = ., 
+        by.x = c('year', 'iso3', 'to'), 
+        by.y = c('t', 'o', 'd'), all.x = T) %>%
   arrange(year, iso3, to) %>%
   dplyr::select(year, ctr, everything()) %>%
   spread(key = to, value = q) %>%
