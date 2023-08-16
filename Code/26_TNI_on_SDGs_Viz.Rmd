@@ -140,7 +140,8 @@ load(f)
 unique(dfs$scenario)
 snr_levels <- c("value_rel", "value_dst", "value_ner", "value_not")
 # snr_labels <- c("real", "no nearby", "no distant", "none")
-snr_labels <- c("real", "only distant", "only nearby", "none") %>% str_to_sentence()
+snr_labels <- c("real world", "Telecoupling only", "Pericoupling only", "Intracoupling only") %>%
+  str_to_sentence()
 snr_colors <- c('#418463', '#5eab94', '#96c56f', '#dfe360')
 
 dfs_score <- dfs %>%
@@ -212,17 +213,6 @@ hist(dfs_score_chg$value_chg, nclass = 100)
 ### check Goal id
 vars <- unique(dfs_score_chg$goal) %>% as.numeric() %>% sort() %>% as.character(); vars
 
-
-
-### for each country, how many goals improved from metacouplings? ------------------------
-dfs_score_chg_count <- dfs_score_chg %>%
-  # dplyr::filter() %>%
-  dplyr::group_by(iso3) %>%
-  dplyr::summarise(counts = sum(value_chg > 0, na.rm = TRUE),
-                   counts_na = sum(is.na(value_chg))) %>%
-  dplyr::filter(counts_na < 17/2) %>%  ## remove countries with too many NA
-  dplyr::mutate(percent_increase = counts/17*100) %>%
-  as.data.frame()
 ```
 
 
@@ -595,7 +585,22 @@ tmap_save(tm = tmap_last(), filename = fname, width=7, height=6, units="in", dpi
 
 ```{r - map of the # of increased SDGs - fig 1d}
 
-### plot -------------------------------------------------------------------------------------------
+### for each country, how many goals improved from metacouplings? ------------------------
+dfs_score_chg_count <- dfs_score_chg %>%
+  # dplyr::filter() %>%
+  dplyr::group_by(iso3) %>%
+  dplyr::summarise(
+    n_incr = sum(value_chg > 0, na.rm = TRUE),
+    n_decr = sum(value_chg < 0, na.rm = TRUE),
+    n = n(),
+    n_na = sum(is.na(value_chg))) %>%
+  ungroup() %>%
+  dplyr::filter(n_na < 17/2) %>%  ## remove countries with too many NA
+  dplyr::mutate(percent_increase = n_incr/17*100, 
+                percent_decrease = 100 - percent_increase) %>%
+  as.data.frame()
+
+### plot ---------------------------------------------------------------------------------
 df_chg_sf  <- dfs_score_chg_count %>%
   merge(x = shp, y = ., by.x = "iso_a3", by.y = "iso3",  all.x = T)
 
@@ -634,6 +639,42 @@ tm_shape(df_chg_sf) +
 tmap_save(tm = tmap_last(), filename = fname, width=7, height=2.8, units="in", dpi = 300)
 ```
 
+
+```{r - map of the # of increased SDGs - fig 1d - % decreased}
+
+### plot -------------------------------------------------------------------------------------------
+
+col_tmap <- brewer.pal(n = 10, name = "OrRd")
+
+fname <- paste0(dir.fig, '01main/fig1dex_SDG_score_count_Decreased_', today, '.jpg'); fname
+# jpeg(filename = fname, width=7, height=2.8, units="in", pointsize=18, res=300)
+
+tm_shape(df_chg_sf) +
+  tm_fill(col = 'percent_decrease', 
+          palette = col_tmap, #col1,
+          style = "fixed",
+          breaks= seq(0, 100, 10),
+          title = '% of 17 SDGs\ndecreased',
+          textNA = 'NA', colorNA = 'gray90',
+          legend.reverse = T) +
+  tm_borders(col = "grey", lwd = 0.1, lty = "solid", alpha = 0.99) +
+  tm_credits(text = "", fontface = "bold", size = 1.2, position = c(0, 0.9)) +
+  tm_layout(
+    frame = F, frame.lwd = 0.1, 
+    legend.position = c(0,0),
+    legend.title.size = 0.9,
+    legend.text.size  = 0.7,
+    # legend.format = list(text.less.than = '<', text.or.more = "<", text.separator = "~"),
+    legend.width = -0.7,
+    legend.height = -0.7, 
+    outer.margins=0, #c(0,0.001, 0, 0.001), #  bottom, left, top, and right
+    inner.margins=0,
+    panel.show = F) 
+
+# dev.off()
+
+tmap_save(tm = tmap_last(), filename = fname, width=7, height=2.8, units="in", dpi = 300)
+```
 
 
 
@@ -676,7 +717,7 @@ p <- dfs_score_goal_snr %>%
   coord_flip() +
   theme_bar_my +
   theme(panel.grid = element_blank(),
-        legend.position = c(0.902, 0.057), 
+        legend.position = c(0.872, 0.057), ## c(0.902, 0.057)
         legend.box.background = element_rect(colour = "black"),
         legend.key.width  = unit(0.4,"cm"),
         legend.key.height = unit(0.3,"cm"),
@@ -723,7 +764,7 @@ p <-
   scale_pattern_manual(
     name = 'Group', 
     values = c(`High income` = "circle", `Low income` = "none")) +
-  geom_errorbar(position=position_dodge(.9), width=.4, color = 'gray30', size = 0.3) +
+  geom_errorbar(position=position_dodge(.9), width=.4, color = 'gray30', linewidth = 0.3) +
   scale_fill_manual(
     name   = 'Scenarios',
     values = rev(snr_colors), 
@@ -739,7 +780,7 @@ p <-
   facet_wrap(~goal, ncol = 4) + 
   theme_bar_my +
   theme(panel.grid = element_blank(),
-        legend.position = c(1, -0.05), 
+        legend.position = c(1, -0.1), ## c(1, -0.05)
         legend.justification = c(1, 0), # right bottom justification
         legend.box.margin = margin(r = 0, b = 0, unit = "mm"), # small margin
         legend.box.background = element_rect(colour = "black"),
@@ -827,7 +868,7 @@ p <- dfs_index_snr %>%
   # coord_flip() +
   theme_bar_my +
   theme(panel.grid = element_blank(),
-        legend.position = c(0.898, 0.892),
+        legend.position = c(0.873, 0.892), ## (0.894, 0.892)
         legend.box.background = element_rect(colour = "black"),
         legend.key.width = unit(0.4,"cm"),
         legend.key.height = unit(0.3,"cm"), 
