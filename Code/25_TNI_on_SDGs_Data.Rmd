@@ -2025,7 +2025,7 @@ score_8_1_1 <- df_score
   
   Material Footprint (MF) is the attribution of global material extraction to domestic final demand of a country. 
   
-  The total material footprint is the sum of the **material footprint** for *biomass, fossil fuels, metal ores and non-metallic minerals*. -- from https://unstats.un.org/sdgs/metadata/files/Metadata-12-02-01.pdf
+  The total material footprint is the *sum* of the `material footprint` for *biomass, fossil fuels, metal ores and non-metallic minerals*. -- from https://unstats.un.org/sdgs/metadata/files/Metadata-12-02-01.pdf
   
 ***Note***
   DE    Domestic extraction
@@ -2045,7 +2045,7 @@ Data Source: https://www.resourcepanel.org/global-material-flows-database
 
 ```{r}
 ind_sdg  <- 'material_per_pop' ## ton/pop
-ind_ft   <- 'Material_footprint'
+ind_ft   <- 'Materialtotal'
 unit_check <- 1
 direction_sdg <- -1
 
@@ -2069,37 +2069,43 @@ mat <- mat_w %>%
 ### resource footprint ----------------------------------------------------------------------------------
 ### - this is a ready-to-use data, instead of from EORA. 
 ### - There is no bi-lateral flows among countries in this data
-xls <- list.files(path = dir.input1, pattern = '^Material footprint', full.names = T); xls 
-ft_w <- readxl::read_excel(path = xls) %>% as.data.frame()  ## the status data
-ft   <- ft_w %>%
-  dplyr::select(-ctr) %>%
-  gather(key = 'year', value = 'ft', `2000`:ncol(.)) %>%
-  dplyr::mutate(ft = ft*unit_check) %>%  
-  dplyr::rename('MF' = 'ft') %>%
-  ## Since `MF = DE + RMEIM - RMEEX`, and we need the value of total net import, i.e., `fromAll` 
-  left_join(x=.,
-            y=mat %>% dplyr::rename('DE' = 'value'), 
-            by = c('iso3', 'year')) %>%
-  dplyr::mutate(fromAll = MF - DE,
-                ind     = ind_ft) %>%
-  # dplyr::select(-MF, -DE) %>%
-  dplyr::select(ind, year, iso3, everything()) %>%
-  # dplyr::filter(year == 2015) %>%
-  as.data.frame()
+# xls <- list.files(path = dir.input1, pattern = '^Material footprint', full.names = T); xls 
+# ft_w <- readxl::read_excel(path = xls) %>% as.data.frame()  ## the status data
+# ft   <- ft_w %>%
+#   dplyr::select(-ctr) %>%
+#   gather(key = 'year', value = 'ft', `2000`:ncol(.)) %>%
+#   dplyr::mutate(ft = ft*unit_check) %>%  
+#   dplyr::rename('MF' = 'ft') %>%
+#   ## Since `MF = DE + RMEIM - RMEEX`, and we need the value of total net import, i.e., `fromAll` 
+#   left_join(x=.,
+#             y=mat %>% dplyr::rename('DE' = 'value'), 
+#             by = c('iso3', 'year')) %>%
+#   dplyr::mutate(fromAll = MF - DE,
+#                 ind     = ind_ft) %>%
+#   # dplyr::select(-MF, -DE) %>%
+#   dplyr::select(ind, year, iso3, everything()) %>%
+#   # dplyr::filter(year == 2015) %>%
+#   as.data.frame()
 
 
+### - UPDATE: bi-lateral material flow data were added on 8/17/2023
+oft <- net_imports_bind  %>%
+  dplyr::filter(ind == ind_ft) %>%
+  dplyr::select(ind, year, iso3, net_in, scenario) %>%
+  spread(key = scenario, value = net_in)
+  
 
 ### w/o trade, and with trade together  -----------------------------------------------------------------
 rel_not_merge <- mat %>%
-  merge(x = ., y = ft,    by = c('iso3', 'year'), all.x = T) %>%
+  merge(x = ., y = oft,   by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = pop_l, by = c('iso3', 'year'), all.x = T) %>%
   dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     # ind       = 'material',
     value_rel = (value + 0)/pop,
     value_not = (value + fromAll)/pop,
-    value_dst = (NA)/pop,
-    value_ner = (NA)/pop,
+    value_dst = (value + fromNer)/pop,
+    value_ner = (value + fromDst)/pop,
     ) %>%
   ### for easy-checking the numbers
   dplyr::select(ind, iso3, year, value, everything())
@@ -2134,7 +2140,6 @@ score_8_4_2x <- df_score
   
 ```{r include=FALSE}
 ind_sdg  <- 'material_per_gdp' ## ton/usd
-ind_ft   <- 'Material_footprint'
 unit_check <- 1
 direction_sdg <- -1
 
@@ -2146,14 +2151,14 @@ direction_sdg <- -1
 
 ### w/o trade, and with trade together  -----------------------------------------------------------------
 rel_not_merge <- mat %>%
-  merge(x = ., y = ft,          by = c('iso3', 'year'), all.x = T) %>%
+  merge(x = ., y = oft,         by = c('iso3', 'year'), all.x = T) %>%
   merge(x = ., y = gdp_rel_not, by = c('iso3', 'year'), all.x = T) %>%
   dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     value_rel = (value +       0)/gdp_rel,
     value_not = (value + fromAll)/gdp_not,
-    value_dst =              (NA)/gdp_dst,
-    value_ner =              (NA)/gdp_ner,
+    value_dst = (value + fromNer)/gdp_dst,
+    value_ner = (value + fromDst)/gdp_ner,
     ) %>%
   ### for easy-checking the numbers
   dplyr::select(ind, iso3, year, value, everything())
@@ -3003,7 +3008,6 @@ score_11_6_22 <- df_score
   
 ```{r}
 ind_sdg  <- 'Material footprint per capita' ## ton per capita
-ind_ft   <- 'Material_footprint'
 unit_check <- 1
 
 ### Check the Unit!!!

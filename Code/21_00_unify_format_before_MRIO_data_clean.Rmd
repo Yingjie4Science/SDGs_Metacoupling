@@ -44,23 +44,26 @@ name_new
 file.rename(from = name_old, to = name_new)
 
 
-## 2. fix SHDB files
-xls.ls.rename <- subset(xls.ls, grepl(pattern = 'SHDB', x = xls.ls))
-for (file in xls.ls.rename) {
-  ## new name
-  file_new <- file %>%
-    gsub(pattern = '20220801', '',  x = .) %>%
-    gsub(pattern = 'SHDB_', 'SHDB', x = .)
-  name_dir <- paste0(dirname(xls.eora.ls[1]), '/')
-  name_old <- paste0(name_dir, file)
-  name_new <- paste0(name_dir, file_new)
-  if (file.exists(name_old)) {
-    ## rename
-    file.rename(name_old, name_new)
-  } else {
-    cat("The file does not exist\n")
-  }
-}
+## 2. fix SHDB files [not in use]
+# xls.eora.ls <- list.files(path = dir.eora, pattern = 'YJ_.*xlsx$', full.names = T);
+# xls.ls <- basename(xls.eora.ls); 
+# xls.ls.rename <- subset(xls.ls, grepl(pattern = 'SHDB', x = xls.ls))
+# 
+# for (file in xls.ls.rename) {
+#   ## new name
+#   file_new <- file %>%
+#     gsub(pattern = '20220801', '',  x = .) %>%
+#     gsub(pattern = 'SHDB_', 'SHDB', x = .)
+#   name_dir <- paste0(dirname(xls.eora.ls[1]), '/')
+#   name_old <- paste0(name_dir, file)
+#   name_new <- paste0(name_dir, file_new)
+#   if (file.exists(name_old)) {
+#     ## rename
+#     file.rename(name_old, name_new)
+#   } else {
+#     cat("The file does not exist\n")
+#   }
+# }
 ```
 
 
@@ -95,8 +98,7 @@ shdb_names_ <- shdb_names %>%
 ### load SHDB data ------------------------------
 getwd()
 pattern <- '^YJ_SHDB_20230718'
-path.new <- './Data/data_02_intermediate/dt02_flows/eora/SHDB2019_135/'
-xls.eora.ls <- list.files(path = path.new, pattern = pattern, full.names = T); xls.eora.ls
+xls.eora.ls <- list.files(path = dir.shdb, pattern = pattern, full.names = T);
 if (length(xls.eora.ls) != 135) {
   stop("Misisng files!")
 }
@@ -127,9 +129,19 @@ for (file in xls.ls) {
   ## or 
   file_new <- paste0('YJ_', name.i, '_2019.xlsx')
   
-  ## add path 
+  ## add path --------------------------------
   dir_old <- paste0(dirname(xls.eora.ls[1]), '/') 
   dir_new <- gsub('_135', '_135_renamed', x = dir_old)
+  # Check if the folder exists, and if not, create it
+  if (!file.exists(dir_new)) {
+    dir.create(dir_new)
+    # cat("Folder created:", dir_new, "\n")
+  } else {
+    cat("Folder already exists:", dir_new, "\n")
+  }
+  
+  
+  
   name_old       <- paste0(dir_old, file)
   name_old_inNew <- paste0(dir_new, file)
   name_new       <- paste0(dir_new, file_new)
