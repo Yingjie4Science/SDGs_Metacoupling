@@ -40,9 +40,10 @@ ctr_p <- readxl::read_excel(paste0(dir.fishstat, 'Metadata_Production_Country.xl
 
 ## Production --------------------------------
 
-  # Production can come from (1) wild capture, and (2) aquaculture. Each source also include productions from "Marine waters" or "Inland waters". 
-  # 
-  # Here, for SDG 14, we mainly focus on *wild capture from marine waters*.
+  #' Production can come from (1) wild capture, and (2) aquaculture. 
+  #' Each source also include productions from "Marine waters" or "Inland waters". 
+  #' 
+  #' Here, for SDG 14, we mainly focus on *wild capture from marine waters*.
 
 
 ### data 1 - Global production by production source ----------------------------------

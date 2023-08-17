@@ -4,7 +4,7 @@ author: "Yingjie Li"
 date: "2021-03-01"
 output: pdf_document
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 
@@ -103,20 +103,20 @@ iso_eora <- readxl::read_excel(path = xls_iso_eora)
 ### to list all the input data files
 library(stringr)
 pattern <- '^YJ_'
-xls.eora.ls <- list.files(path = dir.eora, pattern = pattern, full.names = T); xls.eora.ls
-xls.ls <- basename(xls.eora.ls); xls.ls
+xls.eora.ls <- list.files(path = dir.eora, pattern = pattern, full.names = T); 
+xls.ls <- basename(xls.eora.ls); 
 
 
 ### to obtain the unique list of all the footprint indicator names
 ### - old list
 xls.eora.ls.old <- list.files(path = paste0(dirname(dir.eora), '/2021-08-05'), pattern = pattern, full.names = T);
 xls.ls.old <- basename(xls.eora.ls.old);
-inds <- substr(x = xls.ls.old, start = 4, stop = max(nchar(xls.ls.old))); inds
+inds <- substr(x = xls.ls.old, start = 4, stop = max(nchar(xls.ls.old))); 
 inds <- str_sub(string = inds, end = -10);
 inds <- gsub(pattern = '_$', '', x = inds);
 inds <- unique(inds); 
 inds.old <- inds
-print(paste0('The total number of Eora indicators: ', length(inds.old))) ## 54
+cat(paste0('\n The total number of Eora indicators: ', length(inds.old))) ## 54
 
 
 ### - new list (update on 2022-08-01)
@@ -124,8 +124,8 @@ inds <- substr(x = xls.ls, start = 4, stop = max(nchar(xls.ls)));
 inds <- str_sub(string = inds, end = -10);           ## remove "_YYYY.xlsx"
 inds <- gsub(pattern = '_$|20220801', '', x = inds); ## fix format issue in SHDB' names
 inds <- gsub(pattern = 'SHDB_', 'SHDB', x = inds);   ## fix format issue in SHDB' names
-inds <- unique(inds); inds
-print(paste0('The total number of Eora indicators: ', length(inds)))
+inds <- unique(inds); 
+cat(paste0('\n The total number of Eora indicators: ', length(inds)), '\n\n')
 
 ### - difference
 setdiff(inds.old, inds)
@@ -139,7 +139,7 @@ writexl::write_xlsx(x = inds_df, path = './Data/_eora_indicators_io_list.xlsx')
   
 
 
-```{r - loop read and combine xlsx ❗}
+```{r - loop read and combine xlsx ❗, include=FALSE}
 # pattern <- '^YJ_CO2'
 n_year_check <- 4 ## if 4 years data, to make sure no more files will be matched. 
 n_year_check <- 1
@@ -195,7 +195,7 @@ for (i in inds) {
     print(paste0('Total number of rows for the combine data set: ', nrow(df.eora.x.all)))
   
     ### save as xlsx
-    fname <- paste0(dir.eora_cleaned, iname, '.xlsx'); print(fname); cat('\n\n')
+    fname <- paste0(dir.eora_cleaned, iname, '.xlsx'); cat('\n', fname, '\n\n')
     writexl::write_xlsx(x = df.eora.x.all, path = fname)
   }
   
@@ -207,9 +207,9 @@ for (i in inds) {
 
 
 ```{r - loop detailed SHDB}
-dir.shdb.detail <- './Data/data_02_intermediate/dt02_flows/eora/SHDB2019_135_renamed/'
+dir.shdb.detail <- gsub('135', '135_renamed', dir.shdb)
 pattern <- '^YJ_SHDB'
-inds_ls <- list.files(path = dir.shdb.detail, pattern = pattern, full.names = T); inds_ls
+inds_ls <- list.files(path = dir.shdb.detail, pattern = pattern, full.names = T);
   
 for (xls in inds_ls) {
   
@@ -258,14 +258,14 @@ for (xls in inds_ls) {
 ```{r - format SHDB data}
 
 xls  <- paste0(dir.eora_cleaned, "SHDB1.xlsx"); xls
+temp <- readxl::read_excel(path = xls) %>%
+    dplyr::filter(year == '2019') 
 
 
 ### if use 4 years of data, we need to add year 2000 with NA values
 if (n_year_check == 4) {
   
   ### 1. to create NA data for 2000 
-  temp <- readxl::read_excel(path = xls) %>%
-    dplyr::filter(year == '2015') 
   add_na_2000 <- temp %>%
     dplyr::mutate_if(is.numeric, funs(ifelse(!is.na(.), NA, .))) %>%
     dplyr::mutate(year = '2000')
