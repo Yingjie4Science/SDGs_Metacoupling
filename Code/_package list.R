@@ -57,6 +57,7 @@ conflicts_prefer(
 )
 conflict_prefer("print", "base")
 conflict_prefer("save", "base")
+# conflict_prefer("scale", "base")
 
 
 

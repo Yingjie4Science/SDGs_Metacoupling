@@ -44,8 +44,9 @@ direction_ft  <- googlesheets4::read_sheet(link, sheet = "eora_indicators") %>%
     !is.na(Used),
     !is.na(Filename),
     !grepl('\\?', Filename)) %>%
-  dplyr::select(Filename, ShortName, Used) %>%
-  arrange(Filename)
+  dplyr::select(Filename, ShortName, Used, Impact_direction) %>%
+  arrange(Filename) %>%
+  as.data.frame()
 
 direction_fts <- direction_ft %>%
   dplyr::filter(Used == '1') %>%
@@ -94,7 +95,7 @@ direction_clean <- direction %>%
   dplyr::filter(!is.na(direction)) %>%
   dplyr::filter(!is.na(ShortName)) %>%
   # dplyr::filter(Used == 1) %>%
-  dplyr::select(FT_Indicators, ind, ShortName, Used, SDG_class, direction) %>%
+  dplyr::select(FT_Indicators, ind, ShortName, Used, SDG_class, direction, Impact_direction) %>%
   as.data.frame()
 # str(direction_clean)
 

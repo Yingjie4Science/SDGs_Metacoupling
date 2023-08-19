@@ -2,7 +2,7 @@
 title: "Untitled"
 output: pdf_document
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 
@@ -83,7 +83,7 @@ theme_ns <-
 
 # ### energy
 indicator.name<- 'energy_total'
-xls.name.eora <- 'YJ_Energytotal_2005.xlsx'; unit_name <- 'PJ'         ## PJ = 1000 TJ
+xls.name.eora <- 'YJ_Energytotal_2015.xlsx'; unit_name <- 'PJ'         ## PJ = 1000 TJ
 xls.name.wiod <- '7_ene.xlsx';               unit_conv <- 1/10^3       ## in TJ in the raw data
 
 
@@ -122,18 +122,21 @@ iso_wiod <- readxl::read_excel(path = xls_iso_wiod)
 ### the data
 df.eora  <- readxl::read_excel(path = xls_eora) 
 df.eora1 <- df.eora %>%
-  left_join(., iso_eora, by = c('Row' = 'Row')) %>% ## add ctr code
+  left_join(., iso_eora %>% dplyr::select(Row, iso3_eora), 
+            by = c('Row' = 'Row')) %>% ## add ctr code
   arrange(!is.na(iso3_eora))
 
-names(df.eora1)
+# names(df.eora1)
 # unique(df.eora1$Row)
-ctr_ls_eora <- unique(df.eora1$iso3_eora); ctr_ls_eora
+ctr_ls_eora <- unique(df.eora1$iso3_eora);
 
 ### rename the cols
 names(df.eora1) <- c('ctr', ctr_ls_eora, 'iso3')
 
 ### reorder the col names
-col_name_ctr <- names(df.eora1)[-c(1, ncol(df.eora1))]; col_name_ctr ## remove "ctr" in the 1st col and "iso3" in the last
+col_name_ctr <- names(df.eora1)[-c(1, ncol(df.eora1))]; 
+# col_name_ctr ## remove "ctr" in the 1st col and "iso3" in the last
+
 df.eora.final <- df.eora1 %>%
   dplyr::select(ctr, iso3, all_of(col_name_ctr))
 ```
@@ -145,7 +148,7 @@ df.eora.final <- df.eora1 %>%
 df.wiod <- readxl::read_excel(path = xls_wiod, sheet = 1, range = "B1:AP616")
 s2 <- df.wiod
 # add country name as a new col
-countries <- colnames(s2[1:41]); countries
+countries <- colnames(s2[1:41]); 
 colnames(s2) <- countries; length(countries)
 
 # add year seq to data frame 
@@ -159,12 +162,12 @@ df.wiod1 <- s2 %>%
   arrange(!is.na(iso3))
 
 df.wiod2005 <- df.wiod1 %>% as.data.frame() %>%
-  dplyr::select(year, ctr, iso3, countries) %>%
+  dplyr::select(year, ctr, iso3, all_of(countries)) %>%
   dplyr::filter(year == 2005)
 
 names(df.wiod2005)
 unique(df.wiod2005$ctr)
-ctr_ls_wiod <- unique(df.wiod1$iso3); ctr_ls_wiod
+ctr_ls_wiod <- unique(df.wiod1$iso3); 
 ### rename the cols
 names(df.wiod2005) <- c('year', 'ctr', 'iso3', ctr_ls_wiod)
 
@@ -191,11 +194,11 @@ ctr_ls_common <- Reduce(intersect, list(ctr_ls_wiod, ctr_ls_eora))
 ### wide OR matrix format
 df_common_ctr_wiod <- df.wiod2005 %>%
   dplyr::filter(iso3 %in% ctr_ls_common) %>%
-  dplyr::select(iso3, ctr_ls_common) %>%
+  dplyr::select(iso3, all_of(ctr_ls_common)) %>%
   arrange(iso3)
-df_common_ctr_eora <- df.eora1 %>%
+df_common_ctr_eora <- df.eora.final %>%
   dplyr::filter(iso3 %in% ctr_ls_common) %>%
-  dplyr::select(iso3, ctr_ls_common) %>%
+  dplyr::select(iso3, all_of(ctr_ls_common)) %>%
   arrange(iso3)
 
 ### long format
