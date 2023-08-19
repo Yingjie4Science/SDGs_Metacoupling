@@ -112,19 +112,23 @@ func_norm_sdg_score_auto <- function(df, trim = 0.025, bottom = 0.05, top = 0.95
   ##'   before using *Min-Max Scaling* method to scale the data to a specific range (0-100), 
   ##'   we first use *Robust Scaling* to reduce the impact of extreme values on the scaling process.
   all.val_robust <- all.val %>%
-    mutate_at(vars('val'), 
+    dplyr::mutate_at(vars('val'), 
               ~ robust_scale(.))
   
   all.val_z <- all.val %>%
-    mutate_at(vars('val'), 
-              ~ scale(., center = TRUE, scale = TRUE))
+    as.data.frame() %>%
+    dplyr::mutate_at(vars('val'), 
+              ~ base::scale(., center = TRUE, scale = TRUE))
+    
   
   # hist(all.val$val,        breaks = 100, main = 'raw')
   # hist(all.val_robust$val, breaks = 200, main = 'robust')
   # hist(all.val_z$val,      breaks = 100, main = 'z')
   
   ##' decide which result to use ------------------------------------------------------- #
-  all.val <- all.val_z ## Z-Score Normalization is better than robust scaling after testing
+  ##'   Z-Score Normalization is better than robust scaling after testing
+  ##'   8/18/2023: may not use this normalization 
+  # all.val <- all.val_z 
     
   
   ##' Scale the data to a range of 0-100 ----------------------------------------------- #
@@ -136,19 +140,23 @@ func_norm_sdg_score_auto <- function(df, trim = 0.025, bottom = 0.05, top = 0.95
   
   ##' would be a better idea to keep the score between 1-100, because 0 can lead to Inf 
   ##'     in the further analysis steps
-  if (direction_sdg == -1) {
+  ##' If we want to scale between some bounded arbitrary set of values [a, b]. 
+  ##'     x' = a + (x-min)*(b-a)/(max-min)
+  ##' E.g., [1,100], a = 1, b = 100
+  ##'     x' = 1 + (x-min)*99/(max-min)
+  if (direction == -1) {
     all.val.norm <- all.val %>%
       dplyr::mutate(
         value_norm = ifelse(
-          val > max, 0+1, ifelse(
-            val > min, ((val-max)/(min-max)*100+1), 100+1))
+          val > max, 0, ifelse(
+            val > min, (1+(val-max)/(min-max)*99), 100))
       )
-  } else if (direction_sdg == 1) {
+  } else if (direction == 1) {
     all.val.norm <- all.val %>%
       dplyr::mutate(
         value_norm = ifelse(
-          val < min, 0+1, ifelse(
-            val < max, ((val-min)/(max-min)*100+1), 100+1))
+          val < min, 0, ifelse(
+            val < max, (1+(val-min)/(max-min)*99), 100))
       )
   } else {
     print('\t\t Please specify `direction_sdg` for SDG score normalization! ...')
