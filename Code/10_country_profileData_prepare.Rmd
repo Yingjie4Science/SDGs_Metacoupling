@@ -216,14 +216,14 @@ keywords <- c(
   # 'Passenger'
   # 'transport'
   # 'GDP',
-  'GNI'
+  # 'GNI'
   # 'trade'
   # 'export'
   # 'bank|ATM|account|financial'
   # 'tourism'
   # 'employ'
   # 'energy * use'
-  # 'energy'
+  'energy'
   # 'fisheries'
   # 'clean|renewable'
   # 'sanitation'
@@ -2677,9 +2677,16 @@ C0703 <- wb(indicator = ind, country = "countries_only",
 
 
 
+#### - Energy consumption
 
-```{r - energy consumption}
-
+  [World Bank data]()
+  
+  [IEA data - NOT free](https://www.iea.org/data-and-statistics/data-product/world-energy-statistics-and-balances#world-energy-statistics)
+  
+  [EIA data](https://www.eia.gov/international/data/world/total-energy/total-energy-consumption)
+  
+  
+```{r}
 ### Energy use ----------------------------------------------------------------
 ###
 # 1.1_TOTAL.FINAL.ENERGY.CONSUM	  ++ Total final energy consumption (TFEC)
@@ -2687,7 +2694,7 @@ C0703 <- wb(indicator = ind, country = "countries_only",
 # EG.USE.COMM.GD.PP.KD             + Energy use (kg of oil equivalent) per $1,000 GDP (constant 2011 PPP)
 # EG.USE.COMM.KT.OE	             -- Energy use (kt of oil equivalent)
 
-ind <- '1.1_TOTAL.FINAL.ENERGY.CONSUM'
+ind <- '1.1_TOTAL.FINAL.ENERGY.CONSUM' ## Total final energy consumption (TFEC): This indicator is derived form energy balances statistics and is equivalent to total final consumption excluding non-energy use.
 ### 1. download data from WB
 dfwb  <- wb(indicator = ind, country = "countries_only",
             startdate = yr_start, enddate = yr_end) %>%
@@ -2699,11 +2706,147 @@ iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
 function_fill_na_wb(dfwb)
 ### 3. get a cleaned data and save to dir
 function_format_4yrData_save(iname = iname)
+```
 
 
 
 
+```{r - compare data sources}
+prefixs <- c()
+years <- c("2000","2005", "2010", "2015")
 
+## load WB data --------------------------------------------------------------------------
+# xls <- list.files(path = dir.cleaned, pattern = '^Total final energy consumption', full.names = T); 
+# xls; prefix = 'WB'
+# prefixs <- c(prefixs, prefix)
+# d.wb <- readxl::read_excel(path = xls) %>% 
+#   dplyr::select(-ctr) %>%
+#   gather(key = 'year', value = 'value', `2000`:ncol(.)) %>%
+#   dplyr::mutate(value = value) %>%  
+#   as.data.frame()
+
+
+
+
+## load IEA data -------------------------------------------------------------------------
+f <- './Data/data_01_raw/Energy/INT-Export-08-18-2023_15-05-56.csv'; prefix = 'IEA'
+prefixs <- c(prefixs, prefix)
+## total energy consumption (terajoules)
+d.1 <- readr::read_csv(file = f, show_col_types = F, skip = 1) %>%
+  dplyr::slice(-1) %>% ## remove the row without data
+  dplyr::mutate(iso3 = gsub('INTL\\.44-2-|-TJ\\.A', '', API)) %>%
+  dplyr::select(iso3, everything()) %>%
+  dplyr::filter(!iso3 %in% c('WORL')) %>%
+  dplyr::filter(nchar(iso3) == 3) %>%
+  dplyr::select(iso3, `1990`:ncol(.)) %>%
+  gather(key = 'year', value = 'value', `1990`:ncol(.)) %>%
+  dplyr::mutate(value = as.numeric(value)) %>%
+  dplyr::filter(year %in% years) %>%
+  # dplyr::rename('value_eia' = 'value') %>%
+  as.data.frame()
+unique(d.1$iso3)
+
+
+## load OWID -----------------------------------------------------------------------------
+##' Primary energy consumption, is measured in terawatt-hours (TWh).
+##' Source: U.S. Energy Information Administration (EIA); Energy Institute Statistical Review of World Energy (2023)
+##' Note: Data includes only commercially-traded fuels (coal, oil, gas), nuclear and modern renewables. It does not include traditional biomass.
+##' 1 Terawatt hour [TWh] = 3600 Terajoule [TJ]
+f <- './Data/data_01_raw/Energy/primary-energy-cons.csv'; prefix = 'OWID'
+prefixs <- c(prefixs, prefix)
+d.2 <- readr::read_csv(file = f, show_col_types = F) %>%
+  dplyr::rename('iso3' = 'Code',
+                'year' = 'Year',
+                'value' = "Primary energy consumption (TWh)") %>%
+  dplyr::filter(year %in% years) %>%
+  dplyr::mutate(value = value * 3600,
+                year = as.character(year)) %>%
+  dplyr::filter(!is.na(iso3)) %>%
+  dplyr::filter(!iso3 %in% c('OWID_WRL')) %>%
+  dplyr::filter(nchar(iso3) == 3) %>%
+  dplyr::select(-Entity) %>%
+  as.data.frame()
+unique(d.2$iso3)
+
+setdiff(d.1$iso3, d.2$iso3)
+setdiff(d.2$iso3, d.1$iso3)
+
+
+## join and compare data -----------------------------------------------------------------
+# d2 <- d.wb %>%
+d2 <- d.2 %>%
+  left_join(x = ., 
+            y = d.1, 
+            by = c('iso3', 'year')) %>%
+  dplyr::mutate(dif_abs = abs(value.y - value.x)) %>%
+  as.data.frame()
+
+
+# Filter the data to select only the points to annotate
+selected_data <- rbind(
+  d2 %>% group_by(year) %>% slice_max(prop = 0.03, order_by = value.x, na_rm = T), 
+  d2 %>% group_by(year) %>% slice_min(prop = 0.03, order_by = value.x, na_rm = T),
+  d2 %>% group_by(year) %>% slice_max(prop = 0.05, order_by = dif_abs, na_rm = T),
+  )
+
+
+d2 %>%
+  ggplot(data = ., 
+         aes(x = value.x, 
+             y = value.y, 
+             color = year)) +
+  geom_point(alpha = 0.5, show.legend = F) +
+  facet_wrap(~year, scales = 'free') +
+  geom_abline(slope = 1, color = 'red', alpha = .8) +
+  
+  scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+  scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+  
+  geom_text_repel(
+    data = selected_data, aes(label = iso3), 
+    color = 'blue', alpha = .8,
+    min.segment.length = 0, # draw all line segments
+    point.padding = 0, # additional padding around each point
+    box.padding = 0.5, # additional padding around each text label
+    max.overlaps = Inf) + 
+  
+  xlab(prefixs[1]) +
+  ylab(prefixs[2]) +
+  theme_bw()
+
+### save plot
+fname <-paste0(dir.fig, 'inspection_total energy consumption_', paste(prefixs, collapse = '_'), '.png'); fname
+ggsave(filename = fname, plot = last_plot(), width = 9, height = 9, units = 'in', dpi = 100)
+```
+```{r - merge IEA and OWID data}
+###' the three data sets are pretty similar, but IEA and OWID data are almost the same.
+###' We therefore decide to use the combination of these two data sets. 
+###' 
+iname <- 'Total Primary energy consumption_TJ'
+dt <- rbind(d.1, d.2) %>%
+  dplyr::filter(!is.na(value)) %>%
+  dplyr::distinct(iso3, year, .keep_all = T) %>%
+  as.data.frame() %>%
+  spread(key = year, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3"))
+
+
+dfwb_fillna_4yrs <- dt %>%
+    dplyr::select(iso3_eora, country_eora, `2000`, `2005`, `2010`, `2015`)  %>%
+    arrange(iso3_eora)
+names(dfwb_fillna_4yrs) <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+
+fname <- paste0(dir.cleaned, iname, '_4yrs.xlsx'); print(fname) 
+writexl::write_xlsx(x = dfwb_fillna_4yrs, path = fname)
+
+print(paste0('There are ', round(sum(is.na(dfwb_fillna_4yrs))/(190*4)*100, digits = 1), '% NA'))
+###' "There are 4.6% NA"
+```
+
+#### - Renewable energy
+```{r }
 ### Renewable energy ---------------------------------------------------------
 ###
 # EG.FEC.RNEW.ZS	            ++ Renewable energy consumption (% of total final energy consumption)
@@ -2730,7 +2873,6 @@ function_fill_na_wb(dfwb)
 function_format_4yrData_save(iname = iname)
 
 ```
-
 
 
 ### Goal 8 - Decent Work and Economic Growth

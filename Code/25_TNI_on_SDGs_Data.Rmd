@@ -1625,16 +1625,20 @@ score_6_3_2 <- df_score
 
 ### SDG 7 
 
-  7.1.2 Proportion of population with primary reliance on clean fuels and technology
+####  - 7.1.2 renewable/pop
+
+  7.1.2 Proportion of population with primary reliance on clean fuels and technology [Metadata](https://unstats.un.org/sdgs/metadata/files/Metadata-07-01-02.pdf)
+
   
-```{r - 7.1.2 renewable/pop}
+```{r}
 ind_sdg    <- 'renewable_per_pop' ## TJ/pop
+ind_ft     <- 'Energy_renewable'
 unit_check <- 1
 direction_sdg <- 1
 
 ### Check the Unit!!!
 ### rel    --> TJ;        
-### oft    --> GJ = TJ/10^3; ??? --> seems wrong, double-check with Mengyu, PJ?
+### oft    --> TJ
 ### pop    --> 1 
 
 ### PJ = 10^3 TJ
@@ -1653,8 +1657,8 @@ rel <- rel_w %>%
 
 ### Outsourced footprints (oft) flow --------------------------------------------------------------------
 oft <- net_imports_bind  %>%
-  dplyr::filter(ind == 'Energy_renewable') %>%
-  dplyr::mutate(net_in = net_in/10^3) %>%       ## fix the unit issue, only for energy related indicators
+  dplyr::filter(ind == ind_ft) %>%
+  dplyr::mutate(net_in = net_in) %>%       ## fix the unit issue, only for energy related indicators
   dplyr::select(ind, year, iso3, net_in, scenario) %>%
   spread(key = scenario, value = net_in)
 
@@ -1666,7 +1670,7 @@ rel_not_merge <- rel %>%
   merge(x = ., y = pop_l, by = c('iso3', 'year'), all.x = T) %>%
   dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
-    ind       = unique(oft$ind),
+    ind       = ind_ft,
     value_rel = (value +       0)/pop,       
     value_not = (value + fromAll)/pop,
     value_dst = (value + fromNer)/pop,
@@ -1695,12 +1699,19 @@ score_7_1_2 <- df_score
 ```
 
 
+####  - 7.3.1 total energy/gdp
 
   7.3.1 Energy intensity measured in terms of primary energy and GDP (low energy intensity indicates high SDG ind_sdg score)
   
-  - MJ per 2017 USD PPP (https://www.iea.org/reports/sdg7-data-and-projections/energy-intensity)
+  - **Energy intensity** is expressed in megajoules per unit of purchasing power parity GDP in constant 2017 USD figures. [SDG indicator metadata](https://unstats.un.org/sdgs/metadata/files/Metadata-07-03-01.pdf)
+
+  - Also see "MJ per 2017 USD PPP" (https://www.iea.org/reports/sdg7-data-and-projections/energy-intensity)
   
-```{r - 7.3.1 total energy/gdp}
+  - *Primary energy*:  Energy in the form that it is first accounted for in a statistical energy balance, before any transformation to secondary or tertiary forms of energy. For example, coal can be converted to synthetic gas, which can be converted to electricity; in this example, coal is primary energy, synthetic gas is secondary energy, and electricity is tertiary energy. See Primary energy production and Primary energy consumption. [ref](https://www.eia.gov/tools/glossary/index.php?id=Primary%20energy)
+
+
+  
+```{r}
 ind_sdg    <- 'energy_intensity' ## TJ/USD
 ind_ft     <- 'Energytotal'
 unit_check <- 1
@@ -1708,7 +1719,7 @@ direction_sdg <- -1
 
 ### Check the Unit!!!
 ### rel    --> TJ 
-### oft    --> GJ???       
+### oft    --> TJ     
 ### gdp    --> USD 
 
 ### PJ = 10^3 TJ
@@ -1718,6 +1729,7 @@ direction_sdg <- -1
 
 ### Resource consumption or emissions under the current trading world situation -------------------------
 xls <- list.files(path = dir.input1, pattern = '^Total final energy consumption', full.names = T); xls 
+xls <- list.files(path = dir.input1, pattern = '^Total Primary energy consumption_TJ', full.names = T); xls ## change on 8/18/2023
 rel_w <- readxl::read_excel(path = xls) %>% as.data.frame()  ## the status data
 rel <- rel_w %>%
   dplyr::select(-ctr) %>%
@@ -1729,7 +1741,7 @@ rel <- rel_w %>%
 ### Outsourced footprints (oft) flow --------------------------------------------------------------------
 oft <- net_imports_bind  %>%
   dplyr::filter(ind == ind_ft) %>%
-  dplyr::mutate(net_in = net_in/10^3) %>%    ## fix the unit issue, only for energy related indicators
+  dplyr::mutate(net_in = net_in) %>%    ## fix the unit issue, only for energy related indicators
   dplyr::select(ind, year, iso3, net_in, scenario) %>%
   spread(key = scenario, value = net_in) %>%
   as.data.frame()
@@ -1766,6 +1778,10 @@ df_score <- func_norm_sdg_score_auto(
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
 
+score_7_3_1 <- df_score
+
+
+
 
 
 ### for later use ---------------
@@ -1787,20 +1803,24 @@ totalenergy_rel_not <- rel %>%
     EnergyTotal_dst = var_dst,
     EnergyTotal_ner = var_ner
   )
-
-score_7_3_1 <- df_score
 ```
+
+
+####  - 7.2.1 renewable/total
 
   7.2.1 Renewable energy share in the total final energy consumption
   
-```{r - 7.2.1 renewable/total}
+  [Metadata](https://unstats.un.org/sdgs/metadata/files/Metadata-07-02-01.pdf)
+  
+```{r}
 ind_sdg    <- 'renewable_share' ## TJ/TJ
+ind_ft     <- 'Energy_renewable'
 unit_check <- ''
 direction_sdg <- 1
 
 ### Check the Unit!!!
 ### rel    --> TJ
-### oft    --> TJ/1000; 
+### oft    --> TJ; 
 ### total  --> TJ
 
 ### Resource consumption or emissions under the current trading world situation -------------------------
@@ -1815,8 +1835,8 @@ rel <- rel_w %>%
 
 ### Outsourced footprints (oft) flow --------------------------------------------------------------------
 oft <- net_imports_bind  %>%
-  dplyr::filter(ind == 'Energy_renewable') %>%
-  dplyr::mutate(net_in = net_in/10^3) %>%       ## fix the unit issue, only for energy related indicators
+  dplyr::filter(ind == ind_ft) %>%
+  dplyr::mutate(net_in = net_in) %>%       ## fix the unit issue, only for energy related indicators
   dplyr::select(ind, year, iso3, net_in, scenario) %>%
   spread(key = scenario, value = net_in)
 
@@ -1828,7 +1848,7 @@ rel_not_merge <- rel %>%
   merge(x = ., y = totalenergy_rel_not, by = c('iso3', 'year'), all.x = T) %>%
   dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
-    ind       = unique(oft$ind),
+    ind       = ind_ft,
     value_rel = (value +       0)/EnergyTotal_rel,
     value_not = (value + fromAll)/EnergyTotal_not,
     value_dst = (value + fromNer)/EnergyTotal_dst,
