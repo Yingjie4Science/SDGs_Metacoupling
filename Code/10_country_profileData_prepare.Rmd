@@ -1578,9 +1578,13 @@ function_format_4yrData_save(iname = iname)
 ```
 
 
-
-
-```{r - PM25 <EDGAR>}
+#### - PM25 <EDGAR>
+  EDGARv5.0 provides emissions not only for the greenhouse gases *per sector and country* but also for the air pollutants:
+  - Ozone precursor gases: Carbon Monoxide (CO), Nitrogen Oxides (NOx), Non-Methane Volatile Organic Compounds (NMVOC) and Methane (CH4).
+  - Acidifying gases: Ammonia (NH3), Nitrogen oxides (NOx) and Sulfur Dioxide (SO2).
+  - Primary particulates: Fine Particulate Matter (PM10 and PM2.5 and Carbonaceous speciation (BC, OC).
+  
+```{r}
 ###	EDGAR: https://edgar.jrc.ec.europa.eu/overview.php?v=50_AP (same source for EORA)
 
 getwd()
@@ -1634,6 +1638,46 @@ df4 <- df1 %>%
 ### 5, save to results
 fname <- paste0(dir.cleaned, iname, '_4yrs.xlsx'); fname
 writexl::write_xlsx(x = df4, path = fname)
+```
+
+
+```{r ------ comapre}
+f <- paste0(dir.cleaned, 'PM2.5 air pollution, mean annual exposure (micrograms per cubic meter)_4yrs.xlsx')
+x <- readxl::read_excel(f) %>%
+  gather(key = year, value = value, 3:ncol(.))
+
+f <- paste0(dir.cleaned, 'PM25_kt_4yrs.xlsx')
+y <- readxl::read_excel(f) %>%
+  gather(key = year, value = value, 3:ncol(.)) %>%
+  dplyr::mutate(value = as.numeric(value))
+
+prefixs <- c('WB', 'EDGAR')
+
+z <- left_join(x = x, y = y, by = c('iso3', 'year')) %>%
+  # dplyr::mutate(
+  #   # dif_abs = abs(value.y - value.x),
+  #   value.y = value.y*10^6
+  #   ) %>%
+  drop_na() %>%
+  as.data.frame()
+
+z %>%
+  ggplot(data = ., 
+         aes(x = value.x, 
+             y = value.y, 
+             color = year)) +
+  geom_point(alpha = 0.5, show.legend = F) +
+  facet_wrap(~year, scales = 'free') +
+  geom_abline(slope = 1, color = 'red', alpha = .8) +
+  
+  scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+  scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+
+  xlab(prefixs[1]) +
+  ylab(prefixs[2]) +
+  theme_bw()
 ```
 
 
@@ -2214,7 +2258,7 @@ writexl::write_xlsx(x = df, path = paste0(dir.cleaned, iname, '_4yrs.xlsx'))
 
 
   **Refer to data for SDG 8**
-```{r - employment}
+```{r - Employment}
 # SG.OWN.PRRT.MR	+ Married men and married women have equal ownership rights to property (1=yes; 0=no)
 # SG.LAW.OBHB.MR	+ Married women are required by law to obey their husbands (1=yes; 0=no)
 
@@ -2281,13 +2325,15 @@ ind <- 'SL.UEM.TOTL.FE.ZS'
 ### Goal 6 - Clean Water and Sanitation
 
 
-#### - water withdrawals
-
-  We choose to use the data "Total freshwater withdrawal" from `FAO AQUASTAT`, because it is more complete than the combined data from WB, OWID, and eurostat. 
+#### - Water withdrawals
   
-```{r - <FAO_aquastat>}
+  *Update* 8/18/2023: WB data is updated and it is very complete, so we switch to use WB data
+  
+  We previously used the "Total freshwater withdrawal" from `FAO AQUASTAT`, because it was more complete than the combined data from WB, OWID, and eurostat. *But not the case anymore!*
+  
+```{r - 0. FAO_aquastat}
 csv <- paste0(dir.raw, 'FAO_aquastat/aquastat-Total freshwater withdrawal (10^9 m3_yr).csv'); csv
-dfao <- read_csv(file = csv) %>%
+dfao <- read_csv(file = csv, show_col_types = F) %>%
   dplyr::select(2, seq(4, 24, by = 4)) 
 names(dfao)
 names(dfao) <- c('ctr', 1990, 1995, 2000, 2005, 2010, 2015)
@@ -2311,8 +2357,7 @@ function_fill_na(df = dfao_total)
 
 
 
-```{r - <WB + OWID + eurostat>, eval=FALSE, include=FALSE}
-
+```{r - 1. WB}
 ### 1. data source #1: World Bank ------------------------------------------------------------------------
 ###
 # ER.H2O.FWTL.K3	 - Annual freshwater withdrawals, total (billion cubic meters)
@@ -2346,20 +2391,89 @@ write.csv(x = dfwb, file = fname, row.names = F)
 ### fill NA
 df <- read.csv(fname, stringsAsFactors = F)
 names(df)
-source('function_fill_na_wb.R')
+### 2. fill NA
 function_fill_na_wb(df)
-fname <- paste0(dir.process, iname, '_FILLNA.xlsx'); fname
-df_wd <- readxl::read_excel(fname) %>%
-  dplyr::select(iso3_eora, country_eora, `2000`, `2005`, `2010`, `2015`)  %>%
-  arrange(iso3_eora)
-names(df_wd) <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
-df1 <- df_wd %>% gather(key = year, value = value, `2000`:`2015`)
-  
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## "There are 10.5% NA"
+```
 
 
+##### - 2. OWID
+  Annual freshwater withdrawals refer to total water withdrawals, not counting evaporation losses from storage
+basins, measured in cubic metres (m³) per year. Total water withdrawals are the sum of withdrawals for
+agriculture, industry and municipal (domestic uses). Withdrawals also include water from desalination plants in
+countries where they are a significant source.
+
+```{r, eval=FALSE, include=FALSE}
 ### 2. data source #2: OWID data to fill NA --------------------------------------------------
 ### m3
 dir.owid <- './Data/data_01_raw/Our World in Data/'
+
+
+###' 2.1 
+###' The unit should be m3, instead of "billion cubic meters" -- indicated on the column name
+f <- 'annual-freshwater-withdrawals.csv' # 
+d <- readr::read_csv(file = paste0(dir.owid, f), show_col_types = F) 
+names(d)
+names(d) <- c("Entity", "Code", "Year", 'm3')
+
+owid <- d %>%
+  dplyr::filter(Year >= 2000) %>%
+  dplyr::mutate(m3 = as.numeric(m3)) %>%
+  dplyr::mutate(m3 = m3/10^9) %>%
+  spread(key = Year, value = 4) %>%
+  left_join(x  = ctr_eora, y = ., by = c("iso3_eora" = "Code")) %>%
+  # mutate_if(is.numeric, ~replace_na(., '..')) %>%
+  dplyr::select(iso3_eora, country_eora, `2000`, `2005`, `2010`, `2015`) %>%
+  dplyr::rename(iso3 = iso3_eora) %>%
+  as.data.frame() %>%
+  arrange(iso3)
+```
+
+
+
+```{r  ------ comapre}
+
+f <- paste0(dir.cleaned, 'Annual freshwater withdrawals, total (billion cubic meters)_4yrs.xlsx')
+x <- readxl::read_excel(f) %>%
+  gather(key = year, value = value, 3:ncol(.))
+
+y <- owid %>%
+  gather(key = year, value = value, 3:ncol(.))
+
+prefixs <- c('WB', 'OWID')
+
+z <- left_join(x = x, y = y, by = c('iso3', 'year')) %>%
+  # dplyr::mutate(
+  #   # dif_abs = abs(value.y - value.x),
+  #   value.y = value.y*10^6
+  #   ) %>%
+  drop_na() %>%
+  as.data.frame()
+
+z %>%
+  ggplot(data = ., 
+         aes(x = value.x, 
+             y = value.y, 
+             color = year)) +
+  geom_point(alpha = 0.5, show.legend = F) +
+  facet_wrap(~year, scales = 'free') +
+  geom_abline(slope = 1, color = 'red', alpha = .8) +
+  
+  scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+  scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+
+  xlab(prefixs[1]) +
+  ylab(prefixs[2]) +
+  theme_bw()
+```
+
+  *The following are the old code* that used to combine WB, owid, and eurostat data
+
+```{r 2.2 old owid data, eval=FALSE, include=FALSE}
+### - 2.2 
 csv <- 'water-withdrawals-per-capita.csv'
 owid <- read.csv(file = paste0(dir.owid, csv), stringsAsFactors = F) %>%
   filter(Year >= 1990) %>%
@@ -2383,9 +2497,10 @@ df_owid <- merge(x = pop_l, y = owid_l, by = col_comm, all = T) %>%
   dplyr::select(1:3, water) %>%
   spread(key = year, value = water)
 df2 <- df_owid %>% gather(key = year, value = value, `2000`:`2015`)
+```
 
 
-
+```{r 3. eurostat, eval=FALSE, include=FALSE}
 ### 3. data source #3: eurostat --------------------------------------------------------------
 ### https://ec.europa.eu/eurostat/databrowser/view/ten00002/default/table?lang=en
 ### 10^6 m3
@@ -2434,10 +2549,23 @@ df3 <- d0 %>%
   # spread(key = year, value = value) %>%
   as.data.frame()
 names(df3)
+```
 
 
-  
-### combine these 3 data sources: first to use world bank data, and then OWID, and then eurostat -------------------------------
+
+```{r 4. combine wb-owid-eurostat, eval=FALSE, include=FALSE}
+
+###' combine these 3 data sources: 
+###' first to use world bank data, and then OWID, and then eurostat ----------------------
+
+fname <- paste0(dir.process, iname, '_FILLNA.xlsx'); fname
+df_wd <- readxl::read_excel(fname) %>%
+  dplyr::select(iso3_eora, country_eora, `2000`, `2005`, `2010`, `2015`)  %>%
+  arrange(iso3_eora)
+names(df_wd) <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+df1 <- df_wd %>% gather(key = year, value = value, `2000`:`2015`)
+
+
 col_comm <- intersect(names(df1), names(df2))[1:3]; col_comm
 dfs <- 
   merge(x = df1, y = df2, by = col_comm, all.x = T) %>%
@@ -2460,16 +2588,18 @@ fname <- paste0(dir.cleaned, iname, '_4yrs.xlsx'); fname
  
 
 
-#### - water resources
+#### - Water resources
+
   There are 3 data sources, and the `WB` data is the same as `FAO_aquastat`. 
   We choose WB data, because we have code to fill the NA.
-  We did not use data from `eurostat` because no additional country data can be used for filling the NA in `WB` data. 
-```{r}
+  We did not use data from `eurostat` because no additional country data can be used for filling the NA in `WB` data.
+  
+```{r - FAO_aquastat}
 ### 1. data source #1 - FAO_aquastat ---------------------------------------------------------------------
 ###
 ### Total renewable water resources
 csv <- paste0(dir.raw, 'FAO_aquastat/aquastat_Total renewable water resources (10^9 m3yr).csv'); csv
-dfao <- read_csv(file = csv) %>%
+dfao <- read_csv(file = csv, show_col_types = F) %>%
   dplyr::select(2, seq(4, 24, by = 4)) 
 names(dfao) <- c('ctr', 1990, 1995, 2000, 2005, 2010, 2015)
 dfao_total <- dfao %>%
@@ -2488,7 +2618,7 @@ print(paste0('There are ', round(sum(is.na(dfao_total))/(190*4)*100, digits = 1)
 ###
 ### Total internal renewable water resources (source 1)
 csv <- paste0(dir.raw, 'FAO_aquastat/aquastat-Total internal renewable water resources (IRWR) (10^9 m3_yr).csv'); csv
-dfao <- read_csv(file = csv) %>%
+dfao <- read_csv(file = csv, show_col_types = F) %>%
   dplyr::select(2, seq(4, 24, by = 4)) 
 names(dfao) <- c('ctr', 1990, 1995, 2000, 2005, 2010, 2015)
 dfao_in <- dfao %>%
@@ -2504,10 +2634,10 @@ dfao_in <- dfao %>%
 dfao_in$iso3_eora[duplicated(dfao_in$iso3_eora)]
 names(dfao_in) <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
 print(paste0('There are ', round(sum(is.na(dfao_in))/(190*4)*100, digits = 1), '% NA'))
+```
 
 
-
-
+```{r - WB}
 ### 2. data source #2 - World Bank ---------------------------------------------------------------------
 ###
 ### Total internal renewable water resources (source 2)
@@ -2525,19 +2655,8 @@ iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
 ### 2. fill NA
 function_fill_na_wb(dfwb)
 
-
 ### 3. get a cleaned data and save to dir
-# function_format_4yrData_save(iname = iname)
-fname <- paste0(dir.process, iname, '_FILLNA.xlsx'); fname
-dfwb_fillna_4yrs <- readxl::read_excel(fname) %>%
-  dplyr::select(iso3_eora, country_eora, `2002`:`2014`)  %>%
-  arrange(iso3_eora)
-names(dfwb_fillna_4yrs) <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
-fname <- paste0(dir.cleaned, iname, '_4yrs.xlsx'); fname
-writexl::write_xlsx(x = dfwb_fillna_4yrs, path = fname)
-print(paste0('There are ', round(sum(is.na(dfwb_fillna_4yrs))/(190*4)*100, digits = 1), '% NA'))
-
-
+function_format_4yrData_save(iname = iname)
 ```
 
 
@@ -2711,7 +2830,7 @@ function_format_4yrData_save(iname = iname)
 
 
 
-```{r - compare data sources}
+```{r ------ compare data sources}
 prefixs <- c()
 years <- c("2000","2005", "2010", "2015")
 
