@@ -130,7 +130,7 @@ pop_l <- pop %>% as.data.frame() %>%
 
 ## SDG Score & Index
 
-### Score
+### Score & change
 ```{r - load data - choose ❓}
 ### load data
 ls_f <- list.files(path = './Data/data_03_results', pattern = '^SDGs_all', full.names = T); ls_f
@@ -166,6 +166,11 @@ dfs_score <- dfs %>%
 str(dfs_score)
 cat('The final data include', length(unique(dfs_score$iso3)), 'countries.') ## 189
 
+```
+
+
+
+```{r - score change & outlier}
 
 ### for each country, to what extent each goal was impacted by metacouplings? ------------
 dfs_score_chg <- dfs_score %>%
@@ -177,8 +182,13 @@ dfs_score_chg <- dfs_score %>%
   dplyr::filter(year == 2015) %>%
   as.data.frame()
 
+
 ### outliers? ----------------------------------------------------------------------------
+# Set up the plotting layout
+par(mfrow = c(1, 2))  # 1 row, 2 columns
+
 hist(dfs_score_chg$value_chg, nclass = 100)
+
 library(remotes)
 # Source the function from GitHub
 url_link <- "https://raw.githubusercontent.com/Yingjie4Science/functionX/main/func_find_outliers_bounds.R"
@@ -213,6 +223,8 @@ hist(dfs_score_chg$value_chg, nclass = 100)
 ### check Goal id
 vars <- unique(dfs_score_chg$goal) %>% as.numeric() %>% sort() %>% as.character(); vars
 
+# Reset the plotting layout to the default
+par(mfrow = c(1, 1))
 ```
 
 

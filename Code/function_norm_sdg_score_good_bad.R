@@ -148,14 +148,14 @@ func_norm_sdg_score_auto <- function(df, trim = 0.025, bottom = 0.05, top = 0.95
     all.val.norm <- all.val %>%
       dplyr::mutate(
         value_norm = ifelse(
-          val > max, 0, ifelse(
+          val > max, 1, ifelse(
             val > min, (1+(val-max)/(min-max)*99), 100))
       )
   } else if (direction == 1) {
     all.val.norm <- all.val %>%
       dplyr::mutate(
         value_norm = ifelse(
-          val < min, 0, ifelse(
+          val < min, 1, ifelse(
             val < max, (1+(val-min)/(max-min)*99), 100))
       )
   } else {

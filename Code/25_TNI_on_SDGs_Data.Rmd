@@ -94,7 +94,8 @@ theme_map <- theme(
 ### Rather than just dropping the top and bottom trim percent, these extreme values are replaced with values at the trim and 1- trim quantiles. See more at https://rdrr.io/cran/psych/man/winsor.html
 ### We added one more step of this data processing than Xu and Li et al 2020 in NS. 
 source("./Code/function_norm_sdg_score_good_bad.R")
-
+lower_probs <- 0.025
+upper_probs <- 0.975
 
 ### to plot the initial value of SDG indicator for data checking 
 source('./Code/helper_func_plot_map.R')
@@ -220,7 +221,7 @@ land_total <- rel_w %>%
   as.data.frame()
 
 ctr_eora_list <- land_total %>%
-  distinct(iso3)
+  dplyr::distinct(iso3)
 ```
 
 
@@ -372,7 +373,7 @@ hist(rel_not$value_rel)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -448,7 +449,7 @@ hist(rel_not$value_rel)
 
 ### normalization  -------------------------------------------------------
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
 
@@ -524,7 +525,7 @@ hist(rel_not$value_rel)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -607,7 +608,7 @@ hist(rel_not$value_rel, xlab = unit_ind)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -618,14 +619,20 @@ score_2_1_2 <- df_score
   
 
 ### SDG 3
-  3.9.1 Mortality rate attributed to household and ambient air pollution ( --> ton of PM25 per km2)
-```{r - 3.9.1 PM25/total land}
-ind_sdg  <- 'PM25_concentration' ## ton/km2
-unit_check <- 1000
+
+####  - 3.9.1 PM25/1000 person
+
+  3.9.1 Mortality rate attributed to household and ambient air pollution 
+    - Ton of PM25 per km2
+    - Ton per 1000 person # updated on 8/18/2023
+  
+```{r}
+ind_sdg    <- 'PM25_concentration' ## ton/km2 ==> ton per 1000 person 
+unit_check <- 10^3
 direction_sdg <- -1
 
 ### Check the Unit!!!
-### rel --> kt = 1000 ton
+### rel --> kt = 1000 ton = 10^6 kg
 ### oft --> ton
 ### total  --> km2
 
@@ -653,14 +660,21 @@ oft <- net_imports_bind  %>%
 ### w/o trade, and with trade together  -----------------------------------------------------------------
 rel_not_merge <- rel %>%
   merge(x = ., y = oft,         by = c('iso3', 'year'), all.x = T) %>% 
-  merge(x = ., y = land_total,  by = c('iso3', 'year'), all.x = T) %>% ## total land
+  # merge(x = ., y = land_total,  by = c('iso3', 'year'), all.x = T) %>% ## total land
+  merge(x = ., y = pop_l,       by = c('iso3', 'year'), all.x = T) %>%
   dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
-    value_rel = (value + 0)/(land_total_km2*100),           ## 
-    value_not = (value + fromAll)/(land_total_km2*100),
-    value_dst = (value + fromNer)/(land_total_km2*100),
-    value_ner = (value + fromDst)/(land_total_km2*100)
+    # value_rel = (value +       0)/(land_total_km2*100), ## 
+    # value_not = (value + fromAll)/(land_total_km2*100),
+    # value_dst = (value + fromNer)/(land_total_km2*100),
+    # value_ner = (value + fromDst)/(land_total_km2*100),
+    
+    value_rel = (value +       0)/(pop/1000),       
+    value_not = (value + fromAll)/(pop/1000),
+    value_dst = (value + fromNer)/(pop/1000),
+    value_ner = (value + fromDst)/(pop/1000)
+    
     ) %>%  ## cropland area under no-trade
   ### for easy-checking the numbers
   dplyr::select(ind, iso3, year, value, everything())
@@ -668,27 +682,33 @@ rel_not_merge <- rel %>%
 rel_not <- rel_not_merge %>%
   dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
 
-hist(rel_not$value_rel)
-
 
 ### normalization  -------------------------------------------------------
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
+
+par(mfrow = c(1, 2))  # 1 row, 2 columns
+hist(df_score$val, nclass = 100)
+hist(df_score$value_norm, nclass = 100)
 
 score_3_9_1 <- df_score
 ```
 
 
-  3.9.1 Mortality rate attributed to household and ambient air pollution ( --> ton of SO2 per km2)
+####  - 3.9.1s SO2 per 1000 person 
 
-```{r - 3.9.1s SO2/total land}
-ind_sdg  <- 'SO2_concentration' ## ton/ha
+  3.9.1 Mortality rate attributed to household and ambient air pollution 
+  - Ton of SO2 per km2
+  - Ton of SO2 per 1000 person 
+
+```{r}
+ind_sdg  <- 'SO2 emissions per 1000 people' 
 unit_check <- 1000
 direction_sdg <- -1
 
@@ -696,6 +716,7 @@ direction_sdg <- -1
 ### rel --> kt = 1000 * ton
 ### oft --> ton
 ### total  --> km2 = 100 * ha
+### pop    --> person
 
 
 ### Resource consumption or emissions under the current trading world situation -------------------------
@@ -721,14 +742,19 @@ oft <- net_imports_bind  %>%
 ### w/o trade, and with trade together  -----------------------------------------------------------------
 rel_not_merge <- rel %>%
   merge(x = ., y = oft,         by = c('iso3', 'year'), all.x = T) %>% 
-  merge(x = ., y = land_total,  by = c('iso3', 'year'), all.x = T) %>% ## total land
+  # merge(x = ., y = land_total,  by = c('iso3', 'year'), all.x = T) %>% ## total land
+  merge(x = ., y = pop_l,       by = c('iso3', 'year'), all.x = T) %>%
   dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
-    value_rel = (value + 0)/(land_total_km2*100),           ## 
-    value_not = (value + fromAll)/(land_total_km2*100),
-    value_dst = (value + fromNer)/(land_total_km2*100),
-    value_ner = (value + fromDst)/(land_total_km2*100)
+    # value_rel = (value +       0)/(land_total_km2*100), ## 
+    # value_not = (value + fromAll)/(land_total_km2*100),
+    # value_dst = (value + fromNer)/(land_total_km2*100),
+    # value_ner = (value + fromDst)/(land_total_km2*100)
+    value_rel = (value +       0)/(pop/1000),       
+    value_not = (value + fromAll)/(pop/1000),
+    value_dst = (value + fromNer)/(pop/1000),
+    value_ner = (value + fromDst)/(pop/1000)
     ) %>%  ## cropland area under no-trade
   ### for easy-checking the numbers
   dplyr::select(ind, iso3, year, value, everything())
@@ -736,7 +762,9 @@ rel_not_merge <- rel %>%
 rel_not <- rel_not_merge %>%
   dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
 
-hist(rel_not$value_rel)
+rel_not_check <- rel_not %>%
+  dplyr::mutate(dif_rel_not = value_rel - value_not) %>%
+  dplyr::select(ind, iso3, year, dif_rel_not, value_rel, value_not, everything())
 
 
 ### normalization  -------------------------------------------------------
@@ -744,24 +772,29 @@ hist(rel_not$value_rel)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
+
+par(mfrow = c(1, 2))  # 1 row, 2 columns
+hist(df_score$val, nclass = 100)
+hist(df_score$value_norm, nclass = 100)
 
 score_3_9_1s <- df_score
 ```
 
 
 
-
+#### - 3.4.1 Mortality NCD
+ 
   3.4.1 Mortality rate attributed to cardiovascular disease, cancer, diabetes or chronic respiratory disease
   
   * There are several data sources. 
     - *Total NCD Deaths (in thousands)_4yrs.xlsx*,  from WHO, include many NCD-related death. 
     - *NCD_death_number_of_person_4yrs.xlsx*,       from Min Gon, focus on red and processed meat trade. We chose this one because the trade-related matrix data are available too. 
     
-```{r - 3.4.1 Mortality NCD}
+```{r}
 ind_sdg    <- 'Mortality rate - NCD'
 ind_ft     <- 'TradeMatrix_NCD_death_number' 
 unit_check <- 1
@@ -818,10 +851,10 @@ rel_not_merge <- rel %>%
   dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
-    value_rel = (value)/pop,
-    value_not = (value - fromAll)/pop,     ## few imports, few death
-    value_dst = (value - fromNer)/pop,
-    value_ner = (value - fromDst)/pop
+    value_rel =           (value)/pop*10^6,
+    value_not = (value - fromAll)/pop*10^6,     ## few imports, few death
+    value_dst = (value - fromNer)/pop*10^6,
+    value_ner = (value - fromDst)/pop*10^6
     ) %>% 
   dplyr::select(ind, iso3, year, value, everything())
 
@@ -837,21 +870,31 @@ hist(rel_not$value_rel, xlab = unit_ind)
 ### test, if the calculation match Figure 3b in BMJ paper by Chung, Min et al 2021 -----------------
 ### --> yes!
 rel_not_merge_shp <- rel_not_merge %>%
-  merge(x = shp, y = ., by.x = "iso_a3", by.y = "iso3",  all.y = T) %>%
+  # dplyr::filter(fromAll > 0) %>%
+  merge(x = shp, y = ., 
+        by.x = "iso_a3", by.y = "iso3",  all.x = T) %>%
   dplyr::filter(year == 2015)
 
 ### any countries failed to be joined? --> ANT, SUN, SUN --> which are expected. 
 rel_not_merge_shp_na <- rel_not_merge_shp %>%
   dplyr::filter(is.na(name))
 
-ggplot(data = rel_not_merge_shp) +
-  geom_sf(aes(fill = fromAll/pop*10^6), size = 0.1) +
-  scale_fill_distiller(palette = "Reds", direction = 1, 
-                     name = 'net death_NCD_imports/million pop',
-                     na.value = "grey95") +
-  theme_bw() +
-  ggtitle('NCD death per million people due to red and processed meat trade in 2015') +
-  theme_map
+rel_not_merge_shp2 <- rel_not_merge_shp %>%
+  dplyr::mutate(death_rate = fromAll/pop*10^6)
+hist(rel_not_merge_shp2$death_rate, nclass = 100)
+
+
+rel_not_merge_shp2 %>%
+  dplyr::filter(!is.na(death_rate)) %>%
+  tm_shape(.) +
+    tm_borders() +
+    tm_fill(col = "death_rate", palette = "RdYlBu", 
+            title = 'net death_NCD_imports/million pop',
+            # style = "fisher", 
+            style = "cont", 
+            breaks = c(-50, -10, 0, 0.12, 1.82, 6.76, 41), 
+            n = 11, midpoint = 0) +
+    tm_layout(main.title = "NCD death per million people due to red and processed meat trade in 2015")
   
   
 
@@ -860,7 +903,7 @@ ggplot(data = rel_not_merge_shp) +
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -943,7 +986,7 @@ hist(rel_not$value_rel)
 
 ### normalization  -------------------------------------------------------
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
 
@@ -1010,7 +1053,7 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1063,7 +1106,7 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1169,7 +1212,7 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1258,7 +1301,7 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1373,7 +1416,7 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1449,7 +1492,7 @@ hist(rel_not$value_rel)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1476,7 +1519,9 @@ direction_sdg <- -1
 
 
 ### Resource consumption or emissions under the current trading world situation -------------------------
-xls <- list.files(path = dir.input1, pattern = '^Total freshwater withdrawal', full.names = T); xls 
+# xls <- list.files(path = dir.input1, pattern = '^Total freshwater withdrawal', full.names = T); xls 
+##' update to use this data; 8/18/2023
+xls <- list.files(path = dir.input1, pattern = '^Annual freshwater withdrawals', full.names = T); xls 
 rel_w <- readxl::read_excel(path = xls) %>% as.data.frame()  ## the status data
 rel <- rel_w %>%
   dplyr::select(-ctr) %>%
@@ -1532,12 +1577,10 @@ hist(rel_not$value_rel)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
-
-
 
 score_6_4_2 <- df_score
 ```
@@ -1562,7 +1605,7 @@ direction_sdg <- -1
 ### Check the Unit!!!
 ### rel --> ton = 10^3 kg
 ### oft --> ton = 10^3 kg
-### total water resources --> m3
+### total water resources --> m3 (has been converted from billion m3 to m3 in the above chunk)
 
 
 ### Resource consumption or emissions under the current trading world situation --------------------
@@ -1613,7 +1656,7 @@ hist(rel_not$value_rel, xlab = unit_ind)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1690,7 +1733,7 @@ hist(rel_not$value_rel, breaks = 100)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1773,7 +1816,7 @@ hist(rel_not$value_rel)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1868,7 +1911,7 @@ hist(rel_not$value_rel)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2028,10 +2071,14 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
+
+par(mfrow = c(1, 2))  # 1 row, 2 columns
+hist(df_score$val, nclass = 100)
+hist(df_score$value_norm, nclass = 100)
 
 score_8_1_1 <- df_score
 ```
@@ -2140,11 +2187,14 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
 
+par(mfrow = c(1, 2))  # 1 row, 2 columns
+hist(df_score$val, nclass = 100)
+hist(df_score$value_norm, nclass = 100)
 
 score_8_4_2x <- df_score
 ```
@@ -2193,7 +2243,7 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2280,7 +2330,7 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2357,7 +2407,7 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2428,7 +2478,7 @@ hist(rel_not$value_rel)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2538,7 +2588,7 @@ hist(rel_not$value_rel)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2627,7 +2677,7 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2728,7 +2778,7 @@ rel_not <- rel_not_merge %>%
 
 ### normalization  -------------------------------------------------------
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
 
@@ -2869,7 +2919,7 @@ rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2940,7 +2990,7 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -3007,7 +3057,7 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -3119,7 +3169,7 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -3201,7 +3251,7 @@ hist(rel_not$value_rel)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -3290,7 +3340,7 @@ hist(rel_not$value_rel)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -3365,7 +3415,7 @@ hist(rel_not$value_rel)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -3436,7 +3486,7 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -3527,7 +3577,7 @@ hist(rel_not$value_rel)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -3599,7 +3649,7 @@ hist(rel_not$value_rel)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -3674,7 +3724,7 @@ hist(rel_not$value_rel)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -3727,7 +3777,7 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -3811,7 +3861,7 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -3883,7 +3933,7 @@ hist(rel_not$value_not, nclass = 100)
 
 ### normalization  -------------------------------------------------------
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
 
@@ -3951,7 +4001,7 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -4018,7 +4068,7 @@ rel_not <- rel_not_merge %>%
 ### Be careful with **Data Direction!**
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
-df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95) %>%
+df_score <- func_norm_sdg_score_bad(df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -4099,7 +4149,7 @@ check1 <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -4212,7 +4262,7 @@ hist(rel_not$value_rel)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -4270,7 +4320,7 @@ hist(rel_not$value_rel)
 
 ### normalization  -----------------------------------------------------------------------
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -4352,7 +4402,7 @@ hist(rel_not$value_rel)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, bottom = 0.05, top = 0.95, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, bottom = lower_probs, top = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
