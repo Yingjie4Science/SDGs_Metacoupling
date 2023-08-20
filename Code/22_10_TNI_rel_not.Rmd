@@ -239,7 +239,7 @@ source('./Code/func_net_import_direction.R')
 ### Way 1 ---------> NOT USED
 
   
-#### 1. Non-SHDB spillover
+ #### 1. Non-SHDB spillover
 
 ```{r eval=FALSE, include=FALSE}
 xls.ls <- list.files(path = dir.eora_cleaned, pattern = 'xlsx$', full.names = T); xls.ls
@@ -311,7 +311,7 @@ df_flow <- df %>%
 ```
 
 
-#### 2. SHDB spillover
+ #### 2. SHDB spillover
 ```{r eval=FALSE, include=FALSE}
 ### put all spillover indicators in one table
 net_imports <- data.frame()
@@ -359,7 +359,7 @@ net_imports2_revise <- net_imports2 %>%
 ```
 
 
-#### 3. Combine all data
+ #### 3. Combine all data
 
   We may call this net imports data `outsourced footprints`. (OR displaced footprints?)
   
@@ -375,12 +375,13 @@ net_imports2_revise <- net_imports2 %>%
 
 
 
-### Way 2 ---------> UPDATE!?
+### Way 2 ---------> UPDATE ❗️
 
 
 #### - direction of impacts
   
-  Only indicators with decided *direction* were included in the calculation, while assign *NA* to those with un-decided direction. 
+  Only indicators with decided *direction* were included in the calculation, while assign *NA* to those with un-decided direction.
+  
   - Need to update the `direction` table!
   
 ```{r }
@@ -410,7 +411,10 @@ net_imports2_revise <- net_imports2 %>%
 
 
 
-#### - put all spillover indicators in one table 
+#### - scale + put all indicators in one table 
+
+  * 8/17/2023 revised `func_net_import_direction()`
+    
 ```{r include=FALSE}
 ### put all spillover indicators in one table 
 net_imports <- data.frame()
@@ -419,8 +423,10 @@ for (i in 1:nrow(direction_all)) {
   # print(i)
   ind <- direction_all[i, 'ind']       %>% unlist() %>% paste(sep = '', collapse = ''); 
   drt <- direction_all[i, 'direction'] %>% unlist() %>% paste(sep = '', collapse = '') %>% as.numeric()
+  in_out <- direction_all[i, 'Impact_direction'] %>% unlist() %>% paste(sep = '', collapse = '')
   print(ind)
   print(drt)
+  print(in_out)
   
   
   ### if the direction is specified, read data; if not, skip. 
@@ -428,7 +434,7 @@ for (i in 1:nrow(direction_all)) {
     xls <- paste0(dir.eora_cleaned, ind, '.xlsx'); #print(xls)
     df  <- readxl::read_excel(path = xls)
   } else {
-    cat('\t\t TBD... and skip ... \n\n\n')
+    cat('\t\t TBD... and skip ------> ', ind, ' <------\n\n\n')
   }
     
 
@@ -441,7 +447,7 @@ for (i in 1:nrow(direction_all)) {
   # max <- max(df_l$value, na.rm = TRUE); max
   # min <- min(df_l$value, na.rm = TRUE); min
   
-  net_in      <- func_net_import_direction(df = df, direction_i = drt, frac = 0.025)
+  net_in      <- func_net_import_direction(df = df, in_or_out = in_out, direction_i = drt, frac = 0.025)
   net_imports <- rbind(net_imports, 
                        cbind(ind = ind, net_in))
   
@@ -648,6 +654,9 @@ spillover_norm <- net_imports_fromAll_use %>%
   dplyr::select(ind, iso3, year, score) %>%
   spread(key = 'ind', value = 'score')
 
+unique(spillover_norm$year)
+unique(net_imports_fromAll_use$ind)
+
 spillover_norm <- spillover_norm %>% 
   dplyr::select_if(~any(!is.na(.)))
 
@@ -662,6 +671,7 @@ spillover_index <- net_imports_fromAll_use %>%
   group_by(iso3, year) %>%
   dplyr::summarise(index = mean(score, na.rm = T),
                    non_na_count = sum(!is.na(score))) %>%
+  ungroup() %>%
   arrange(iso3, year)
 
 hist(spillover_index$index)
@@ -853,6 +863,9 @@ spillover_index_top_bottom <- spillover_index_shp %>%
   
   ### choose country group classification
   dplyr::mutate(
+    rank = case_when(
+      dense_rank(index) <= 10 ~ "Bottom 10", 
+      TRUE ~ 'Top 10'),
     group = group_income2,
     group = stringr::str_squish(group),
     group = factor(x = group, levels = c("High income", "Low income"))) %>%
@@ -864,9 +877,6 @@ spillover_index_top_bottom <- spillover_index_shp %>%
   Index rank county-shape [NOT used] 
 ```{r eval=FALSE, include=FALSE}
 spillover_index_top_bottom %>%
-  dplyr::mutate(rank = case_when(
-    index > 50 ~ "top 10", 
-    TRUE ~ 'bottom 10')) %>%
   ggplot(aes(x = reorder(name, index))) +
   # geom_hline(yintercept = 50) +
   geom_col(aes(y = index, fill = (rank)), show.legend = T) + 
@@ -901,9 +911,6 @@ ggsave(filename = fname, plot = last_plot(), width = width_1col, height = 8, uni
   
 ```{r eval=FALSE, include=FALSE}
 spillover_index_top_bottom %>%
-  dplyr::mutate(rank = case_when(
-    index > 50 ~ "top 10", 
-    TRUE ~ 'bottom 10')) %>%
   ggplot(aes(x = reorder(name, index))) +
   geom_col(aes(y = index, fill = (rank)), show.legend = T) + 
   geom_point(aes(y = -2, color = group), show.legend = T) + # size = 1.2, 
@@ -929,17 +936,38 @@ ggsave(filename = fname, plot = last_plot(), width = width_2col/3*2, height = wi
 
 
 ```{r - fig2a - bar - index rank county-color-2-group}
+library(grid) ## linesGrob()
+
 p <- spillover_index_top_bottom %>%
-  dplyr::mutate(rank = case_when(
-    index > 50 ~ "top 10", 
-    TRUE ~ 'bottom 10')) %>%
   ggplot(aes(x = reorder(name, index))) +
-  geom_col(aes(y = index, fill = (rank)), show.legend = T) + 
-  geom_point(aes(y = -2, color = group), show.legend = T, size = 3) + # size = 1.2, 
-  # scale_fill_manual(values=c('#fee6ce', '#f16913'))+
-  scale_fill_brewer(palette = "Reds") +
+  geom_col(aes(y = index, fill = (rank)), show.legend = T, alpha = .6) + 
+  geom_point(aes(y = min(index)-8, color = group), show.legend = T, size = 3) + # size = 1.2, 
+  scale_fill_manual(values=c('#5ab4ac', '#d8b365'))+
+  # scale_fill_brewer(palette = "Reds") +
   # scale_fill_manual(values = brewer.pal(n = 5, "Reds")[c(2,4)]) +
   scale_color_manual(values=c('#2371A6', '#F26463'))+
+  
+  annotation_custom(grob = linesGrob(
+    arrow=arrow(type="open", ends="last", length=unit(2,"mm")), 
+    gp=gpar(col="#d8b365", lwd=2)), 
+    xmin = 0, xmax = 0, ymin = 0, ymax = 40) +
+  annotation_custom(grob = grid::textGrob(
+    label = "Impacting", hjust=0, 
+    gp=gpar(col="#d8b365", cex=.6)),
+    xmin = 0, xmax = 0.1, ymin = 10) +
+  annotation_custom(grob = linesGrob(
+    arrow=arrow(type="open", ends="first", length=unit(2,"mm")), 
+    gp=gpar(col="#5ab4ac", lwd=2)), 
+    xmin = 0, xmax = 0, ymin = 0, ymax = -20) +
+  annotation_custom(grob = grid::textGrob(
+    label = "Impacted", hjust=4, 
+    gp=gpar(col="#5ab4ac", cex=.6)),
+    xmin = 0, xmax = 0.1, ymin = -30) +
+  
+  
+  ggplot2::annotate("text", x = -.5, y = -1, label = "") +
+  coord_cartesian(ylim = c(-100, 100), clip = "off") +
+  
   ylab('Transnational Impact Index') +
   coord_flip() +
   theme(axis.title.y=element_blank(), 
@@ -954,6 +982,7 @@ p <- spillover_index_top_bottom %>%
   guides(
    color = guide_legend(order = 2, title = NULL, override.aes = list(fill  = c(NA, NA)), reverse = F),
    fill  = guide_legend(order = 1, title = NULL, override.aes = list(shape = c(NA, NA)), reverse = T)) 
+p
 
 fig <- ggarrange(p, labels = "a", font.label = list(size = 12), vjust = 1, hjust = 0); fig
 fname <- paste0(dir.fig, '01main/', 'fig2a_spillover_top_bot_color_2grp_', postfix, '_', today,'.jpg'); fname
@@ -980,9 +1009,16 @@ spillover_index_type <- spillover_norm %>%
         y = spillover_index_top_bottom %>% dplyr::select(-2, -3, -4, -5), 
         by.x = 'iso3', by.y = 'iso_a3', all.x = T) %>%
   
-  ### link with what type of impacts - env, soc, eco, or sec?
-  merge(x = ., y = direction, by.x = 'indicator', by.y = 'ind', all.x = T) %>%
+  ### link with what type of impacts - env, soc, eco, or sec
+  merge(x = ., 
+        y = direction %>% dplyr::select(ind, SDG_class), 
+        by.x = 'indicator', by.y = 'ind', all.x = T) %>%
   dplyr::mutate(SDG_class = as.factor(SDG_class)) %>%
+  as.data.frame() %>%
+  dplyr::group_by(iso3, rank, group, SDG_class) %>%
+  dplyr::summarise(score_each = sum(score_each, na.rm = T),
+                   index = mean(index, na.rm = T))  %>%
+  ungroup() %>%
   as.data.frame()
   
 str(spillover_index_type)  
@@ -999,10 +1035,12 @@ spillover_index_type_SDGtype <- spillover_index_type %>%
 ggplot(spillover_index_type_SDGtype, 
        aes(#fill = indicator, 
            fill = fct_rev(SDG_class),
-           y=score_each, x = reorder(iso3, index))) + 
+           y = score_each, 
+           x = reorder(iso3, index))) + 
   scale_fill_manual(values = c('#33a02c', '#fdbf6f', '#ff7f00', '#6a3d9a') %>% rev(), name = '') +
   geom_bar(position="stack", stat="identity", alpha = 0.8) +
   coord_flip() +
+  # geom_hline(yintercept = 0, color = 'red', alpha = .8) +
   theme(
     legend.position = c(0.99, 0.01), 
     legend.justification = c(1, 0), 
@@ -1095,7 +1133,7 @@ unique(map_each_na$indicator) %>% sort()
 map_each_ind <- map_each %>%
   st_drop_geometry() %>%
   dplyr::filter(!is.na(ShortName)) %>%
-  distinct(ShortName, indicator)
+  dplyr::distinct(ShortName, indicator)
 
 # ind_selected <- map_each_ind$indicator; ind_selected
 # ind_name     <- map_each_ind$ShortName; ind_name

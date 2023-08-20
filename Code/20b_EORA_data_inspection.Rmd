@@ -10,7 +10,7 @@ editor_options:
 
 ```{r Paths and packages}
 # To clear your environment 
-remove(list = ls())
+# remove(list = ls())
 
 # set work dir
 path <- rstudioapi::getSourceEditorContext()$path
@@ -106,6 +106,7 @@ country_selected <- c('USA', 'CHN', 'HKG', 'SRB', 'IND', 'IDN', 'JPN', 'DEU', 'F
 xls.name.eora <- 'YJ_Energytotal_2015.xlsx'; unit_name <- ''         ## PJ = 1000 TJ
 # xls.name.eora <- 'YJ_Energy_renewable_2015.xlsx'; unit_name <- ''
 # xls.name.eora <- 'YJ_Landuse_forest_2015.xlsx'; unit_name <- 'ha'
+xls.name.eora <- 'YJ_PM25_2015.xlsx'; unit_name <- ''
 
 
 
@@ -166,6 +167,7 @@ df2.1 <- df2_ %>%
   arrange(!is.na(exporter_iso3)) %>%
   gather(key = 'importer_iso3', value = 'value', 2:ncol(.)) %>%
   arrange(!is.na(importer_iso3)) %>%
+  dplyr::mutate(value = value) %>%
   as.data.frame()
 ```
 

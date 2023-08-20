@@ -4,7 +4,7 @@ author: "Yingjie Li"
 date: "2021-09-23"
 output: pdf_document
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 
@@ -102,7 +102,7 @@ summary(dst_stat_each$n)
 ```{r }
 ### get the name list of all the spillovers and manually add `direction` info for further normalizing the values
 
-xls.ls <- list.files(path = dir.eora_cleaned, pattern = 'xlsx$', full.names = T); xls.ls
+xls.ls <- list.files(path = dir.eora_cleaned, pattern = 'xlsx$', full.names = T); 
 
 spillover_name_list <- data.frame(ind = gsub('.xlsx', '', basename(xls.ls))) %>%
   # dplyr::mutate(shdb = str_detect(ind, pattern="SHDB")) %>%
@@ -129,7 +129,7 @@ direction_use <- direction %>%
   * `distant only` scenario = no nearby  trade: to evaluate *nearby*  impact --> use nearby  footprints data
   * `nearby only`  scenario = no distant trade: to evaluate *distant* impact --> use distant footprints data
 
-```{r - distant only scenario --> nearby impact}
+```{r - distant only scenario --> nearby impact, include=FALSE}
 
 scenario <- 'fromNer'
 matrix   <- ner.matrix
@@ -144,6 +144,7 @@ for (i in 1:nrow(direction_use)) {
   # print(i)
   ind <- direction_use[i, 'ind']       %>% unlist() %>% paste(sep = '', collapse = ''); 
   drt <- direction_use[i, 'direction'] %>% unlist() %>% paste(sep = '', collapse = '') %>% as.numeric()
+  in_out <- direction_use[i, 'Impact_direction'] %>% unlist() %>% paste(sep = '', collapse = '')
   print(ind)
   print(drt)
   
@@ -180,7 +181,7 @@ for (i in 1:nrow(direction_use)) {
   }
   
   
-  net_in <- func_net_import_direction(df = df_scenario, direction = drt, frac = 0.025)
+  net_in <- func_net_import_direction(df = df_scenario, in_or_out = in_out, direction = drt, frac = 0.025)
   net_imports <- rbind(net_imports, cbind(ind = ind, net_in))
   
 }
@@ -192,7 +193,7 @@ net_imports_fromNer  <- net_imports
   
   
   
-```{r - nearby only scenario --> distant impact}
+```{r - nearby only scenario --> distant impact, include=FALSE}
 
 scenario <- 'fromDst'
 matrix   <- dst.matrix
@@ -206,6 +207,7 @@ for (i in 1:nrow(direction_use)) {
   # print(i)
   ind <- direction_use[i, 'ind']       %>% unlist() %>% paste(sep = '', collapse = ''); 
   drt <- direction_use[i, 'direction'] %>% unlist() %>% paste(sep = '', collapse = '') %>% as.numeric()
+  in_out <- direction_use[i, 'Impact_direction'] %>% unlist() %>% paste(sep = '', collapse = '')
   print(ind)
   print(drt)
   
@@ -240,7 +242,7 @@ for (i in 1:nrow(direction_use)) {
     cat('\t TBD... and skip ... \n\n')
   }    
   
-  net_in <- func_net_import_direction(df = df_scenario, direction = drt, frac = 0.025)
+  net_in <- func_net_import_direction(df = df_scenario, in_or_out = in_out, direction = drt, frac = 0.025)
   net_imports <- rbind(net_imports, cbind(ind = ind, net_in))
   
 }
