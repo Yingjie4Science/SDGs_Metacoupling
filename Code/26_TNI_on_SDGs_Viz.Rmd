@@ -617,18 +617,20 @@ df_chg_sf  <- dfs_score_chg_count %>%
   merge(x = shp, y = ., by.x = "iso_a3", by.y = "iso3",  all.x = T)
 
 # col_tmap <- colors_changes
+n_class = 10
+n_class = 4
 display.brewer.all()
-col_tmap <- brewer.pal(n = 10, name = "PiYG")
-col_tmap <- brewer.pal(n = 10, name = "Greens")
+col_tmap <- brewer.pal(n = n_class, name = "PiYG")
+col_tmap <- brewer.pal(n = n_class, name = "Greens")
 
-fname <- paste0(dir.fig, '01main/fig1d_SDG_score_count_Improved_', today, '.jpg'); fname
+fname <- paste0(dir.fig, '01main/fig1d_SDG_score_count_Improved_', today, '_n', n_class, '.jpg'); fname
 # jpeg(filename = fname, width=7, height=2.8, units="in", pointsize=18, res=300)
 
 tm_shape(df_chg_sf) +
   tm_fill(col = 'percent_increase', 
           palette = col_tmap, #col1,
           style = "fixed",
-          breaks= seq(0, 100, 10),
+          breaks= seq(0, 100, 100/n_class),
           title = '% of 17 SDGs\nimproved',
           textNA = 'NA', colorNA = 'gray90',
           legend.reverse = T) +
@@ -637,15 +639,14 @@ tm_shape(df_chg_sf) +
   tm_layout(
     frame = F, frame.lwd = 0.1, 
     legend.position = c(0,0),
-    legend.title.size = 0.9,
-    legend.text.size  = 0.7,
+    legend.title.size = 0.8,
+    legend.text.size  = 0.6,
     # legend.format = list(text.less.than = '<', text.or.more = "<", text.separator = "~"),
     legend.width = -0.7,
     legend.height = -0.7, 
     outer.margins=0, #c(0,0.001, 0, 0.001), #  bottom, left, top, and right
     inner.margins=0,
     panel.show = F) 
-
 # dev.off()
 
 tmap_save(tm = tmap_last(), filename = fname, width=7, height=2.8, units="in", dpi = 300)
@@ -656,16 +657,16 @@ tmap_save(tm = tmap_last(), filename = fname, width=7, height=2.8, units="in", d
 
 ### plot -------------------------------------------------------------------------------------------
 
-col_tmap <- brewer.pal(n = 10, name = "OrRd")
+col_tmap <- brewer.pal(n = n_class, name = "OrRd")
 
-fname <- paste0(dir.fig, '01main/fig1dex_SDG_score_count_Decreased_', today, '.jpg'); fname
+fname <- paste0(dir.fig, '01main/fig1dex_SDG_score_count_Decreased_', today, '_n', n_class, '.jpg'); fname
 # jpeg(filename = fname, width=7, height=2.8, units="in", pointsize=18, res=300)
 
 tm_shape(df_chg_sf) +
   tm_fill(col = 'percent_decrease', 
           palette = col_tmap, #col1,
           style = "fixed",
-          breaks= seq(0, 100, 10),
+          breaks= seq(0, 100, 100/n_class),
           title = '% of 17 SDGs\ndecreased',
           textNA = 'NA', colorNA = 'gray90',
           legend.reverse = T) +
@@ -674,8 +675,8 @@ tm_shape(df_chg_sf) +
   tm_layout(
     frame = F, frame.lwd = 0.1, 
     legend.position = c(0,0),
-    legend.title.size = 0.9,
-    legend.text.size  = 0.7,
+    legend.title.size = 0.7,
+    legend.text.size  = 0.6,
     # legend.format = list(text.less.than = '<', text.or.more = "<", text.separator = "~"),
     legend.width = -0.7,
     legend.height = -0.7, 
@@ -984,15 +985,19 @@ dfs_index_sf <- dfs_index %>%
   spread(key = scenario, value = index) %>%
   merge(x = shp, y = ., by.x = "iso_a3", by.y = "iso3",  all.x = T)
 
+hist(dfs_index_sf$value_rel, nclass = 50)
+hist(dfs_index_sf$value_not, nclass = 50)
+max_score <- (max(dfs_index_sf$value_rel, na.rm = T)/5) %>% ceiling() %>% "*"(5) # 75
+min_score <- (min(dfs_index_sf$value_rel, na.rm = T)/5) %>% floor()   %>% "*"(5) # 35
 
 ### plot 
 p <- tm_shape(dfs_index_sf) +
   tm_fill(c('value_rel', 'value_not'),
           palette = 'YlGn', 
-          style = "fixed",
+          style = "cont",
           ## "cat", "fixed", "sd", "equal", "pretty", "quantile", "kmeans", "hclust", "bclust", "fisher", "jenks"
           # stretch.palette = T,
-          breaks = c(0, seq(50, 100, by = 10)),
+          breaks = c(min_score, seq(50, max_score, by = 5), 100),
           # labels = seq(0, 100, by = 10),
           title  = c('SDG Index\n(Baseline)', 'SDG Index\n(Global autarky)'),
           textNA = 'NA', colorNA = 'gray90',
@@ -1000,11 +1005,11 @@ p <- tm_shape(dfs_index_sf) +
   tm_borders(col = "white", lwd = 0.1, lty = "solid", alpha = 0.99) +
   tm_layout(frame = F, frame.lwd = 0.1,
     legend.position = c(0,0),
-    legend.title.size = 1, 
+    legend.title.size = 1.1, 
     # legend.title.fontface = "bold",
-    legend.text.size  = 0.8,
-    legend.width = -0.5,
-    legend.height = -0.5,
+    legend.text.size  = 0.9,
+    legend.width = -0.7,
+    legend.height = -0.7,
     outer.margins=0, inner.margins=0,
     panel.show = F) +
   tm_facets(free.scales.fill = F, ncol = 1)
@@ -1072,14 +1077,17 @@ sf_small_l <- st_read('./Data/country classification/country_samll_annotation_li
 #   tm_dots(col = 'value_chg', size = 0.5)
 ## ----------------------------------------------------------------------
 
-max(df_chg_sf$value_chg, na.rm = T) # 20
-min(df_chg_sf$value_chg, na.rm = T) # -3.2
+hist(df_chg_sf$value_chg)
+max_chg <- (max(df_chg_sf$value_chg, na.rm = T)/5) %>% ceiling() %>% "*"(5) # 20   --> 27
+min_chg <- (min(df_chg_sf$value_chg, na.rm = T)/5) %>% floor()   %>% "*"(5) # -3.2 --> -5
 
 # seq <- c(-20, -10, -5, 0, 5, 10, 20); seq; length(seq) ## should base on `min`
 # col_tmap <- colors_changes ## Colour Palette; one value to one color ## ('red' --> 'blue')
 
-seq <- c(          -5, 0, 5, 10, 20); seq; length(seq)
-col_tmap <- colors_changes[4:length(colors_changes)]
+break_seq <- seq(min_chg, max_chg, 5); break_seq; length(break_seq)
+col_tmap <- colors_changes[4:length(break_seq)]
+# col_tmap <- colors_changes
+# col_tmap <- 'RdYlBu'
 
 fname <- paste0(dir.fig, '01main/', 'fig1a_SDG_Index_chg_Map_', today, '.jpg'); fname
 # jpeg(filename = fname, width=7, height=2.8, units="in", pointsize=18, res=300)
@@ -1090,10 +1098,11 @@ p <- tm_shape(df_chg_sf) +
     palette = col_tmap, 
     stretch.palette = F,
     style  = "fixed",
+    # breaks = break_seq, 
     breaks = c(#-Inf, -20, -10, 
-      -5, 0, 5, 10, 20, Inf), 
-    labels = c(#"< -20", "[-20, -10)", "[-10, -5]", 
-      "(-5, 0)", "[0, 5)", "[5, 10]", "(10, 20]", "> 20"), 
+      -5, 0, 5, 10, 20, Inf),
+    labels = c(#"< -20", "[-20, -10)", "[-10, -5]",
+      "(-5, 0)", "[0, 5)", "[5, 10]", "(10, 20]", "> 20"),
     legend.reverse = T,
     textNA = 'NA', 
     colorNA = 'gray90',
@@ -1111,10 +1120,11 @@ p <- tm_shape(df_chg_sf) +
     palette = col_tmap, 
     stretch.palette = F,
     style  = "fixed",
-    breaks = c(#-Inf, -20, -10, 
-      -5, 0, 5, 10, 20, Inf), 
-    labels = c(#"< -20", "[-20, -10)", "[-10, -5]", 
-      "(-5, 0)", "[0, 5)", "[5, 10]", "(10, 20]", "> 20"),  
+    # breaks = break_seq, 
+    breaks = c(#-Inf, -20, -10,
+      -5, 0, 5, 10, 20, Inf),
+    labels = c(#"< -20", "[-20, -10)", "[-10, -5]",
+      "(-5, 0)", "[0, 5)", "[5, 10]", "(10, 20]", "> 20"),
     legend.col.reverse = T, 
     legend.show = F,
     size = 0.02) +
