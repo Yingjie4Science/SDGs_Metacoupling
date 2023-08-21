@@ -3426,9 +3426,12 @@ score_13_2_2 <- df_score
 ```
 
 
-  **13.2.s** CO2 emissions intensity of areas under forest management.
-  
-  - *???* need to further look into the calculation of this indicator, as the calculation is different from the Xu et al 2020 NS paper. 
+  **13.2.s** CO2 emissions intensity of areas under forest management (GtCO2-equivalent per ha)
+ 
+  - Based on Xu et al 2020 NS paper. 
+  - low value indicates high SDG target score
+  - S  = f(CE / FA);        # CE: CO2 emissions, FA: forest area
+  - S' = f((CE−NEC) / FA)
   
 ```{r - 13.2.s co2/forest}
 ind_sdg    <- 'CO2 per area of forest' ## ton/ha
@@ -3467,9 +3470,9 @@ rel_not_merge <- rel %>%  # forest area in real world
   dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
-    value_rel = var_rel/(value - 0),   ## (co2 in real world) / (forest area in real world)
+    value_rel = var_rel/(value - 0),        ## (co2 in real world) / (forest area in real world)
     # value_not = var_not/(value - net_in), ## (co2 if no trade)   / (forest area if no trade)
-    value_not = var_not/(value - 0),   ## in 2020 NS paper, we use this calculation. (???), assuming forest don't change?
+    value_not = var_not/(value - 0),        ## in 2020 NS paper, we use this calculation. (???), assuming forest don't change?
     value_dst = var_dst/(value - 0),
     value_ner = var_ner/(value - 0)
     ) %>%        

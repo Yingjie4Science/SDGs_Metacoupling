@@ -146,7 +146,10 @@ n_year_check <- 1
 f <- paste0(dir.flowScenario, 'para_n_year_check.RData'); f
 save(n_year_check, file = f)
 
-for (i in inds) {
+##' remove SHDB files from the list
+inds_nonSHDB <- inds[grep("SHDB", inds, invert = T, ignore.case = TRUE)]
+
+for (i in inds_nonSHDB) {
   # print(i)
   iname = i
   pattern <- paste0('^YJ_', i, '_20'); #print(pattern)

@@ -10,7 +10,7 @@ editor_options:
 
 ```{r Paths and packages}
 # To clear your environment 
-# remove(list = ls())
+remove(list = ls())
 
 # set work dir
 path <- rstudioapi::getSourceEditorContext()$path
@@ -40,6 +40,7 @@ library(hrbrthemes)
 library(circlize)  ## for circlize plot
 library(Cairo)
 
+today <- format(Sys.time(), "%Y%m%d") ## %H%M%S
 ```
 
 
@@ -90,6 +91,7 @@ iso_eora <- readxl::read_excel(path = xls_iso_eora)
 
 dir1 <- './Data/data_02_intermediate/dt02_flows/eora/2023-08-16pro/' ## updated on 8/16/2023; only three energy-related files
 dir2 <- './Data/data_02_intermediate/dt02_flows/eora/2023-08-17con/' ## updated on 8/17/2023; all files + 1 materiel + 135 shdb
+dir2 <- './Data/data_02_intermediate/dt02_flows/eora/2023-08-20con/' ## updated on 8/20/2023; all files
 
 
 dir_list <- basename(c(dir1, dir2))
@@ -102,11 +104,11 @@ country_selected <- c('USA', 'CHN', 'HKG', 'SRB', 'IND', 'IDN', 'JPN', 'DEU', 'F
 
 ### indicator file names ----------------------------
 # xls.name.eora <- 'YJ_CO2_2015.xlsx'; unit_name <- 'tonne' ## tonne
-# xls.name.eora <- 'YJ_Water_2015.xlsx'; unit_name <- 'm3'  ## m3
+xls.name.eora <- 'YJ_Water_2015.xlsx'; unit_name <- 'm3'  ## m3
 xls.name.eora <- 'YJ_Energytotal_2015.xlsx'; unit_name <- ''         ## PJ = 1000 TJ
 # xls.name.eora <- 'YJ_Energy_renewable_2015.xlsx'; unit_name <- ''
 # xls.name.eora <- 'YJ_Landuse_forest_2015.xlsx'; unit_name <- 'ha'
-xls.name.eora <- 'YJ_PM25_2015.xlsx'; unit_name <- ''
+# xls.name.eora <- 'YJ_PM25_2015.xlsx'; unit_name <- ''
 
 
 
@@ -230,7 +232,8 @@ d1 %>%
   theme_bw()
 
 ### save plot
-fname <-paste0(dir.fig, 'eora_figures/', 'data_inspection_Trade_', indicator.name, '_', paste(dir_list, collapse = '_'), '.png'); fname
+fname <-paste0(dir.fig, 'eora_figures/', 'data_inspection_Trade_', indicator.name, '_', 
+               paste(dir_list, collapse = '_'), '_',today, '.png'); fname
 ggsave(filename = fname, plot = last_plot(), width = 9, height = 9, units = 'in', dpi = 200)
 ```
 
@@ -289,6 +292,7 @@ ht2 <- df2.1 %>%
 ggarrange(ht1, ht2, ncol = 2, labels = dir_list, common.legend = T, vjust = 0, legend = 'top')
 
 ### save plot
-fname <-paste0(dir.fig, 'eora_figures/', 'data_inspection_heatmap_', indicator.name, '_', paste(dir_list, collapse = '_'), '.png'); fname
+fname <-paste0(dir.fig, 'eora_figures/', 'data_inspection_heatmap_', indicator.name, 
+               '_', paste(dir_list, collapse = '_'),  '_', today, '.png'); fname
 ggsave(filename = fname, plot = last_plot(), width = width_2col, height = width_2col/2, units = unit_ns, dpi = 300)
 ```

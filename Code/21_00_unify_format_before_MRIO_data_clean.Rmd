@@ -143,20 +143,21 @@ for (file in xls.ls) {
   
   
   name_old       <- paste0(dir_old, file)
-  name_old_inNew <- paste0(dir_new, file)
+  name_old_inNewFolder <- paste0(dir_new, file)
   name_new       <- paste0(dir_new, file_new)
   # print(basename(name_new))
   # print(name_new)
   
   
-  ## Copy the file to the destination folder
-  file.copy(name_old, dir_new)
+  ##' Copy the file to the destination folder
+  ##' or rename the file and save it in the same folder
+  # file.copy(name_old, dir_new)
   
   
   ## rename file -------------------------------
-  if (file.exists(name_old_inNew)) {
+  if (file.exists(name_old_inNewFolder)) {
     ## rename
-    file.rename(name_old_inNew, name_new)
+    file.rename(from = name_old_inNewFolder, to = name_new)
   } else {
     cat("\n\n The file does not exist! \n\n")
   }

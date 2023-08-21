@@ -788,6 +788,18 @@ spillover_index_shp_match_check <- spillover_index %>%
 nrow(spillover_index_shp_match_check) ## ROW was not included here. 
 
 
+## decide color palette 
+hist(spillover_index_shp$index)
+index_max <- max(spillover_index_shp$index, na.rm = T) %>% ceiling()
+index_min <- min(spillover_index_shp$index, na.rm = T) %>% floor()
+if (index_min >= 0) {
+  palette_map <- "Reds"
+  palette_drc <- 1
+} else {
+  palette_map <- "BrBG"
+  palette_drc <- -1
+}
+
 
 ### 1 year map for 2015 only -------------------------------------------------------------
 map1 <- spillover_index_shp %>%
@@ -795,7 +807,7 @@ map1 <- spillover_index_shp %>%
   dplyr::filter(year == 2015) %>%
   ggplot()+
   geom_sf(aes(fill = index), color='gray80', size = 0.1) +
-  scale_fill_distiller(palette = "Reds", direction = 1, na.value = 'black', name = 'Transnational\nImpact\nIndex') +
+  scale_fill_distiller(palette = palette_map, direction = palette_drc, na.value = 'black', name = 'Transnational\nImpact\nIndex') +
   # scale_fill_viridis(direction = -1, option = 'C', discrete = F, name = 'Impact\nIndex') +
   
   scale_y_continuous(expand = c(0, 0)) + ## reduce the space between plot and border
@@ -821,12 +833,40 @@ ggsave(filename = fname, plot = fig, width = width_2col, height = width_2col*2.8
 
 # fname <- paste0(dir.fig, '01main/',    fignm);
 # ggsave(filename = fname, plot = fig, width = width_2col, height = width_2col*2.8/7, units = unit_ns, dpi = 300)
+```
+
+
+```{r - fig2b - tmap - TNI Index}
+spillover_index_shp %>%
+  dplyr::filter(!is.na(year)) %>%
+  dplyr::filter(year == 2015) %>%
+  
+  tm_shape(.) +
+  tm_borders(col = 'gray80', lwd = 0.1) +
+  tm_fill(col = "index", title = 'Transnational\nImpact\nIndex', 
+          palette = '-BrBG', #midpoint = 0, #n = 7, 
+          breaks = c(index_min, seq(-30, 30, 10), index_max), style = "cont", 
+          legend.reverse = T,
+          colorNA = 'black') +
+  tm_layout(
+    title = 'b', 
+    frame = F, attr.outside = F, title.position = c(0, .97), title.size = 1, title.fontface = 'bold',
+    # legend.text.size = .5, 
+    legend.width = 3,
+    legend.title.size = .8,
+    legend.text.size = 0.7,
+    # panel.label.height = .5,
+    outer.margins=0, 
+    inner.margins=0, 
+    panel.show = F)
+
+f <- gsub('\\.jpg', '_tmap.jpg', fname)
+tmap_save(filename = f, width = width_2col, height = width_2col*2.8/7, units = unit_ns, dpi = 300)
+```
 
 
 
-
-
-
+```{r}
 ### 4 years map --------------------------------------------------------------------------
 # map4 <- spillover_index_shp %>%
 #   dplyr::filter(!is.na(year)) %>%
@@ -1133,6 +1173,7 @@ unique(map_each_na$indicator) %>% sort()
 map_each_ind <- map_each %>%
   st_drop_geometry() %>%
   dplyr::filter(!is.na(ShortName)) %>%
+  dplyr::filter(Used == 1) %>%
   dplyr::distinct(ShortName, indicator)
 
 # ind_selected <- map_each_ind$indicator; ind_selected
@@ -1142,12 +1183,18 @@ n_col <- 4
 n_row <- ceiling(n_p/n_col + 0.01); n_row 
 
 
+# map_each <- map_each %>% 
+#   dplyr::mutate(spillover_norm_cat = cut_number(spillover_norm, n = 7))
+
+
 map_each_p <- map_each %>%
   dplyr::filter(!is.na(ShortName)) %>%  ## remove un-matched 
   ggplot()+
   geom_sf(aes(fill = spillover_norm), color='gray80', size = 0.1) +
-  scale_fill_distiller(palette = "Spectral", direction = -1, na.value = 'gray70', 
+  scale_fill_distiller(palette = "Spectral", direction = -1, na.value = 'gray70',
                        name= 'Transnational Impact Score') +
+  # scale_fill_brewer(palette = "Spectral", direction = -1, na.value = 'gray70', 
+  #                   name= 'Transnational Impact Score') +
   facet_wrap(~ShortName, ncol = n_col, nrow = n_row) +
   # ggtitle(yr)+
   theme(legend.position = c(0.9, 0.07)) +
@@ -1158,8 +1205,8 @@ map_each_p <- map_each %>%
         plot.title   = element_text(size = 4),
         strip.text.x = element_text(size = 6)
         ) 
-map_each_p
-fname <- paste0(dir.fig, '01main/', 'ex_5_map_spillover_norm_each_', yr, '_long_', today, '.jpg'); #fname
+# map_each_p
+fname <- paste0(dir.fig, '01main/', 'ex_5_map_spillover_norm_each_', yr, '_long_', today, '-.jpg'); #fname
 ggsave(filename = fname, plot = map_each_p, width = 7, height = n_row*7.2/8, units = 'in', dpi = 300)
 ```
 
