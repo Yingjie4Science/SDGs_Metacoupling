@@ -33,7 +33,9 @@ source('./Code/_package list.R')
 
   **Rename files** - in case the name system is not consistent. 
   
-```{r - rename files, eval=FALSE, include=FALSE}
+## non-SHDB data  
+
+```{eval=FALSE eval=FALSE, include=FALSE}
 
 ## 1. fix `Water_scare` file
 name_old <- list.files(path = dir.eora, pattern="Water_scare", full.names = T)
@@ -69,7 +71,7 @@ file.rename(from = name_old, to = name_new)
 
 
 
-# SHDB data
+## SHDB data
 
 * This data was updated on *2023-07-17* by Mengyu. 
  
@@ -77,7 +79,7 @@ file.rename(from = name_old, to = name_new)
  
  Here, we want to rename the files for easy identification. 
 
-```{r - rename SHDB - indicators, include=FALSE}
+```{r, include=FALSE}
 
 ### load SHDB name list ------------------------
 library(googlesheets4)

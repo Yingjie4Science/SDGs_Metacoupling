@@ -452,8 +452,8 @@ ctr_unctad_code <- ctr_unctad %>%
 grp_update <- grp %>%
   dplyr::filter(!is.na(iso_a3)) %>%
   merge(x = ., y = ctr_wb,   by = 'iso_a3', all = T) %>%
-  merge(x = .,   y = ctr_unsd, by = 'iso_a3', all = T) %>%
-  merge(x = .,   y = ctr_unctad_code, by = 'iso_a3', all = T) %>%
+  merge(x = ., y = ctr_unsd, by = 'iso_a3', all = T) %>%
+  merge(x = ., y = ctr_unctad_code, by = 'iso_a3', all = T) %>%
   dplyr::mutate(check1 = ifelse(eco_group == class_unsd, NA, 1),
                 check2 = ifelse(class_unctad == class_unsd, NA, 1),
                 check3 = ifelse(class_unctad == eco_group, NA, 1)) %>%

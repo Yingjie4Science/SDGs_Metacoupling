@@ -2939,6 +2939,10 @@ d2 %>%
 fname <-paste0(dir.fig, 'inspection_total energy consumption_', paste(prefixs, collapse = '_'), '.png'); fname
 ggsave(filename = fname, plot = last_plot(), width = 9, height = 9, units = 'in', dpi = 100)
 ```
+
+
+
+
 ```{r - merge IEA and OWID data}
 ###' the three data sets are pretty similar, but IEA and OWID data are almost the same.
 ###' We therefore decide to use the combination of these two data sets. 

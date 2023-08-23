@@ -18,6 +18,7 @@ remove(list = ls())
 ### data path
 source('./Code/_path of data.R')
 source('./Code/_package list.R')
+source('https://raw.githubusercontent.com/Yingjie4Science/functionX/main/scaling_normalization_Pro.R')
 
 library(dplyr)
 library(ggplot2)
@@ -55,17 +56,33 @@ theme_ns <-
 
 ```{r - income group}
 
-load('./Data/Ancillary_Data_ISO3code_shp.RData') ## iso_eora, pop, gdp, shp, grp
+load('./Data/Ancillary_Data_ISO3code_shp.RData') ## iso_eora, pop, gdp, shp, grp, grp_update
 
-grp_id <- grp %>%
-  dplyr::mutate(group_id = as.numeric(gsub("\\D", "", inc_group))) %>% 
+grp_use <- left_join(
+  x = grp_update, 
+  y = grp %>%
+    dplyr::select(name, iso_a3, inc_group),
+  by = c('name', 'iso_a3')
+)
+
+grp_id <- grp_use %>%
+  
+  ### re-code income group into 2 categories
+  dplyr::mutate(group_numID = case_when(
+    str_detect(group_income4, "High")         ~ "1",
+    str_detect(group_income4, "Upper")        ~ "2",
+    str_detect(group_income4, "Lower middle") ~ "3",
+    str_detect(group_income4, "Low income")   ~ "4",
+    TRUE                                      ~ '')) %>%
+  
+  dplyr::mutate(group_id = as.numeric(gsub("\\D", "", group_numID))) %>% 
   dplyr::select(iso_a3, group_id) %>%
   dplyr::filter(!is.na(iso_a3)) %>%
   as.data.frame()
 
 # 1: high 
-# 2: mid-upper
-# 3: mid-low
+# 2: upper middle
+# 3: low middle
 # 4: low
 ```
 
@@ -191,7 +208,7 @@ d <- dist$dist %>% as.numeric()
 ctr_list_cepii <- dist %>%
   dplyr::select(1:2) %>%
   gather(key = 'od', value = 'iso', 1:2) %>%
-  distinct(iso, .keep_all = T) %>%
+  dplyr::distinct(iso, .keep_all = T) %>%
   arrange(iso)
 
 ```
@@ -219,7 +236,7 @@ cat(length(unique(ft_ind$ind)), 'indicators were included in the analysis.\n')
 
 
 ### !!! ** Choose how many type of flows will be used**
-class_detail <- F
+class_detail <- F   ## use aggregated 
 # class_detail <- T
 
 ###' class-detailed | class-aggregated 
@@ -243,7 +260,7 @@ links_dist_type_collection <- data.frame()
 for (ind in unique(ft_ind$ind)) {
   
   ## test
-  # ind <- "Corruption"
+  # ind <- "CO2"
   
   print(ind)
   
@@ -275,7 +292,12 @@ for (ind in unique(ft_ind$ind)) {
     dplyr::select(-ctr, -year) %>%
     arrange(from, to) %>%
     dplyr::distinct(from, to, .keep_all = T) %>%  
+    dplyr::select(from, to, everything()) %>%
     as.data.frame()
+  
+  ## need to normalize the weight factor for calculation 
+  links <- func_robust_scaling(data = links, var = 'weight') %>%
+    dplyr::mutate(weight = func_norm_minmax(weight, a=0.01, b=100))
   
   links_dist <- 
     merge(x = links, y = dist, by.x = c('from', 'to'), by.y = c('iso_o', 'iso_d'), all.x = T) %>%
@@ -316,8 +338,15 @@ for (ind in unique(ft_ind$ind)) {
   links_dist_aggr <- links_dist %>%
     dplyr::mutate(
       od_direction = case_when(
-      group_od %in% c(14, 13, 12) ~ 'Vertical flows', ## 
-      group_od %in% c(41, 31, 21) ~ 'Vertical flows', ## 
+        
+        ## option 1
+        # group_od %in% c(12, 13, 14) ~ 'Vertical flows', ## 
+        # group_od %in% c(21, 31, 41) ~ 'Vertical flows', ## 
+        
+        ## option 2
+        group_od %in% c(12, 13, 14, 23, 24, 34) ~ 'Vertical flows', ## 
+        group_od %in% c(21, 31, 41, 32, 42, 43) ~ 'Vertical flows', ## 
+      
       TRUE ~ 'Horizontal flows') 
     ) %>% as.data.frame()
   
@@ -353,8 +382,34 @@ cat(length(unique(links_dist_type_collection$type)), 'indicators were included i
 ## distance measure  
 ```{r}
 
+##' check on data to see the distribution, and if there are NA values, or negative values
+##'     in the data. 
+hist(links_dist_type_collection$weight, nclass = 1000)
+
+links_dist_type_collection %>%
+  ggplot(., aes(weight)) +
+  geom_histogram()
+
+links_dist_type_collection %>%
+  dplyr::filter(weight < 10^3) %>%
+  dplyr::filter(weight > -10^3) %>%
+  ggplot(., aes(weight)) +
+  geom_histogram() +
+  geom_vline(xintercept = 0, color = 'red')
+
+links_dist_type_collection_check <- links_dist_type_collection %>%
+  dplyr::filter(weight <0)
+
+unique(links_dist_type_collection_check$type)
+##' only "FDI_matrix" and "ODA_OOF_oecd_matrix" has negative values
+##' to avoid errors, we set these negative values as NA (or remove these rows) when calculating
+##'   impact distance because technically negative value mean the country 
+##'   is impacted but not impacting others
+
+
 ## for a receiving country, calculate its impact distance --------------------------------- 
 ft_d <- links_dist_type_collection %>%
+  dplyr::filter(weight > 0) %>%                           ## remove negative values - see notes above
   dplyr::mutate(ftd = weight * dist) %>%                  ## flow * distance
   dplyr::group_by(to, type, od_direction) %>%
   dplyr::summarise(dq_sum = sum(ftd, na.rm = T),          ## total (flow * distance)
