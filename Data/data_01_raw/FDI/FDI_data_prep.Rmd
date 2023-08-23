@@ -24,6 +24,7 @@ source('./Code/_path of data.R')
 
 ### packages
 source('./Code/_package list.R')
+source('./Code/function_scatter_plot.R')
 ```
 
 
@@ -46,11 +47,18 @@ load(f) # `temp_eora`
 ## FDI
   Based on the list by Harvard - *Foreign Direct Investment and Aid Data Resources* at https://guides.library.harvard.edu/fdi, this data -- *Coordinated Direct Investment Survey - IMF* is what we need. 
   
-  Link to the data: https://data.imf.org/?sk=40313609-f037-48c1-84b1-e1f1ce54d6d5&sid=1410469360660 --> *CDIS Table 6: Direct lnvestment Positions by All Reporting Economies Cross-classified by Counterpart Economies*
+  Link to the data: https://data.imf.org/?sk=40313609-f037-48c1-84b1-e1f1ce54d6d5&sid=1410469360660 --> *CDIS Table 6: Direct Investment Positions by All Reporting Economies Cross-classified by Counterpart Economies*
 
   *Meta-data*  
-  * Blank cells reflect data not available or not applicable and cells with "c" reflect data that were suppressed by the reporting economy to preserve confidentiality. “0” reflects amounts that are less than +/-$500,000, or amounts reported as “0”.
+  * Blank cells reflect data not available or not applicable and 
+  * cells with "c" reflect data that were suppressed by the reporting economy to preserve confidentiality. 
+  * 0 reflects amounts that are less than +/-$500,000, or amounts reported as “0”.
   Totals may not be equal to the sum of their components due to rounding. 
+  
+  For data from -- Table 6-i: *Inward* Direct Investment Positions by All Reporting Economies Cross-classified by Counterpart Economies
+    Direct investment positions are *negative* when a direct investor's claims (equity and/or debt) on its direct investment enterprise are less than the direct investment enterprise's claims (equity and/or debt) on its direct investor. 
+    Direct investment positions also could be *negative* due to net negative positions with fellows. 
+    Direct investment positions also can be *negative* due to negative retained earnings (which may result from the accumulation of negative reinvested earnings).
   
   Based on `Metadata availability` https://data.imf.org/regular.aspx?key=60559496, *Inward* data are better. 
   
@@ -58,21 +66,20 @@ load(f) # `temp_eora`
   - https://data.oecd.org/fdi/fdi-flows.htm#indicator-chart 
   - [cepii - 2012 old data](http://www.cepii.fr/CEPII/en/bdd_modele/bdd_modele_item.asp?id=4)
 
-```{r - IMF}
+```{r - IMF - preprocessing}
 ### get the indicator name
 ind <- 'FDI'
 
 yrs <- c(2000, 2005, 2010, 2015)
 yrs <- c(2000, 2005, 2010, 2015, 2021)
 
-dir.i <- './Data/data_01_raw/FDI/IMF/'
 
 fdi.direction <- "inward";  column1.name  <- "Investment from:"
 # fdi.direction <- "outward"; column1.name  <- "Investment in:"
 
 
 file.pat <- paste0('CDIS_Table_6_Direct_Investment_Posi-', fdi.direction)
-xls_ls <- list.files(path = dir.i, pattern = file.pat, full.names = T); xls_ls
+xls_ls <- list.files(path = dir.imf, pattern = file.pat, full.names = T); xls_ls
 
 
 dfs <- data.frame()
@@ -170,18 +177,21 @@ if (fdi.direction == 'inward') {
 
 
 ### save IMF data to the raw data folder
-fname <- paste0(dir.i, ind, '_rawCleaned_', fdi.direction,'.xlsx'); fname
+fname <- paste0(dir.imf, ind, '_rawCleaned_', fdi.direction,'.xlsx'); fname
 writexl::write_xlsx(x = dfs_flow_, path = fname)
 ```
 
 
-  By looking at Table 3 - https://data.imf.org/regular.aspx?key=60564262, we can also spot the different values reported by either country side. 
+
+
+  By looking at Table 3 - https://data.imf.org/regular.aspx?key=60564262, 
+  we can also spot the different values reported by either country side. 
   
-```{r - IMF compare inward vs outward}
+```{r - IMF - compare inward vs outward}
 yr_comp <- c(2010, 2015, 2021)
 yr_comp <- c(2021)
 
-f <- paste0(dir.i, 'FDI_rawCleaned_inward.xlsx');
+f <- paste0(dir.imf, 'FDI_rawCleaned_inward.xlsx');
 d1 <- readxl::read_excel(path = f) %>%
   # pivot_longer(cols = 4:ncol(.), names_to = 'to', values_to = 'value_in') %>%
   # dplyr::select(-ctr) %>%
@@ -191,7 +201,7 @@ d1 <- readxl::read_excel(path = f) %>%
   
   
 
-f <- paste0(dir.i, 'FDI_rawCleaned_outward.xlsx');
+f <- paste0(dir.imf, 'FDI_rawCleaned_outward.xlsx');
 d2 <- readxl::read_excel(path = f) %>%
   # pivot_longer(cols = 4:ncol(.), names_to = 'to', values_to = 'value_out')%>%
   # dplyr::select(-ctr) %>%
@@ -205,16 +215,25 @@ dcomp <- d1 %>%
   dplyr::filter(year %in% yr_comp) %>%
   dplyr::select(year, iso3, to, everything())
 
-dcomp %>%
-  ggplot() +
-  geom_point(aes(x= value_in, y= value_out)) +
-  geom_abline(slope=1)
 
-dcomp %>%
-  dplyr::filter(iso3 == 'USA', to == 'AUS')
 
+## check on examples
 dcomp %>%
-  dplyr::filter(iso3 == 'AUS', to == 'USA')
+  dplyr::filter(iso3 %in% c('USA', 'CHN'), 
+                to   %in% c('USA', 'CHN'), 
+                iso3 != to)
+
+
+## plot scatter plot for inspection
+pp1 <- function_scatter_plot(data = dcomp, x = 'value_in', y = 'value_out', log.xy = F)
+pp2 <- function_scatter_plot(data = dcomp, x = 'value_in', y = 'value_out', log.xy = T)
+ggpubr::ggarrange(pp1, pp2)
+
+
+## there are negative values
+dcomp_check <- dcomp %>%
+  dplyr::filter(value_in<0 | value_out<0)
+function_scatter_plot(data = dcomp_check, x = 'value_in', y = 'value_out', log.xy = F)
 ```
 
 
