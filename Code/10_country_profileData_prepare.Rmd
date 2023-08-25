@@ -24,6 +24,8 @@ source('./Code/_path of data.R')
 
 # Packages ----------------------------------------------------------------
 source('./Code/_package list.R')
+library(scales)
+
 ## data package
 library(wbstats)
 
@@ -74,6 +76,7 @@ source('./Code/function_fill_na_wb.R')           ## for data from World Bank
 source("./Code/function_fill_na_owid.R")         ## for data from Our World In Data
 source('./Code/function_fill_na_cleaned_raw.R')  ##
 source('./Code/function_fill_na_ILOSTAT.R')      ## for data from ILOSTAT
+source('./Code/function_scatter_plot.R')
 
 
 
@@ -567,7 +570,7 @@ function_format_4yrData_save(iname = iname)
 
   We choose to use `GDP (constant 2010 US$)`, and use `GDP (current US$)` to fill the data gap. 
 ```{r - GDP}
-# NY.GDP.MKTP.KD	   ++ GDP (constant 2010 US$)  # prefer this one
+# NY.GDP.MKTP.KD	   ++ GDP (constant 2015 US$)  # prefer this one
 # NY.GDP.MKTP.CD     ++ GDP (current US$)
 # NY.GDP.MKTP.KN	      GDP (constant LCU)
 # NY.GDP.MKTP.PP.KD  ++ GDP, PPP (constant 2011 international $)
@@ -577,7 +580,7 @@ function_format_4yrData_save(iname = iname)
 # NY.GDP.MKTP.KD.ZG	    GDP growth (annual %)
 
 
-ind <- 'NY.GDP.MKTP.KD';    
+ind <- 'NY.GDP.MKTP.KD';
 ### 1. download data from WB
 dfwb  <- wb(indicator = ind, country = "countries_only",
             startdate = yr_start, enddate = yr_end) %>%
@@ -588,7 +591,8 @@ iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
 ### 2. fill NA
 function_fill_na_wb(dfwb)
 ### 3. get a cleaned data and save to dir
-function_format_4yrData_save(iname = iname)
+function_format_4yrData_save(iname = iname) 
+## There are 4.5% NA
 
 
 
@@ -605,6 +609,7 @@ iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
 function_fill_na_wb(dfwb)
 ### 3. get a cleaned data and save to dir
 function_format_4yrData_save(iname = iname)
+## "There are 3.2% NA"
 ```
 
 
@@ -1153,10 +1158,11 @@ function_format_4yrData_save(iname = iname) ## "There are 15.8% NA"
 ```
 
 
+####  - Cereal trade
 
   * This data are good, but do not have bilateral trade volumn information. 
     It would be better to use the *Cereal trade - maxtrix* data
-```{r - Cereal trade}
+```{r}
 ### 2. trade balance part -----------------------------------------
 df <- dt %>%
   dplyr::filter(element %in% c('Import Quantity')) %>%
@@ -1190,11 +1196,13 @@ function_format_4yrData_save(iname = iname) ## "There are 15.8% NA"
 
 
 
+#### - Cereal trade - maxtrix
+
   To know what are included in the `Cereals` list in the `Detailed trade matrix` dataset, we need to first look at the `Food Balances` dataset used in the above. 
   
   - FAO's `FBS and SUA list.xlsx` downloaded from 'https://www.fao.org/faostat/en/#data/FBS' is helpful but the "item code" is not consistent. 
   
-  - This doc might be useful too -- FAO definition and classification of commodities https://www.fao.org/es/faodef/fdef01e.htm
+  - This doc might be useful too -- [FAO definition and classification of commodities](https://www.fao.org/es/faodef/fdef01e.htm)
   
   - This is also very helpful --> https://github.com/jagephart/cereals-network-shocks/blob/master/data/crop_list.tsv
   
@@ -1221,10 +1229,7 @@ function_format_4yrData_save(iname = iname) ## "There are 15.8% NA"
 
   **Wheat and products**	Default composition: 15 Wheat, 16 Flour, wheat, 17 Bran, wheat, 18 Macaroni, 19 Germ, wheat, 20 Bread, 21 Bulgur, 22 Pastry, 23 Starch, wheat, 24 Gluten, wheat, 41 Cereals, breakfast, 110 Wafers, 114 Mixes and doughs, 115 Food preparations, flour, malt extract
 
-
-
-
-```{r - Cereal trade - maxtrix}
+```{r}
 
 # csv <- paste0(dir.fao, 'Trade_DetailedTradeMatrix_E_All_Data_(Normalized)/Trade_DetailedTradeMatrix_E_All_Data_(Normalized).csv'); csv
 # tm <- readr::read_csv(file = csv)
@@ -1238,7 +1243,7 @@ tm_q <- tm %>%
   dplyr::filter(Year >= 1990)
 
 unique(tm_q$Item) %>% length()
-unique(tm_q$Unit)
+unique(tm_q$Unit) ## tonne 
 
 
 ### only to include `cereals` list; 
@@ -3734,7 +3739,9 @@ fatal_per100k_compare %>%
 
 ### Goal 9 - Industry, Innovation, and Infrastructure
 
-  We choose to use the data from `EDGAR`, because EORA also use this data as the inputs. We also use part of the `WB` data to fill the NA in EDGAR.
+  We choose to use the data from `EDGAR`, because EORA also use this data as the inputs. 
+  
+  We also use part of the `WB` data to fill the NA in EDGAR.
 
 ```{r - emissions--CO2 <WB> }
 # EN.ATM.CO2E.KT	      ++ CO2 emissions (kt)
@@ -3765,58 +3772,56 @@ iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
 ### 2. fill NA
 function_fill_na_wb(dfwb)
 ### 3. get a cleaned data and save to dir
-function_format_4yrData_save(iname = iname)
+function_format_4yrData_save(iname = iname) ## 8.9% NA
 ```
 
 
 
-```{r - emissions--CO2 <EDGAR> }
-###	EDGAR: https://edgar.jrc.ec.europa.eu/overview.php?v=50_GHG (same source for EORA)
+```{r - emissions--CO2 <EDGAR>}
+###'	EDGAR: https://edgar.jrc.ec.europa.eu/overview.php?v=50_GHG (same source for EORA)
+###'	    EDGARv5.0 provides emissions of the three main greenhouse gases (CO2, CH4 and N2O) per sector and country.
+###'	    Emission country totals are expressed in `kton` substance / year.
 
 getwd()
 
 ### 1, we use this data, as it is also used in EORA --------------------------
-xls <- './Data/data_01_raw/EDGAR_GHG/v50_CO2_excl_short-cycle_org_C_1970_2018/v50_CO2_excl_short-cycle_org_C_1970_2018.xls'
-### the unit here is Gg, and 1 gigagram = 1 kiloton (metric)
-sheet <- 'TOTALS BY COUNTRY'
-skip <- 8
-df0 <- readxl::read_excel(path = xls, sheet = sheet, skip = skip)
-df1 <- df0 %>% 
-  dplyr::select(ISO_A3, Name, `2000`, `2005`, `2010`, `2015`) %>%
-  merge(., ctr, by.x = 'ISO_A3', by.y = 'iso3_eora', all.y = T) %>%
-  dplyr::select(ISO_A3, Name, `2000`, `2005`, `2010`, `2015`) %>%
-  ### to format the numbers
-  gather(key = 'year', value = 'value', `2000`:`2015`) %>%
-  dplyr::mutate(value = round(value, digits = 3)) %>%
-  spread(key = year, value = value) %>%
-  arrange(ISO_A3) %>%
-  arrange(!is.na(Name))
-colnames_formal <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
-names(df1) <- colnames_formal
+dir.edgar <- './Data/data_01_raw/EDGAR_GHG/'
+xls <- paste0(dir.edgar, 'v50_CO2_excl_short-cycle_org_C_1970_2018/v50_CO2_excl_short-cycle_org_C_1970_2018.xls')
+###' the unit here is `Gg`, and 1 gigagram = 1 kiloton (metric) = 1000 ton = 10^6 kg
 
+func_read_edgar <- function(file, sheet = 'TOTALS BY COUNTRY', skip = 8){
+  df0 <- readxl::read_excel(path = file, sheet = sheet, skip = skip)
+  df1 <- df0 %>% 
+    dplyr::select(ISO_A3, Name, `2000`, `2005`, `2010`, `2015`) %>%
+    merge(x = ., y = ctr_eora, by.x = 'ISO_A3', by.y = 'iso3_eora', all.y = T) %>%
+    dplyr::select(ISO_A3, Name, `2000`, `2005`, `2010`, `2015`) %>%
+    ### to format the numbers
+    gather(key = 'year', value = 'value', `2000`:`2015`) %>%
+    dplyr::mutate(
+      value = as.numeric(value),
+      value = ifelse(!is.na(value) & !is.null(value), round(value, digits = 5), NA)) %>%
+    spread(key = year, value = value) %>%
+    arrange(ISO_A3) %>%
+    arrange(!is.na(Name))
+  colnames_formal <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
+  names(df1) <- colnames_formal
+  return(df1)
+}
 
+df_co2 <- func_read_edgar(file = xls)
 
 
 ### 2, we use `world bank` data to fill the missing ones ------------------------
-ind <- 'EN.ATM.CO2E.KT'
-dfwb <- wb(indicator = ind, country = "countries_only",
-           startdate = yr_start, enddate = yr_end) %>%
-  as.data.frame() %>%
-  spread(key = date, value = value) %>%
-  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
-iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
-
 fname <- list.files(path = dir.cleaned, pattern = 'CO2 emissions \\(kt\\)_4yrs.xlsx', full.names = T); fname
-df2 <- readxl::read_excel(fname) 
-
+df2_co2_kt_WB <- readxl::read_excel(fname)
 
 
 
 ### 3. compare the 2 data
-df12 <- merge(df1, df2, by = 'iso3')
-library(scales)
+df12 <- merge(df_co2, df2_co2_kt_WB, by = 'iso3')
 ggplot(data = df12) +
   geom_point(aes(x = `2015.x`, y = `2015.y`)) +
+  geom_abline(slope = 1, color = 'red') +
   # scale_x_continuous(trans = log2_trans()) +
   # scale_y_continuous(trans = log2_trans()) +
   scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x), 
@@ -3829,22 +3834,21 @@ ggplot(data = df12) +
 
 
 ### 4, fill data gap -----------------------------------------------------------
-ctr_na <- df1 %>% 
-  dplyr::filter(is.na(ctr)) %>%
-  dplyr::select(iso3)
+ctr_na    <- df_co2 %>% dplyr::filter(is.na(ctr)) %>% dplyr::select(iso3)
 ctr_na_ls <- unique(ctr_na$iso3); ctr_na_ls
-df2.fill <- df2 %>%
-  dplyr::filter(iso3 %in% ctr_na_ls)
+df_fillna <- df2_co2_kt_WB %>% dplyr::filter(iso3 %in% ctr_na_ls)
 
 ### rbind data
-df3 <- df1 %>% 
-  dplyr::filter(!is.na(ctr)) %>% ### the non-NA data in df1
-  rbind(df2.fill) %>%            ### append the fill-NA data in df2
+df3 <- df_co2 %>% 
+  dplyr::filter(!iso3 %in% ctr_na_ls) %>% ### the non-NA data in df_co2
+  rbind(df_fillna) %>%                     ### append the fill-NA data in df2
   arrange(iso3)
 
-### the ROW data gap -------------------------------------------------------------
-### the global total value, for calculating the data for ROW
-### (1). use world bank data
+### the ROW data gap ---------------------------------------------------------------------
+###' the global total value, for calculating the data for ROW
+###' 
+###'  option 1. use world bank data
+###'  
 # wld <- wb(indicator = ind, country = "WLD",
 #            startdate = yr_start, enddate = yr_end) %>%
 #   as.data.frame() %>%
@@ -3855,24 +3859,28 @@ df3 <- df1 %>%
 # names(wld) <- colnames_formal
 ### --> the data of World is even smaller than several countries, not sure how is that???
 
-### (2). use sum 
-wld <- df0 %>%
-  dplyr::select(ISO_A3, Name, `2000`, `2005`, `2010`, `2015`)%>%
-  summarize_if(is.numeric, sum, na.rm=TRUE)
-dat <- df3 %>%
-  summarize_if(is.numeric, sum, na.rm=TRUE) %>%
-  as.data.frame() 
-row <- (wld - dat) %>%
-  cbind(iso3 = 'ROW', ctr = 'Rest of the World, calculated') %>%
-  dplyr::select(all_of(colnames_formal))
-  
-df4 <- df3 %>% 
-  dplyr::filter(iso3 != 'ROW') %>%  ### remove the ROW row that have no data
-  rbind(row) %>%                    ### append the calculated ROW data       
-  arrange(iso3)
+###'
+###'  option 2. use EDGAR data
+###'  
+###'  !! update on 8/25/2023: leave ROW as NA because this calculation is not accurate enough
+###'  
+# wld <- df0 %>%
+#   dplyr::select(ISO_A3, Name, `2000`, `2005`, `2010`, `2015`)%>%
+#   dplyr::summarize_if(is.numeric, sum, na.rm=TRUE)
+# dat <- df3 %>%
+#   dplyr::summarize_if(is.numeric, sum, na.rm=TRUE) %>%
+#   as.data.frame() 
+# row <- (wld - dat) %>%
+#   cbind(iso3 = 'ROW', ctr = 'Rest of the World, calculated') %>%
+#   dplyr::select(all_of(colnames_formal))
+# df4 <- df3 %>% 
+#   dplyr::filter(iso3 != 'ROW') %>%  ### remove the ROW row that have no data
+#   rbind(row) %>%                    ### append the calculated ROW data       
+#   arrange(iso3)
+df4 <- df3
 
 
-### 5, save to results
+### 5, save to results, overwrite the old data
 fname <- paste0(dir.cleaned, iname, '_4yrs.xlsx'); fname
 writexl::write_xlsx(x = df4, path = fname)
 ```
@@ -3880,8 +3888,10 @@ writexl::write_xlsx(x = df4, path = fname)
 
 
 
-```{r - emissions--GHG}
-### GHG emissions --------------------------------------------------------------
+```{r - emissions--GHG - WB + EDGAR}
+###'
+###' 1. WB ===============================================================================
+###' 
 ind <- "EN.ATM.GHGT.KT.CE"
 ### 1. download data from WB
 dfwb  <- wb(indicator = ind, country = "countries_only",
@@ -3903,11 +3913,61 @@ dfwb_fillna_4yrs <- readxl::read_excel(fname) %>%
   dplyr::select(iso3_eora, country_eora, `2000`, `2005`, `2010`, ncol(.))  %>%
   arrange(iso3_eora)
 names(dfwb_fillna_4yrs) <- c('iso3', 'ctr', "2000", "2005", "2010", "2015")
-writexl::write_xlsx(x = dfwb_fillna_4yrs, path = paste0(dir.cleaned, iname, '_4yrs.xlsx'))
+fname <- paste0(dir.cleaned, iname, '_4yrs.xlsx'); fname
+writexl::write_xlsx(x = dfwb_fillna_4yrs, path = fname)
 print(paste0('There are ', round(sum(is.na(dfwb_fillna_4yrs))/(190*4)*100, digits = 1), '% NA'))
 
-```
 
+## for later use
+df_ghg_wb <- dfwb_fillna_4yrs
+
+
+
+
+###' 2. EDGAR ============================================================================
+###' 
+###' EDGARv5.0 provides emissions of the three main greenhouse gases (CO2, CH4 and N2O) 
+###'    per sector and country.
+###' 
+xls <- paste0(dir.edgar, 'v50_CH4_1970_2015/v50_CH4_1970_2015.xls')
+df_ch4 <- func_read_edgar(file = xls)
+
+xls <- paste0(dir.edgar, 'v50_N2O_1970_2015/v50_N2O_1970_2015.xls')
+df_n2o <- func_read_edgar(file = xls)
+
+
+df_ghg <- df_co2 %>% gather(key = 'year', value = 'value', 3:ncol(.)) %>%
+  left_join(x=., y=df_ch4 %>% gather(key = 'year', value = 'value', 3:ncol(.)), by=c("iso3", "ctr","year")) %>%
+  left_join(x=., y=df_n2o %>% gather(key = 'year', value = 'value', 3:ncol(.)), by=c("iso3", "ctr","year")) %>%
+  dplyr::mutate(ghg = value.x + value.y + value) %>%
+  dplyr::select(-value.x, -value.y, -value) %>%
+  spread(key = 'year', value = 'ghg')
+
+
+###'
+###' use both wb and eggar data to fill data gaps
+###'
+df.merge <- merge(df_ghg, df_ghg_wb, by = 'iso3')
+function_scatter_plot(data = df.merge, x = '2015.x', y = '2015.y', log.xy = T)
+
+
+
+### 4, fill data gap -----------------------------------------------------------
+ctr_na    <- df_ghg %>% dplyr::filter(is.na(ctr)) %>% dplyr::select(iso3)
+ctr_na_ls <- unique(ctr_na$iso3); ctr_na_ls
+df_fillna <- df_ghg_wb %>% dplyr::filter(iso3 %in% ctr_na_ls)
+
+### rbind data
+df3 <- df_ghg %>% 
+  dplyr::filter(!iso3 %in% ctr_na_ls) %>% ### the non-NA data in df_co2
+  rbind(df_fillna) %>%                     ### append the fill-NA data in df2
+  arrange(iso3)
+
+
+### 5, save to results, overwrite the old data
+fname <- paste0(dir.cleaned, iname, '_4yrs.xlsx'); fname
+writexl::write_xlsx(x = df3, path = fname)
+```
 
 
 
