@@ -138,16 +138,16 @@ gdp1 <- readxl::read_excel(
                 ### data source: http://data.un.org/Data.aspx?d=SNAAMA&f=grID%3A101%3BcurrID%3AUSD%3BpcFlag%3A1%3BcrID%3A810#SNAAMA
 
                 ### Taiwan, data from https://eng.stat.gov.tw/ct.asp?xItem=37408&CtNode=5347&mp=5
-                `2000` = ifelse(iso3 == 'TWN', 330725*10^6, `2000`),
-                `2005` = ifelse(iso3 == 'TWN', 374042*10^6, `2005`),
-                `2010` = ifelse(iso3 == 'TWN', 444245*10^6, `2010`),
-                `2015` = ifelse(iso3 == 'TWN', 534474*10^6, `2015`),
+                `2000` = ifelse(iso3 == 'TWN' & is.na(`2000`), 330725*10^6, `2000`),
+                `2005` = ifelse(iso3 == 'TWN' & is.na(`2005`), 374042*10^6, `2005`),
+                `2010` = ifelse(iso3 == 'TWN' & is.na(`2010`), 444245*10^6, `2010`),
+                `2015` = ifelse(iso3 == 'TWN' & is.na(`2015`), 534474*10^6, `2015`),
 
                 ### Curacao, data from world bank
-                `2000` = ifelse(iso3 == 'CUW', 3038699608.93855, `2000`),
-                `2005` = ifelse(iso3 == 'CUW', 3038699608.93855, `2005`),
-                `2010` = ifelse(iso3 == 'CUW', 3038699608.93855, `2010`),
-                `2015` = ifelse(iso3 == 'CUW', 3151910782.12290, `2015`)) %>%
+                `2000` = ifelse(iso3 == 'CUW' & is.na(`2000`), 3038699608.93855, `2000`),
+                `2005` = ifelse(iso3 == 'CUW' & is.na(`2005`), 3038699608.93855, `2005`),
+                `2010` = ifelse(iso3 == 'CUW' & is.na(`2010`), 3038699608.93855, `2010`),
+                `2015` = ifelse(iso3 == 'CUW' & is.na(`2015`), 3151910782.12290, `2015`)) %>%
   arrange(iso3) 
 
 gdp1_na <- gdp1 %>%
@@ -165,28 +165,29 @@ gdpx <- gdp1 %>%
   dplyr::filter(!iso3 %in% unique(gdp1_na$iso3)) %>%
   rbind(., gdp2) %>%
   arrange(!is.na(`2000`)) %>%
-  dplyr::mutate(`2000` = ifelse(iso3 == 'PRK', 16283*10^6, `2000`), 
-                `2005` = ifelse(iso3 == 'PRK', 13945*10^6, `2005`),
-                `2010` = ifelse(iso3 == 'PRK', 13031*10^6, `2010`),
-                `2015` = ifelse(iso3 == 'PRK', 10608*10^6, `2015`),
+  dplyr::mutate(`2000` = ifelse(iso3 == 'PRK' & is.na(`2000`), 16283*10^6, `2000`), 
+                `2005` = ifelse(iso3 == 'PRK' & is.na(`2005`), 13945*10^6, `2005`),
+                `2010` = ifelse(iso3 == 'PRK' & is.na(`2010`), 13031*10^6, `2010`),
+                `2015` = ifelse(iso3 == 'PRK' & is.na(`2015`), 10608*10^6, `2015`),
                 
-                `2000` = ifelse(iso3 == 'SOM', 4049*10^6, `2000`), 
-                `2005` = ifelse(iso3 == 'SOM', 1093*10^6, `2005`),
-                `2010` = ifelse(iso3 == 'SOM', 2316*10^6, `2010`),
-                `2015` = ifelse(iso3 == 'SOM', 2052*10^6, `2015`),
+                `2000` = ifelse(iso3 == 'SOM' & is.na(`2000`), 4049*10^6, `2000`), 
+                `2005` = ifelse(iso3 == 'SOM' & is.na(`2005`), 1093*10^6, `2005`),
+                `2010` = ifelse(iso3 == 'SOM' & is.na(`2010`), 2316*10^6, `2010`),
+                `2015` = ifelse(iso3 == 'SOM' & is.na(`2015`), 2052*10^6, `2015`),
                 ### https://countryeconomy.com/gdp/Somalia?year=2015
                 
-                `2000` = ifelse(iso3 == 'VGB', 42225*10^6*20311, `2000`), ## GDP per capita * population
-                `2005` = ifelse(iso3 == 'VGB', 42997*10^6*23107, `2005`),
-                `2010` = ifelse(iso3 == 'VGB', 36732*10^6*27794, `2010`),
-                `2015` = ifelse(iso3 == 'VGB', 40283*10^6*29152, `2015`)
-        ### http://data.un.org/Data.aspx?q=British+Virgin+Islands&d=SNAAMA&f=grID%3A101%3BcurrID%3AUSD%3BpcFlag%3A1%3BcrID%3A92
+                `2000` = ifelse(iso3 == 'VGB' & is.na(`2000`),42660*20104, `2000`), 
+                `2005` = ifelse(iso3 == 'VGB' & is.na(`2005`),   994*10^6, `2005`),
+                `2010` = ifelse(iso3 == 'VGB' & is.na(`2010`),  1114*10^6, `2010`),
+                `2015` = ifelse(iso3 == 'VGB' & is.na(`2015`),  1279*10^6, `2015`)
+        ###' https://unctadstat.unctad.org/countryprofile/generalprofile/en-gb/092/index.html
+        ###' http://data.un.org/Data.aspx?q=British+Virgin+Islands&d=SNAAMA&f=grID%3A101%3BcurrID%3AUSD%3BpcFlag%3A1%3BcrID%3A92
   ) %>%
   arrange(!is.na(`2000`))
 
-gdp <- gdpx %>%
-  arrange(iso3)
-writexl::write_xlsx(x = gdp, path = paste0(dir.cleaned, 'GDP (constant 2010 US$)_4yrs_update.xlsx'))
+gdp <- gdpx %>% arrange(iso3)
+
+writexl::write_xlsx(x = gdp, path = paste0(dir.cleaned, 'GDP (constant 2015 US$)_4yrs_update.xlsx'))
 ```
 
 
