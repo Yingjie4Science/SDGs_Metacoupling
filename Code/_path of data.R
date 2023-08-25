@@ -20,6 +20,8 @@ dir.peace        <- './Data/data_01_raw/Arm trade_Peacekeeping/UN peacekeeping o
 dir.traffick     <- './Data/data_01_raw/Human trafficking/'
 dir.student_flow <- './Data/data_01_raw/International Student flows/'
 dir.oecd         <- './Data/data_01_raw/OECD/'
+dir.imf          <- './Data/data_01_raw/FDI/IMF/'
+
 
 
 #
@@ -47,11 +49,15 @@ dir.cleaned      <- paste0(dir.root, '/Data/data_02_intermediate/dt01_ctr_profil
   # dir.eora <- './Data/data_02_intermediate/dt02_flows/eora/2022-08-05con/' 
   
   #### 🟡 - updated on 8/12/2022; production-based calculation;  updated on 8/12/2022
-  postfix  <- '20220812pro'
+  # postfix  <- '20220812pro'
   # dir.eora <- './Data/data_02_intermediate/dt02_flows/eora/2022-08-05pro/' ## updated on 8/12/2022
   # dir.eora <- './Data/data_02_intermediate/dt02_flows/eora/2023-08-16pro/' ## updated on 8/16/2023; only three energy-related files
-  dir.eora <- './Data/data_02_intermediate/dt02_flows/eora/2023-08-17con/' ## updated on 8/17/2023; all files + 1 materiel + 135 shdb
-  dir.shdb <- './Data/data_02_intermediate/dt02_flows/eora/2023-08-17_SHDB2019_135/'
+  # dir.eora <- './Data/data_02_intermediate/dt02_flows/eora/2023-08-17con/' ## updated on 8/17/2023; all files + 1 materiel + 135 shdb
+  # dir.shdb <- './Data/data_02_intermediate/dt02_flows/eora/2023-08-17_SHDB2019_135/'
+  
+  postfix  <- '20230821con'
+  dir.eora <- './Data/data_02_intermediate/dt02_flows/eora/2023-08-21con/' ## updated on 8/20/2023; address the data issue of less than *10 times
+  dir.shdb <- './Data/data_02_intermediate/dt02_flows/eora/2023-08-21con/' ## keep all data in the same folder
 
 
 

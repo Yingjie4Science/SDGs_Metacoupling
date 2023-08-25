@@ -689,7 +689,7 @@ for (xls in xls.ls) {
   # dfht
   
   ### save plot
-  fname <-paste0(dir.fig, 'footprint_heatmap/FT_HT_', iname, '_', yr, '_', postfix, '.png'); print(fname)
+  fname <-paste0(dir.fig, 'footprint_heatmap/FT_HT_', iname, '_', yr, '_', postfix, '_', today, '.png'); print(fname)
   ggsave(filename = fname, plot = dfht, width = 16, height = 16, units = 'in', dpi = 300)
   
 }

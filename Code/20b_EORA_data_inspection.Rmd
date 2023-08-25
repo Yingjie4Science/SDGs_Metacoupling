@@ -92,6 +92,7 @@ iso_eora <- readxl::read_excel(path = xls_iso_eora)
 dir1 <- './Data/data_02_intermediate/dt02_flows/eora/2023-08-16pro/' ## updated on 8/16/2023; only three energy-related files
 dir2 <- './Data/data_02_intermediate/dt02_flows/eora/2023-08-17con/' ## updated on 8/17/2023; all files + 1 materiel + 135 shdb
 dir2 <- './Data/data_02_intermediate/dt02_flows/eora/2023-08-20con/' ## updated on 8/20/2023; all files
+dir2 <- './Data/data_02_intermediate/dt02_flows/eora/2023-08-21con/' ## updated on 8/21/2023; all files
 
 
 dir_list <- basename(c(dir1, dir2))
@@ -234,7 +235,7 @@ d1 %>%
 ### save plot
 fname <-paste0(dir.fig, 'eora_figures/', 'data_inspection_Trade_', indicator.name, '_', 
                paste(dir_list, collapse = '_'), '_',today, '.png'); fname
-ggsave(filename = fname, plot = last_plot(), width = 9, height = 9, units = 'in', dpi = 200)
+ggsave(filename = fname, plot = ggplot2::last_plot(), width = 9, height = 9, units = 'in', dpi = 200)
 ```
 
 
@@ -294,5 +295,5 @@ ggarrange(ht1, ht2, ncol = 2, labels = dir_list, common.legend = T, vjust = 0, l
 ### save plot
 fname <-paste0(dir.fig, 'eora_figures/', 'data_inspection_heatmap_', indicator.name, 
                '_', paste(dir_list, collapse = '_'),  '_', today, '.png'); fname
-ggsave(filename = fname, plot = last_plot(), width = width_2col, height = width_2col/2, units = unit_ns, dpi = 300)
+ggsave(filename = fname, plot = ggplot2::last_plot(), width = width_2col, height = width_2col/2, units = unit_ns, dpi = 300)
 ```

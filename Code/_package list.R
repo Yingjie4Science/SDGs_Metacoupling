@@ -35,6 +35,7 @@ library(sf)
 ### plot #####
 library(cowplot)
 library(ggplot2)
+library(tmap)
 library(ggpubr)
 library(RColorBrewer)
 ## Color Brewer palette
@@ -53,6 +54,7 @@ conflicts_prefer(
   dplyr::filter, 
   dplyr::mutate, 
   dplyr::select, 
+  ggplot2::last_plot,
   .quiet = T
 )
 conflict_prefer("print", "base")
