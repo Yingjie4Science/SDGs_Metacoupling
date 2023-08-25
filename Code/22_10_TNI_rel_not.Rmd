@@ -1091,7 +1091,7 @@ ggplot(spillover_index_type_SDGtype,
   ylab('Transnational Impact Index') + xlab('Country')
 
 fname <- paste0(dir.fig, '01main/', 'ex_4_spillover_index_top_bottom_ByType_', postfix, '_', today, '.jpg'); fname
-ggsave(filename = fname, plot = last_plot(), width = width_2col/3*2, height = width_2col/2, units = 'cm', dpi = 600)
+ggsave(filename = fname, plot = ggplot2::last_plot(), width = width_2col/3*2, height = width_2col/2, units = 'cm', dpi = 600)
 ```
 
 

@@ -737,7 +737,7 @@ p <- dfs_score_goal_snr %>%
         axis.ticks.y = element_blank())
 ggarrange(p, labels = "b", font.label = list(size = 20))
 fname <- paste0(dir.fig, '01main/fig3b_score_goal_snr4_', today, '.jpg'); fname
-ggsave(filename = fname, plot = last_plot(), width = 6, height = 8, units = 'in', dpi = 300)
+ggsave(filename = fname, plot = ggplot2::last_plot(), width = 6, height = 8, units = 'in', dpi = 300)
 ```
 
 
@@ -893,7 +893,7 @@ p <- dfs_index_snr %>%
          fill    = guide_legend(override.aes = list(pattern = "none"), reverse = T) ) 
 ggarrange(p, labels = "a", font.label = list(size = 20))
 fname <- paste0(dir.fig, '01main/fig3a_index_byIncome_snr4_', today, '.jpg'); fname
-ggsave(filename = fname, plot = last_plot(), width = 6, height = 8, units = 'in', dpi = 300)
+ggsave(filename = fname, plot = ggplot2::last_plot(), width = 6, height = 8, units = 'in', dpi = 300)
 ```
 
 
@@ -1176,7 +1176,7 @@ dfs_index_chg1 %>%
   xlab('') + ylab('Transnational impact on SDG Index')
   
 fname <- paste0(dir.fig, '01main/ex_2_SDG_Index_chg_byGroup_4grp_', today, '.jpg'); fname
-ggsave(filename = fname, plot = last_plot(), width = 6, height = 6, units = 'in', dpi = 300)
+ggsave(filename = fname, plot = ggplot2::last_plot(), width = 6, height = 6, units = 'in', dpi = 300)
 ```
 
 
@@ -1205,7 +1205,7 @@ dfs_index_chg %>%
     xlab('') + ylab('Transnational impact on SDG Index')
   
 fname <- paste0(dir.fig, '01main/ex_2_SDG_Index_chg_byGroup_2grp_', today, '.jpg'); fname
-ggsave(filename = fname, plot = last_plot(), width = 6, height = 6, units = 'in', dpi = 300)
+ggsave(filename = fname, plot = ggplot2::last_plot(), width = 6, height = 6, units = 'in', dpi = 300)
 ```
 
 
