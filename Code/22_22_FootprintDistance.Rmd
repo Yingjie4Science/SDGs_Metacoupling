@@ -519,7 +519,7 @@ p1 <- ft_d %>%
 ggarrange(p1, labels = '')
 fname <- paste0(dir.fig, '01main/', 'ex_6_ImpactDistance_byFT',
                 '_class', od_direction_count, '_', today, '.jpg'); fname
-ggsave(filename = fname, plot = last_plot(), width = 7, height = p_height, units = 'in', dpi = 300)
+ggsave(filename = fname, plot = ggplot2::last_plot(), width = 7, height = p_height, units = 'in', dpi = 300)
 ```
 
 
@@ -558,7 +558,7 @@ p <- ft_d_summary %>%
 ggarrange(p, labels = 'd')
 fname <- paste0(dir.fig, '01main/', 'fig2d_ImpactDistance_', ind, '_',
                 od_direction_count, 'grp_', today, '.jpg'); fname
-ggsave(filename = fname, plot = last_plot(), width = 7.5/2, height = 7.5/2, units = 'in', dpi = 300)
+ggsave(filename = fname, plot = ggplot2::last_plot(), width = 7.5/2, height = 7.5/2, units = 'in', dpi = 300)
 ```
 
 

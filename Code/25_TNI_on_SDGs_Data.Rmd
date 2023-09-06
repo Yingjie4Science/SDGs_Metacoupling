@@ -906,7 +906,9 @@ func_plot_netImports_vs_rel(df = rel_not_merge)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, lower_bound = lower_probs, upper_bound = upper_probs, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, trim.to.na = T,
+  lower_bound = lower_probs, upper_bound = upper_probs, 
+  direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1063,6 +1065,7 @@ rel   <- rel_w %>%
 oft <- net_imports_bind  %>%
   dplyr::filter(ind == ind_ft) %>%
   dplyr::select(ind, year, iso3, net_in, scenario) %>%
+  # dplyr::mutate(net_in = net_in * coef_correction_curb_10e_issue) %>%
   spread(key = scenario, value = net_in)
 
 
@@ -1126,7 +1129,8 @@ rel_not_merge_shp2 %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, lower_bound = lower_probs, upper_bound = upper_probs, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, trim.to.na = T,
+  lower_bound = lower_probs, upper_bound = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1246,7 +1250,8 @@ direction_sdg <- 1
 ### rel --> 
 ### oft --> person
 
-### Outsourced footprints (oft) flow --------------------------------------------------------------------
+###' Outsourced footprints (oft) flow --------------------------------------------------------------------
+###' -- so here, we use outflow only - `total_ex`
 oft <- net_imports_bind  %>%
   dplyr::filter(ind == ind_ft) %>%
   # dplyr::select(ind, year, iso3, total_ex, total_in) %>%
@@ -1264,10 +1269,19 @@ rel_not_merge <- oft %>%
     ind       = unique(oft$ind),
     # value_ex  = total_ex/pop,  ## net exports as the measurement
     # value_in  = total_in/pop,
-    value_rel = fromAll/pop,     ## more out-flow, the better
-    value_not = 0.1/pop,         ## 0 transfer under no-trade ## use 0.1 avoid 0, which cause problem in calculation later
-    value_dst = fromNer/pop,
-    value_ner = fromDst/pop) %>%   
+    value_rel = fromAll/pop,      ## more out-flow, the better
+    value_not = fromAll*0.001/pop, 
+    ## 0 transfer under no-trade ## use 0.1 avoid 0, which cause problem in calculation later
+    value_dst = fromDst/pop,
+    value_ner = fromNer/pop,
+    
+    # value_rel = ifelse(-fromAll>0, -fromAll/pop, NA),      ## more out-flow, the better
+    # value_not = ifelse(-fromAll>0, -fromAll*0.01/pop, NA), 
+    # ## 0 transfer under no-trade ## use 0.1 avoid 0, which cause problem in calculation later
+    # value_dst = ifelse(-fromDst>0, -fromDst/pop, NA),
+    # value_ner = ifelse(-fromNer>0, -fromNer/pop, NA) 
+    
+    ) %>%   
   ### for easy-checking the numbers
   dplyr::select(ind, iso3, year, everything())
 
@@ -1280,7 +1294,11 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, lower_bound = lower_probs, upper_bound = upper_probs, direction = direction_sdg) %>%
+  df = rel_not, 
+  trim = 0.025, trim.to.na = T,
+  # lower_bound = lower_probs, upper_bound = upper_probs, 
+  lower_bound = 0, upper_bound = 1, 
+  direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -1305,7 +1323,8 @@ direction_sdg <- 1
 ### rel --> 
 ### oft --> person
 
-### Outsourced footprints (oft) flow --------------------------------------------------------------------
+###' Outsourced footprints (oft) flow --------------------------------------------------------------------
+###' -- so here, we use outflow only - `total_in`
 oft <- net_imports_bind  %>%
   dplyr::filter(ind == ind_ft) %>%
   dplyr::select(ind, year, iso3, total_in, scenario) %>%
@@ -1320,10 +1339,10 @@ rel_not_merge <- oft %>%
   dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
-    value_rel = fromAll,     ## more out-flow, the better
-    value_not = 0.1,         ## 0 transfer under no-trade ## use 0.1 avoid 0, which cause problem in calculation later
-    value_dst = fromNer,
-    value_ner = fromDst) %>%   
+    value_rel = fromAll,       ## more in-flow, the better
+    value_not = fromAll*0.001, ## 0 transfer under no-trade ## use 0.1 avoid 0, which cause problem in calculation later
+    value_dst = fromDst,
+    value_ner = fromNer) %>%   
   ### for easy-checking the numbers
   dplyr::select(ind, iso3, year, everything())
 
@@ -1336,13 +1355,18 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, lower_bound = lower_probs, upper_bound = upper_probs, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, trim.to.na = T,
+  lower_bound = lower_probs, upper_bound = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
 
 
 score_4_7_1s <- df_score
+
+
+func_plot_netImports_vs_rel(df = rel_not_merge, x = 'pop')
+func_plot_sdg_ScoreChange_byGroup(df_score = df_score)
 ```
 
 
@@ -1902,7 +1926,10 @@ hist(rel_not$value_rel, xlab = unit_ind)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, lower_bound = lower_probs, upper_bound = upper_probs, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, trim.to.na = F,
+  # lower_bound = lower_probs, upper_bound = upper_probs, 
+  lower_bound = 0, upper_bound = 1, 
+  direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2903,8 +2930,8 @@ hist(rel_not$value_rel, nclass = 100)
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
   df = rel_not, trim = 0.025, trim.to.na = T,
-  lower_bound = lower_probs, upper_bound = upper_probs,
-  # lower_bound = .1, upper_bound = .9, 
+  # lower_bound = lower_probs, upper_bound = upper_probs,
+  lower_bound = 0, upper_bound = 1,
   direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
@@ -2966,7 +2993,7 @@ rel <- readxl::read_excel(path = xls) %>%
 ### Outsourced footprints (oft) flow ---------------------------------------------------------------
 oft <- net_imports_bind  %>%
   dplyr::filter(ind == ind_ft) %>%
-  dplyr::mutate(net_in = net_in * 1000 * (coef_correction_curb_10e_issue/100)) %>% # unit: 1000 USD --> USD
+  dplyr::mutate(net_in = net_in * 1000) %>% # unit: 1000 USD --> USD
   dplyr::select(ind, year, iso3, net_in, scenario) %>%
   spread(key = 'scenario', value = 'net_in')
 
@@ -2998,8 +3025,9 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, trim.to.na = T,
-  lower_bound = lower_probs, upper_bound = upper_probs, 
+  df = rel_not, trim = 0.1, trim.to.na = T,
+  lower_bound = lower_probs, upper_bound = upper_probs,
+  # lower_bound = 0, upper_bound = 1, 
   direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
@@ -3104,7 +3132,7 @@ rel_not <- rel_not_merge %>%
 
 ### normalization  -------------------------------------------------------
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, trim.to.na = T, 
+  df = rel_not, trim = 0.05, trim.to.na = T, 
   lower_bound = lower_probs, upper_bound = upper_probs, direction = direction_sdg) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -3263,7 +3291,7 @@ rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, 
+  df = rel_not, trim = 0.025, trim.to.na = T,
   lower_bound = lower_probs, upper_bound = upper_probs, 
   direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
@@ -3340,12 +3368,18 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, lower_bound = lower_probs, upper_bound = upper_probs, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.025, trim.to.na = T, 
+  lower_bound = lower_probs, upper_bound = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
 
 score_11_6_2 <- df_score
+
+
+
+func_plot_netImports_vs_rel(df = rel_not_merge)
+func_plot_sdg_ScoreChange_byGroup(df_score = df_score)
 ```
 
 
@@ -3408,7 +3442,9 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, lower_bound = lower_probs, upper_bound = upper_probs, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.01, trim.to.na = T,
+  lower_bound = lower_probs, upper_bound = upper_probs, 
+  direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -3524,7 +3560,8 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, lower_bound = lower_probs, upper_bound = upper_probs, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.05, trim.to.na = T,
+  lower_bound = lower_probs, upper_bound = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -4346,7 +4383,8 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, lower_bound = lower_probs, upper_bound = upper_probs, direction = direction_sdg) %>%
+  df = rel_not, trim = 0.05, trim.to.na = T,
+  lower_bound = lower_probs, upper_bound = upper_probs, direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
