@@ -462,7 +462,7 @@ color_grp <- c('#2371A6', '#F26463') ## high, low
 color_grp <- rev(color_grp)
 
 p <-
-ggplot(data = chg_err_group, 
+  ggplot(data = chg_err_group, 
        aes(x=factor(goal, levels = rev(vars)),
            y = value_chg,
            fill = group)) +
@@ -550,13 +550,18 @@ ggsave(filename = fname, plot = fig, width = 6, height = 8, units = 'in', dpi = 
 
 ```{r - map of 17 SDGs change - fig ex_3}
 
+ind_sdg <- 'SDG Score change'
+
 df_chg <- dfs_score_chg %>%
   dplyr::select(iso3, year, goal, value_chg) %>%
   spread(key = goal, value = value_chg)
 
-ind_sdg <- 'SDG Score change'
+###' need to define the break values and colors specifically -----------------------------
+max(dfs_score_chg$value_chg, na.rm = T) ## 42.72
+min(dfs_score_chg$value_chg, na.rm = T) ## -26.87468
 
-### plot -------------------------------------------------------------------------------------------
+
+### plot ---------------------------------------------------------------------------------
 df_chg_sf  <- df_chg %>%
   merge(x = shp, y = ., by.x = "iso_a3", by.y = "iso3",  all.x = T)
 
@@ -566,14 +571,19 @@ title_ls <- paste0('SDG ', vars); title_ls
 fname <- paste0(dir.fig, '01main/ex_3_SDG_chg_Map_byGoal_', today, '.jpg'); fname
 # jpeg(filename = fname, width=7, height=6, units="in", pointsize=18, res=500) ## width=7, height=4 --> ncol=4
 
+col_tmap_score <- c(
+  '#a63603','#e6550d','#fd8d3c',"#feb24c","#ffeda0", ## 6-class YlOrRd + 6-class Oranges
+  '#eff3ff','#bdd7e7','#6baed6','#3182bd','#2171b5'  ## 6-class Blues
+)
+
 tm_shape(df_chg_sf) +
   tm_fill(vars, 
-    # 'value_chg',
-    palette = col_tmap, #col1,
+    palette = col_tmap_score,
     style = "fixed",
-    breaks=c(-Inf, -20, -10, -5, 0, 5, 10, 20, Inf), 
-    midpoint = 0,
-    labels = c("< -20", "[-20, -10)", "[-10, -5]", "(-5, 0)", "[0, 5)", "[5, 10]", "(10, 20]", "> 20"), 
+    breaks=c(-Inf, -20, -15, -10, -5, 0, 5, 10, 15, 20, Inf), 
+    # midpoint = 0,
+    labels = c("< -20", "[-20, -15)", "[-15, -10)", "[-10, -5]", "(-5, 0)", 
+               "[0, 5)", "[5, 10]",   "(10, 15]",   "(15, 20]",  "> 20"), 
     title = title_ls, textNA = 'NA', colorNA = 'gray95',
     legend.reverse = T) +
   tm_borders(col = "grey", lwd = 0.1, lty = "solid", alpha = 0.99) +
@@ -589,7 +599,7 @@ tm_shape(df_chg_sf) +
   tm_facets(ncol=3)
 
 # dev.off()
-tmap_save(tm = tmap_last(), filename = fname, width=7, height=6, units="in", dpi = 500, outer.margins = 0)
+tmap_save(tm = tmap_last(), filename = fname, width=7, height=6, units="in", dpi = 300, outer.margins = 0)
 ```
 
 
@@ -899,18 +909,46 @@ ggsave(filename = fname, plot = ggplot2::last_plot(), width = 6, height = 8, uni
 
 
 ```{r - Index change - MS ✏️📝}
+
 ### SDG Index change ---------------------------------------------------------------------
 dfs_index_chg <- dfs_index %>%
   # dplyr::select(-group) %>%
   spread(key = scenario, value = index) %>%
-  dplyr::mutate(value_chg = value_rel - value_not, 
-                # value_chg = ifelse(value_chg >= 20,  20, value_chg),
-                # value_chg = ifelse(value_chg <=-20, -20, value_chg),
-                value_chg = ifelse(iso3 =='GRL', NA, value_chg)) %>%
+  dplyr::mutate(
+    value_chg = value_rel - value_not, 
+    # value_chg = ifelse(value_chg >= 20,  20, value_chg),
+    # value_chg = ifelse(value_chg <=-20, -20, value_chg),
+    value_chg = ifelse(iso3 =='GRL', NA, value_chg),
+    chg_color = case_when(
+      is.na(value_chg) ~ NA,
+      value_chg < -5 ~ "#feb24c",
+      value_chg <  0 ~ "#ffeda0",
+      value_chg <  5 ~ '#eff3ff',
+      value_chg < 10 ~ '#bdd7e7',
+      value_chg < 15 ~ '#6baed6',
+      value_chg < 20 ~ '#3182bd',
+      T              ~ '#2171b5'
+    )
+    ) %>%
   dplyr::filter(year == 2015) %>%
   as.data.frame()
-        
 
+
+###' need to define the break values and colors specifically -----------------------------
+break_seq_ini <- seq(-5, 20, 5)       
+
+max(dfs_index_chg$value_chg, na.rm = T) ## 29.94641
+min(dfs_index_chg$value_chg, na.rm = T) ## -5.548772
+max_chg <- (max(dfs_index_chg$value_chg, na.rm = T)/5) %>% ceiling() %>% "*"(5); max_chg # 20   --> 30
+min_chg <- (min(dfs_index_chg$value_chg, na.rm = T)/5) %>% floor()   %>% "*"(5); min_chg # -3.2 --> -10
+
+c(
+  "#feb24c","#ffeda0",
+  '#eff3ff','#bdd7e7','#6baed6','#3182bd','#2171b5'
+)
+
+
+### % of change --------------------------------------------------------------------------
 dfs_index_chg_pct <- dfs_index_chg %>%
   dplyr::filter(!is.na(value_not) & value_not != 0) %>%
   dplyr::mutate(value_chg_pct = value_chg/value_not*100)
@@ -919,8 +957,16 @@ dfs_index_chg_pct <- dfs_index_chg %>%
 hist(dfs_index_chg_pct$value_chg)
 boxplot(dfs_index_chg_pct$value_chg)
 summary(dfs_index_chg_pct$value_chg)
+dfs_index_chg_pct %>%
+  ggplot(aes(x=value_chg, fill = value_chg<0)) +
+  geom_histogram(binwidth=1, na.rm = T, alpha = 0.7) +
+  scale_fill_manual(values = c('#3182bd', '#feb24c')) +
+  geom_vline(aes(xintercept=0), color="red", linetype="dashed", linewidth=1) +
+  theme_bw()
+```
 
 
+```{r - Index change - MS ✏️📝}
 ### numbers for writing ------------------------------------------------------------------
 cat('SDG Index of countries would improve', 
     mean(dfs_index_chg_pct$value_chg, na.rm = T) %>% round(., digits = 1),      ## 9.2
@@ -987,8 +1033,8 @@ dfs_index_sf <- dfs_index %>%
 
 hist(dfs_index_sf$value_rel, nclass = 50)
 hist(dfs_index_sf$value_not, nclass = 50)
-max_score <- (max(dfs_index_sf$value_rel, na.rm = T)/5) %>% ceiling() %>% "*"(5) # 75
-min_score <- (min(dfs_index_sf$value_rel, na.rm = T)/5) %>% floor()   %>% "*"(5) # 35
+max_score <- (max(dfs_index_sf$value_rel, na.rm = T)/5) %>% ceiling() %>% "*"(5); max_score # 75
+min_score <- (min(dfs_index_sf$value_rel, na.rm = T)/5) %>% floor()   %>% "*"(5); min_score # 35
 
 ### plot 
 p <- tm_shape(dfs_index_sf) +
@@ -1021,18 +1067,18 @@ tmap_save(tm = p, filename = fname, width=7, height=2.8*2, units="in", dpi = 300
 
 
 ```{r - map of Index change - fig 1a}
-df_chg <- dfs_index_chg %>%
+dfs_index_chg_ <- dfs_index_chg %>%
   dplyr::select(-value_not, -value_rel)
 
 
 ### plot ---------------------------------------------------------------------------------
-df_chg_sf  <- df_chg %>%
+dfs_index_chg_sf  <- dfs_index_chg_ %>%
   merge(x = shp, y = ., by.x = "iso_a3", by.y = "iso3",  all.x = T) %>%
   dplyr::arrange(year, area, value_chg)
 
 
 ## - small regions that may be invisible on a map -----------------------
-sf_small <- df_chg_sf %>%
+sf_small <- dfs_index_chg_sf %>%
   dplyr::mutate(area = as.numeric(area)/10^6) %>%
   dplyr::filter(area/10^4 < 3,
                 !is.na(year))
@@ -1042,7 +1088,7 @@ sf_small_area <- sf_small %>%
   dplyr::select(iso_a3, area) %>%
   dplyr::distinct(iso_a3, .keep_all = T)
 
-sf_small_decrease <- df_chg_sf %>%
+sf_small_decrease <- dfs_index_chg_sf %>%
   dplyr::mutate(area = as.numeric(area)/10^6) %>%
   dplyr::filter(value_chg < 0)
 max(sf_small_decrease$area)
@@ -1056,20 +1102,20 @@ fname <- './Data/country classification/shp_prj_smaller3wkm2.shp'
 area_show_min <- 10^4
 sf_small_p <- st_read('./Data/country classification/country_small_annotation_points.shp') %>%
   dplyr::select(-Country_Na) %>%
-  merge(x = ., y = df_chg, by.x = "ISO3", by.y = "iso3",  all.x = T) %>%
+  merge(x = ., y = dfs_index_chg_, by.x = "ISO3", by.y = "iso3",  all.x = T) %>%
   merge(x = ., y = sf_small_area, by.x = "ISO3", by.y = "iso_a3",  all.x = T) %>%
   dplyr::filter(!is.na(year)) %>%
   dplyr::filter(area < area_show_min)
 
 
 sf_small_l <- st_read('./Data/country classification/country_samll_annotation_lines.shp') %>%
-  merge(x = ., y = df_chg, by.x = "ISO3", by.y = "iso3",  all.x = T) %>%
+  merge(x = ., y = dfs_index_chg_, by.x = "ISO3", by.y = "iso3",  all.x = T) %>%
   merge(x = ., y = sf_small_area, by.x = "ISO3", by.y = "iso_a3",  all.x = T) %>%
   dplyr::filter(!is.na(year)) %>%
   dplyr::filter(area < area_show_min)
 
 ## test plot
-# tm_shape(df_chg_sf) +
+# tm_shape(dfs_index_chg_sf) +
 #   tm_fill('value_chg') +
 #   tm_shape(sf_small_l) +
 #   tm_lines(lwd = .1, alpha = 0.7) +
@@ -1077,32 +1123,52 @@ sf_small_l <- st_read('./Data/country classification/country_samll_annotation_li
 #   tm_dots(col = 'value_chg', size = 0.5)
 ## ----------------------------------------------------------------------
 
-hist(df_chg_sf$value_chg)
-max_chg <- (max(df_chg_sf$value_chg, na.rm = T)/5) %>% ceiling() %>% "*"(5) # 20   --> 27
-min_chg <- (min(df_chg_sf$value_chg, na.rm = T)/5) %>% floor()   %>% "*"(5) # -3.2 --> -5
+hist(dfs_index_chg_sf$value_chg)
 
 # seq <- c(-20, -10, -5, 0, 5, 10, 20); seq; length(seq) ## should base on `min`
 # col_tmap <- colors_changes ## Colour Palette; one value to one color ## ('red' --> 'blue')
 
 break_seq <- seq(min_chg, max_chg, 5); break_seq; length(break_seq)
-col_tmap <- colors_changes[4:length(break_seq)]
+# col_tmap <- colors_changes[4:length(break_seq)]
+col_tmap <- colors_changes[1:(length(break_seq))]
 # col_tmap <- colors_changes
 # col_tmap <- 'RdYlBu'
 
+###' to make sure each categrory has the right color 
+colors <- dfs_index_chg_sf %>% 
+  dplyr::distinct(value_chg, chg_color) %>%
+  arrange(value_chg) %>%
+  dplyr::distinct(chg_color) %>%
+  dplyr::filter(!is.na(chg_color))
+col_tmap <- colors$chg_color
+```
+
+
+```{r --- fig 1a}
 fname <- paste0(dir.fig, '01main/', 'fig1a_SDG_Index_chg_Map_', today, '.jpg'); fname
 # jpeg(filename = fname, width=7, height=2.8, units="in", pointsize=18, res=300)
 
-p <- tm_shape(df_chg_sf) +
+p <- tm_shape(dfs_index_chg_sf) +
   tm_fill(
     col = 'value_chg',
-    palette = col_tmap, 
-    stretch.palette = F,
+    stretch.palette = F, 
+    # breaks = c(-Inf, min_chg, 0, 5, 10, 20, max_chg, Inf),
+    
+    ###' this option has to ensure the number of negative and positive breaks are the same
+    ###'    so that the color can be symmetrical 
+    # style  = "cont",
+    # breaks = c(-30, -20, -15, -10, -5, 0, 5, 10, 15, 20, 30),
+    # palette = 'RdYlBu',
+    
     style  = "fixed",
-    # breaks = break_seq, 
-    breaks = c(#-Inf, -20, -10, 
-      -5, 0, 5, 10, 20, Inf),
-    labels = c(#"< -20", "[-20, -10)", "[-10, -5]",
-      "(-5, 0)", "[0, 5)", "[5, 10]", "(10, 20]", "> 20"),
+    breaks = c(-Inf, break_seq_ini, Inf),
+    palette = col_tmap, 
+    legend.format = list(
+      # scientific = TRUE, 
+      # text.or.more = '<', text.less.than = '<',
+      format="f", 
+      text.separator = '–'),
+    # labels = c("< -5", "[-5, 0)", "[0, 5)", "[5, 10)", "[10, 20]", paste0("> ", max_chg)),
     legend.reverse = T,
     textNA = 'NA', 
     colorNA = 'gray90',
@@ -1120,11 +1186,9 @@ p <- tm_shape(df_chg_sf) +
     palette = col_tmap, 
     stretch.palette = F,
     style  = "fixed",
-    # breaks = break_seq, 
-    breaks = c(#-Inf, -20, -10,
-      -5, 0, 5, 10, 20, Inf),
-    labels = c(#"< -20", "[-20, -10)", "[-10, -5]",
-      "(-5, 0)", "[0, 5)", "[5, 10]", "(10, 20]", "> 20"),
+    breaks = c(-Inf, break_seq_ini, Inf),
+    # breaks = c(-5, 0, 5, 10, 20, Inf),
+    # labels = c("(-5, 0)", "[0, 5)", "[5, 10]", "(10, 20]", "> 20"),
     legend.col.reverse = T, 
     legend.show = F,
     size = 0.02) +
@@ -1142,7 +1206,7 @@ p <- tm_shape(df_chg_sf) +
     panel.show = F)
 p
 # dev.off()
-tmap_save(tm = p, filename = fname, width=7, height=2.8, units="in", dpi = 500)
+tmap_save(tm = p, filename = fname, width=7, height=2.8, units="in", dpi = 400)
 ```
 
 
@@ -1289,7 +1353,7 @@ ggsave(filename = fname, plot = map, width = 7*n_snr/2, height = 5, units = 'in'
 
 
 ```{r - map score change, eval=FALSE, include=FALSE}
-df_chg <- df_score %>%
+df_score_chg_ <- df_score %>%
   dplyr::select(-val) %>%
   spread(key = scenario, value = value_norm) %>%
   dplyr::mutate(value_chg = value_rel - value_not, 
@@ -1300,11 +1364,11 @@ df_chg <- df_score %>%
   dplyr::filter(year == 2015) %>%
   as.data.frame()
 
-hist(df_chg$value_chg)
+hist(df_score_chg_$value_chg)
 
 
 
-df_chg_sf  <- df_chg %>%
+df_score_chg_sf  <- df_score_chg_ %>%
   merge(x = shp, y = ., by.x = "iso_a3", by.y = "iso3",  all.x = T)
 
 
@@ -1314,7 +1378,7 @@ labels.legend <- seq
 
 
 ### 1. using ggplot --> not that good
-# ggplot(data = df_chg_sf) +
+# ggplot(data = df_score_chg_sf) +
 #   geom_sf(aes(fill = value_chg), size = 0.1, color = "grey90") +
 #   # scale_fill_viridis(direction = -1, na.value = "grey20") +
 #   scale_fill_gradient2(
@@ -1333,7 +1397,7 @@ col_tmap <- colors_changes
 
 # jpeg(filename = fname, width=7, height=4, units="in", pointsize=18, res=300)
 
-tm_shape(df_chg_sf) +
+tm_shape(df_score_chg_sf) +
   tm_fill(#sdgs_list,          # tm_polygons; tm_fill
     'value_chg',
           palette = col_tmap, #col1,
