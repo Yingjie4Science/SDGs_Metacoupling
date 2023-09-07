@@ -79,14 +79,28 @@ ind <- 'ODA_OOF_oecd'
 #             'DACGEO_Data_utf8.csv')
 # ### name the indicator
 # ind <- 'ODA_DACGEO_oecd'
+
+
+
+###' - 4
+###' DACSECTOR_Data_GeoBook ODA by sector - bilateral commitments by donor and recipient.zip
+f <- paste0(dir.raw, 'OECD_ODA/',
+            'DACSECTOR_Data_GeoBook ODA by sector - bilateral commitments by donor and recipient/',
+            'DACSECTOR_Data_utf8.csv')
+### name the indicator
+ind <- 'ODA_DACSECTOR_oecd'
 ```
 
 
-```{r - load ODA data}
+
+#### * Tidy data
+
+```{r}
 # The 'fread' function automatically detects the delimiter (comma in this case)
 
 cols_to_remove <- c("RECIPIENT", "DONOR", 
                     "AIDTYPE", "SERIES",
+                    "SECTOR", 
                     "PART", 'AMOUNTTYPE', 'TIME', 'Flags')
 
 library(data.table)
@@ -98,12 +112,16 @@ names(data)
 unique(data$`Aid type`)
 unique(data$Series)
 
+
 unique(data$Part)          ## "1 : Part I - Developing Countries"     "2 : Part II - Countries in Transition"
 unique(data$`Amount type`) ## "Current Prices (USD millions)"       "Constant Prices (2021 USD millions)"
-unique(data$Year)
+unique(data$Sector) %>% str_to_title()
+```
 
 
-if (ind == 'DACGEO_oecd'){
+
+```{r - data 1, eval=FALSE, include=FALSE}
+if (ind == 'ODA_DACGEO_oecd'){
   dat_ <- data %>%
     ### rename a column to keep consistent 
     setNames(gsub("Series", "Aid type", names(.))) %>%
@@ -114,8 +132,10 @@ if (ind == 'DACGEO_oecd'){
                              `Amount type`, 
                              "Constant Prices (2021 USD millions)")) %>%
     as.data.frame() 
-} else {
+} else if (ind != 'ODA_DACSECTOR_oecd') {
   dat_ <- data
+} else {
+  cat('\n', 'please load the `by sector` data', '\n\n')
 }
 
 
@@ -156,7 +176,7 @@ if( length(unique(data_$`Aid type`)) > 1) {
 }
 
 
-### aggragate data after filtering -------------------------------------------------------
+### aggregate data after filtering -------------------------------------------------------
 cols_to_remove2 <- c("Aid type", "Amount type", "Part")
 
 data_agg <- data_aidtype %>%
@@ -171,11 +191,58 @@ data_wide <- data_agg %>%
 
 
 names(data_agg)
-
-
-
 rm(data)
 gc()
+```
+
+
+
+
+```{r - data 2 - by sector, eval=FALSE, include=FALSE}
+
+data_sec <- data %>%
+    ### rename a column to keep consistent 
+    # setNames(gsub("Series", "Aid type", names(.))) %>%
+  dplyr::select(-any_of(cols_to_remove)) %>%
+  dplyr::filter(
+    Year >= 2010
+  ) %>%
+  as.data.frame() 
+
+
+data_sec_agg <- data_sec %>%
+  group_by(Recipient, Donor, Sector, Year) %>%
+  dplyr::summarise_at(c("Value"), sum, na.rm = TRUE) %>%
+  ungroup() %>%
+  as.data.frame()
+
+
+data_sec_agg_infr <- data_sec_agg %>%
+  dplyr::filter(stringr::str_detect(Sector, regex('Infrastructure|Multisector|Transport', ignore_case=TRUE))) %>%
+  group_by(Recipient, Donor, Year) %>%
+  dplyr::summarise_at(c("Value"), sum, na.rm = TRUE) %>%
+  ungroup() %>%
+  # dplyr::filter(Year == 2015) %>%
+  as.data.frame()
+
+# unique(data_sec_agg_infr$Sector)
+```
+
+
+
+```{r - compare data}
+if (ind == 'ODA_DACSECTOR_oecd'){
+  data_agg <- data_sec_agg_infr %>%
+    dplyr::mutate(
+      Donor = ifelse(str_detect(Donor, "Ivoire"), "Côte d'Ivoire", Donor),
+      Donor = ifelse(str_detect(Donor, "rkiye"), "Türkiye", Donor),
+      Recipient = ifelse(str_detect(Recipient, "Ivoire"), "Côte d'Ivoire", Recipient),
+      Recipient = ifelse(str_detect(Recipient, "rkiye"), "Türkiye", Recipient),
+      ) %>%
+    as.data.frame()
+} else{
+  data_agg = data_agg
+}
 
 
 ### 
@@ -184,12 +251,14 @@ cat('\n Total rows of data in', ind, ': \t\t', nrow(data_agg), '\n')
 ##' Total rows of data in ODA_OOF_oecd : 		         151609
 ##' Total rows of data in ODA_disbursements_oecd : 	 164060 -- best?
 ##' Total rows of data in DACGEO_oecd : 		         126893 
+##' Total rows of data in ODA_DACSECTOR_oecd : 		    46758
 ```
 
 
+#### * Country names
 ```{r - tidy names}
 ### clean the country names and add iso3 code --------------------------------------------
-f <- "C:/Users/pc/OneDrive - Stanford/Recipient_13_266.xlsx"
+f <- paste0(dir.raw, 'OECD_ODA/', "Recipient_13_266.xlsx")
 
 # List all the sheets in the Excel file
 sheet_names <- readxl::excel_sheets(f)
@@ -261,6 +330,8 @@ rm(c, c_cleaned, c_all)
 ```
 
 
+
+#### * Final data
 
 ```{r - filter and tidy data}
 data_ctr <- data_agg %>%
@@ -349,7 +420,9 @@ cat('\n Total NA in', ind, 'in 2015:\t\t', sum(is.na(df_formatted.check$value)),
 ##' Total NA in ODA_OOF_oecd in 2015:		           32351 -- best
 ##' Total NA in ODA_disbursements_oecd in 2015:		 32368
 ##' Total NA in DACGEO_oecd in 2015:		           32469 
-
+##' 
+##' It seems that *ODA_OOF_oecd* is a better data source!
+##' 
 
 
 ### save to the `eora_cleaned` folder ----------------------------------------------------
@@ -360,9 +433,3 @@ writexl::write_xlsx(x = df_formatted, path = fname)
 gc()
 ```
 
-
-
-
-```{r - best data!}
-##' It seems that *ODA_OOF_oecd* is a better data source!
-```
