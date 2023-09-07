@@ -1241,7 +1241,7 @@ func_plot_sdg_ScoreChange_byGroup(df_score = df_score)
   - to use total population or use `School enrollment, tertiary_population`
   
 ```{r}
-ind_sdg    <- 'student_flow' ## person
+ind_sdg    <- 'student_flow' ## global education person per 1000 population
 ind_ft     <- 'student_flow'
 unit_check <- 1
 direction_sdg <- 1
@@ -1266,20 +1266,19 @@ rel_not_merge <- oft %>%
   merge(x = ., y = pop_l, by = c('iso3', 'year'), all.x = T) %>%
   dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
-    ind       = unique(oft$ind),
+    ind       = ind_ft,
     # value_ex  = total_ex/pop,  ## net exports as the measurement
     # value_in  = total_in/pop,
-    value_rel = fromAll/pop,      ## more out-flow, the better
-    value_not = fromAll*0.001/pop, 
+    value_rel = fromAll*1000/pop,      ## more out-flow, the better
+    value_not = fromAll*1000*0.1/pop, 
     ## 0 transfer under no-trade ## use 0.1 avoid 0, which cause problem in calculation later
-    value_dst = fromDst/pop,
-    value_ner = fromNer/pop,
+    value_dst = fromDst*1000/pop,
+    value_ner = fromNer*1000/pop,
     
-    # value_rel = ifelse(-fromAll>0, -fromAll/pop, NA),      ## more out-flow, the better
-    # value_not = ifelse(-fromAll>0, -fromAll*0.01/pop, NA), 
-    # ## 0 transfer under no-trade ## use 0.1 avoid 0, which cause problem in calculation later
-    # value_dst = ifelse(-fromDst>0, -fromDst/pop, NA),
-    # value_ner = ifelse(-fromNer>0, -fromNer/pop, NA) 
+    # value_rel = log(value_rel+ 0.001),      ## more out-flow, the better
+    # value_not = log(value_not+ 0.001),
+    # value_dst = log(value_dst+ 0.001),
+    # value_ner = log(value_ner+ 0.001)
     
     ) %>%   
   ### for easy-checking the numbers
@@ -1295,7 +1294,7 @@ rel_not <- rel_not_merge %>%
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
   df = rel_not, 
-  trim = 0.025, trim.to.na = T,
+  trim = 0, trim.to.na = T,
   # lower_bound = lower_probs, upper_bound = upper_probs, 
   lower_bound = 0, upper_bound = 1, 
   direction = direction_sdg) %>%
@@ -1308,6 +1307,11 @@ score_4_7_1 <- df_score
 
 func_plot_netImports_vs_rel(df = rel_not_merge, x = 'pop')
 func_plot_sdg_ScoreChange_byGroup(df_score = df_score)
+
+df_score_chg <- df_score %>%
+  dplyr::select(-val) %>%
+  spread(key = scenario, value = value_norm) %>%
+  dplyr::mutate(value_chg = value_rel - value_not)
 ```
 
 
@@ -1355,8 +1359,10 @@ rel_not <- rel_not_merge %>%
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0.025, trim.to.na = T,
-  lower_bound = lower_probs, upper_bound = upper_probs, direction = direction_sdg) %>%
+  df = rel_not, trim = 0, trim.to.na = T,
+  # lower_bound = lower_probs, upper_bound = upper_probs, 
+  lower_bound = 0, upper_bound = 1, 
+  direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
   as.data.frame()
@@ -2834,7 +2840,7 @@ co2_rel_not <- rel %>%
 
 
 
-#### - ??? 9.4.1y CO2 emissions from fuel combustion
+#### - [?] 9.4.1y CO2 emissions from fuel combustion
   
 ```{r}
 # ind_sdg  <- 'co2_in_fossil' ## ton/ha
@@ -2855,7 +2861,7 @@ co2_rel_not <- rel %>%
   
   [v] OECD - https://www.oecd.org/development/idsonline.htm 
   
-    - “Flows by provider and recipient”, which provides comprehensive aggregate historical and forward-looking data on the volume, origin and destination of resource flows (including country programmable aid);
+    - "Flows by provider and recipient", which provides comprehensive aggregate historical and forward-looking data on the volume, origin and destination of resource flows (including country programmable aid);
     
     - https://stats.oecd.org/Index.aspx?datasetcode=TABLE7B
     
@@ -2864,6 +2870,7 @@ co2_rel_not <- rel %>%
 ```{r}
 ind_sdg    <- 'ODA to infrastructure' ## USD
 ind_ft     <- 'ODA_OOF_oecd_matrix'
+# ind_ft     <- 'ODA_DACSECTOR_oecd_matrix'
 unit_check <- ''
 direction_sdg <- 1
 
@@ -2897,19 +2904,20 @@ rel_not_merge <- oft %>%
     value     = (-fromAll),
     
     ##' option 1
-    # value_rel = ifelse( (-fromAll) > 0, (-fromAll), 0+1),  ##
-    # # value_not = (0 + 1),              ## under no-trade 
-    # value_dst = ifelse( value-(-fromNer) >0, value-(-fromNer), 0+1), ## (total outflow) - (nearby outflow)
-    # value_ner = ifelse( value-(-fromDst) >0, value-(-fromDst), 0+1), ## (total outflow) - (distant outflow)
+    value_rel = ifelse( (-fromAll) > 0, (-fromAll), 0+1),  ##
+    value_not = ifelse( (-fromAll) > 0, (-fromAll)*0.01, 0+1),  ## under no-trade
+    value_dst = ifelse( value-(-fromNer) >0, value-(-fromNer), 0+1), ## (total outflow) - (nearby outflow)
+    value_ner = ifelse( value-(-fromDst) >0, value-(-fromDst), 0+1), ## (total outflow) - (distant outflow)
     
     ##' option 2
     ##'   inflow can also be helpful for infrastructure development, 
     ##'   e.g., in developing countries
-    value_rel = abs(-fromAll),       ## total outflow as the indicator
-    value_not = abs(-fromAll)*0.01,  ## to avoid extreme values, this assumes the total outflow become 1% of before 
-    value_dst = abs(-fromDst),       ## total outflow to distant regions
-    value_ner = abs(-fromNer),
+    # value_rel = abs(-fromAll),       ## total outflow as the indicator
+    # value_not = abs(-fromAll)*0.01,  ## to avoid extreme values, this assumes the total outflow become 1% of before 
+    # value_dst = abs(-fromDst),       ## total outflow to distant regions
+    # value_ner = abs(-fromNer),
     
+    ##' option 3
     # value_rel = value_rel/gdp_rel,
     # value_not = value_not/gdp_not,
     # value_dst = value_dst/gdp_dst,
