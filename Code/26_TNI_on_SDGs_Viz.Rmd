@@ -140,7 +140,7 @@ load(f)
 unique(dfs$scenario)
 snr_levels <- c("value_rel", "value_dst", "value_ner", "value_not")
 # snr_labels <- c("real", "no nearby", "no distant", "none")
-snr_labels <- c("real world", "Telecoupling only", "Pericoupling only", "Intracoupling only") %>%
+snr_labels <- c("Real world", "Telecoupling only", "Pericoupling only", "Intracoupling only") %>%
   str_to_sentence()
 snr_colors <- c('#418463', '#5eab94', '#96c56f', '#dfe360')
 
@@ -151,7 +151,7 @@ dfs_score <- dfs %>%
   dplyr::filter(!iso3 %in% c('SUN', 'ROW')) %>%
   group_by(iso3, year, scenario, goal) %>%
   dplyr::summarise(score = mean(value_norm, na.rm = TRUE)) %>% ungroup() %>%
-  dplyr::mutate(score = as.numeric(score)) %>%
+  dplyr::mutate(score    = as.numeric(score)) %>%
   dplyr::mutate(goal     = factor(x = goal, levels = seq(1, 17, 1)),
                 scenario = factor(x = scenario, levels = snr_levels)) %>%
   ### add country group info (updated on 2023-01-17)
@@ -259,7 +259,7 @@ chg_pct_err %>%
 ```
 
 
-```{r - bar - change by Goal - fig 1b}
+```{r ___ fig 1b - bar - change by Goal}
 
 ### Bar plot - Goal score change - by goal ---------------------------------------------------------
 chg_err  <- dfs_score_chg %>% 
@@ -277,17 +277,22 @@ chg_err  <- dfs_score_chg %>%
 # mycols <- colors_changes[4:8]
 levels(chg_err$value_chg)
 
-p <- chg_err %>%
+p1b <- chg_err %>%
   dplyr::mutate(chg_direction = ifelse(value_chg > 0, 1, -1),
                 chg_direction = factor(chg_direction, levels = c(1,-1))) %>%
   ggplot(data = ., 
          aes(y = factor(goal, levels = rev(vars)), x = value_chg, fill = chg_direction)) +
-  geom_bar(position = position_dodge(0.8), stat="identity", width = 0.8, show.legend = F, alpha = .9)+
-  geom_errorbar(aes(xmin=value_chg-se, xmax=value_chg+se), 
-                width=.3, 
-                position=position_dodge(.8)) +
+  geom_bar(position = position_dodge(0.8), stat="identity", width = 0.8, show.legend = F, alpha = .7)+
+  geom_errorbar(aes(
+    xmin=value_chg-se,
+    xmax=value_chg+se), 
+    width=.3, color = 'gray20',
+    position=position_dodge(.8)) +
   # scale_fill_manual(values = mycols) +
-  scale_fill_manual(values = c('#6baed6', '#ffeda0')) +
+  scale_fill_manual(values = c(#'black', 
+                               '#6baed6',
+                               '#ffeda0')) +
+  scale_x_continuous(labels = scales::number_format(accuracy = 1)) +
   xlab("Transnational impact on SDG score")+ ylab('SDGs') + labs(fill = "Goal")+
   theme_bar_my +
   theme(plot.margin = unit(c(0.1, 0, 0.1, -.5), "cm"))+ 
@@ -296,7 +301,7 @@ p <- chg_err %>%
         # panel.grid.major = , 
         # axis.text.y = element_blank(),
         panel.grid.minor = element_blank())
-p
+p1b
 # fname <- paste0(dir.fig, 'SDG_score_chg_errorBar.jpg'); fname
 # ggsave(filename = fname, plot = last_plot(), width = 3, height = 5, units = 'in', dpi = 300)
 
@@ -321,7 +326,7 @@ sdg_id.y <- sdg_id - 0.5; sdg_id.y  ## - 0.5
 sdg_id.y <- rev(sdg_id.y); sdg_id.y
 scale_here <- 0.9
 
-icons <- axis_canvas(plot = p, axis = 'y') + 
+icons <- axis_canvas(plot = p1b, axis = 'y') + 
   draw_image(paste0(img_sur, '01', '.png'), y = sdg_id.y[1], scale = scale_here) +
   draw_image(paste0(img_sur, '02', '.png'), y = sdg_id.y[2], scale = scale_here) +
   draw_image(paste0(img_sur, '03', '.png'), y = sdg_id.y[3], scale = scale_here) +
@@ -342,15 +347,23 @@ icons <- axis_canvas(plot = p, axis = 'y') +
   # draw_image(paste0(img_sur, 18, '.png'), y = 18-.5, scale = scale_here)
 
 ### insert the image strip into the bar plot and draw  
-p_icon <- ggdraw(insert_yaxis_grob(plot = p, grob = icons, grid::unit(.1, "null"), position = "left"))
+p_icon <- ggdraw(insert_yaxis_grob(plot = p1b, grob = icons, grid::unit(.1, "null"), position = "left"))
 # p_icon
 
-fig <- ggarrange(p_icon, labels = "b", font.label = list(size = 20), vjust = 1, hjust = 0)
+fig1b <- ggarrange(p_icon, labels = "b", font.label = list(size = 20), vjust = 1, hjust = 0)
 fname <- paste0(dir.fig, '01main/fig1b_SDG_score_chg_Bar_Icon_', today, '.jpg'); fname
-# ggsave(filename = fname, plot = fig, width = 6, height = 8, units = 'in', dpi = 600)
+# ggsave(filename = fname, plot = fig1b, width = 6, height = 8, units = 'in', dpi = 600)
 
 ## ref: https://www.rdocumentation.org/packages/cowplot/versions/1.1.1/topics/axis_canvas
 ```
+
+```{r ___ 17 SDG list}
+```
+SDG 2 (Zero hunger)
+SDG 4 (Quality education)
+SDG 6 (Clean water and sanitation)
+SDG 11 (Sustainable cities and communities)
+SDG 15 (Life on land) 
 
 
 
@@ -457,19 +470,20 @@ cat('High income - the number of SDGs that decreased:', sum(chg_err_group_text$`
 ```
 
 
-```{r}
+```{r ... fig 1c}
 color_grp <- c('#2371A6', '#F26463') ## high, low
 color_grp <- rev(color_grp)
 
-p <-
+p1c <-
   ggplot(data = chg_err_group, 
        aes(x=factor(goal, levels = rev(vars)),
            y = value_chg,
            fill = group)) +
   geom_bar(position = position_dodge(0.8), stat="identity", width = 0.8, show.legend = T)+
-  geom_errorbar(aes(ymin=value_chg-se, ymax=value_chg+se), 
-                width=.3, 
-                position=position_dodge(.8)) +
+  geom_errorbar(aes(
+    ymin=value_chg-se, ymax=value_chg+se), 
+    width=.3, color = 'gray20',
+    position=position_dodge(.8)) +
   ylab("Transnational impact on SDG score") + xlab('SDGs') + labs(fill = "Group")+
   # scale_fill_brewer(palette = "Blues", direction = -1) +
   scale_fill_manual(values = color_grp, guide = guide_legend(reverse = TRUE)) +
@@ -478,7 +492,7 @@ p <-
   
   theme_bar_my +
   theme(
-    legend.position = c(0.86, 0.16),    ## 0.15, 0.06
+    legend.position = c(0.877, 0.15),    ## 0.15, 0.06
     # legend.key.size = unit(0.2,"cm"), 
     legend.box.background = element_rect(colour = "black"),
     legend.key.width  = unit(0.4,"cm"), 
@@ -486,14 +500,21 @@ p <-
     legend.text=element_text(size=rel(.9)),
     panel.grid.minor = element_blank())
 
-ggarrange(p, labels = "c", font.label = list(size = 20), vjust = 1)
+ggarrange(p1c, labels = "c", font.label = list(size = 20), vjust = 1)
 fname <- paste0(dir.fig, '01main/fig1c_SDG_score_chg_Bar_byGroup2grp_', today, '_', mark, '.jpg'); fname
 # ggsave(filename = fname, plot = last_plot(), width = 6, height = 8, units = 'in', dpi = 300)
 ```
 
 
+```{r ... fig1bc combined-1}
+p1bc <- ggarrange(fig1b, p1c+xlab(''), labels = "", font.label = list(size = 20), vjust = 1, hjust = 0, align = 'v')
+fname <- paste0(dir.fig, '01main/fig1Combined1_bc_SDG_score_chg_Bar_Icon_', today, '.jpg'); fname
+ggsave(filename = fname, plot = p1bc, width = 6*2, height = 8, units = 'in', dpi = 600)
+```
 
-```{r - bar - fig1bc combined}
+
+
+```{r ... fig1bc combined-2}
 chg_err_groups <- rbind(
   chg_err %>% dplyr::mutate(group = 'Global') %>% dplyr::select(names(chg_err_group)),
   chg_err_group
@@ -527,7 +548,7 @@ p <- chg_err_groups %>%
   
   theme_bar_my +
   theme(
-    legend.position = c(0.87, 0.065),    ## 0.15, 0.06
+    legend.position = c(0.877, 0.15),    ## 0.15, 0.06 -> 0.065
     # legend.key.size = unit(0.2,"cm"), 
     legend.box.background = element_rect(colour = "black"),
     legend.key.width  = unit(0.4,"cm"), 
@@ -701,8 +722,8 @@ tmap_save(tm = tmap_last(), filename = fname, width=7, height=2.8, units="in", d
 
 
 
-####  - Score by goal by scenario - fig 3b
-```{r}
+####  - Score by goal by scenario
+```{r ... fig 3b}
 
 dfs_score_goal_snr <- dfs_score %>%
   summarySE(measurevar= "score", groupvars = c("year", 'scenario', "goal"), na.rm = T) %>%
@@ -753,9 +774,9 @@ ggsave(filename = fname, plot = ggplot2::last_plot(), width = 6, height = 8, uni
 
 
 
-####  - Score by goal by scenario by group - fig ex_7
+####  - Score by goal by scenario by group
 
-```{r}
+```{r ... fig ex_7}
 dfs_score_goal_snr_grp <- dfs_score %>%
   summarySE(measurevar= "score", groupvars = c("year", 'group', 'scenario', "goal"), na.rm = T) 
 
@@ -814,7 +835,7 @@ p <-
         axis.ticks.y = element_blank()) +
   guides(pattern = guide_legend(override.aes = list(fill = "white")), 
          fill    = guide_legend(override.aes = list(pattern = "none"), reverse = T) ) 
-
+# p
 fig <- ggarrange(p, labels = "", font.label = list(size = 20))
 fname <- paste0(dir.fig, '01main/ex_7_score_goal_snr4_grp_', today, '.jpg'); fname
 ggsave(filename = fname, plot = fig, width = 6, height = 8, units = 'in', dpi = 500)
@@ -828,8 +849,8 @@ ggsave(filename = fname, plot = fig, width = 6, height = 8, units = 'in', dpi = 
 ### Index
 ##########################################################################################
 
-```{r - Index by scenario - fig 3a}
-### SDG Index ----------------------------------------------------------------------------
+```{r message=FALSE, warning=FALSE}
+### SDG Index by country -----------------------------------------------------------------
 dfs_index <- dfs_score %>%
   ungroup() %>%
   group_by(iso3, group, year, scenario) %>%
@@ -839,8 +860,66 @@ dfs_index <- dfs_score %>%
   as.data.frame() 
 
 
+### global SDG index
+dfs_index_glo <- dfs_index %>%
+  group_by(year, scenario) %>%
+  dplyr::summarise(index = mean(index, na.rm = TRUE)) %>%
+  ungroup() %>%
+  column_to_rownames(var = 'scenario') %>%
+  dplyr::mutate(scenario = row.names(.),
+                scenario = factor(x = scenario, levels = snr_levels)) %>%
+  as.data.frame()
+
+
+
+### add global sdg index change to Fig 3a
+snr_chg_levels <- c('value_chg_rel', 'value_chg_dst', 'value_chg_ner')
+
+dfs_index_glo_chg <- dfs_index_glo %>%
+  spread(key = scenario, value = index) %>%
+  dplyr::mutate(
+    value_chg_rel = value_rel - value_not, 
+    value_chg_dst = value_dst - value_not, 
+    value_chg_ner = value_ner - value_not, 
+    ) %>%
+  dplyr::filter(year == 2015) %>%
+  dplyr::select(year, starts_with('value_chg_')) %>%
+  gather(key = 'scenario', value = 'index', value_chg_rel:ncol(.)) %>%
+  dplyr::mutate(group = 'Global') %>%
+  summarySE(measurevar= "index", groupvars = c("year", 'scenario', 'group'), na.rm = T) %>%
+  dplyr::mutate(scenario = factor(x = scenario, levels = snr_chg_levels)) %>%
+  dplyr::arrange(year, scenario) %>%
+  as.data.frame()
+
+
+
+dfs_index_glo %>%
+  ggplot(data = ., aes(x = scenario, y = index, fill = fct_rev(scenario))) +
+  geom_col(width = .8, show.legend = F)+
+  scale_fill_manual(
+    name   = 'Scenarios',
+    values = rev(snr_colors),
+    labels = rev(snr_labels),
+    guide  = guide_legend(reverse = T)) +
+  scale_x_discrete(labels = snr_labels) +
+  scale_y_continuous(limits = c(50, 60), breaks = seq(50, 60, 2), oob = rescale_none) +
+  xlab('Scenarios') + ylab("Global SDG Index") +
+  # theme_bar_my +
+  theme(panel.grid = element_blank(),
+        legend.position = c(0.873, 0.892), ## (0.894, 0.892)
+        legend.box.background = element_rect(colour = "black"),
+        legend.key.width = unit(0.4,"cm"),
+        legend.key.height = unit(0.3,"cm"),
+        ) 
+
+```
+
+
+#### - Index by scenario - bar
+```{r ... fig3a}
 dfs_index_snr <- dfs_index %>%
   summarySE(measurevar= "index", groupvars = c("year", 'scenario', 'group'), na.rm = T) %>%
+  dplyr::arrange(year, scenario, group) %>%
   as.data.frame() 
 
 y_upper <- ceiling(max(dfs_index_snr$index) + max(dfs_index_snr$se) + 1)
@@ -908,7 +987,52 @@ ggsave(filename = fname, plot = ggplot2::last_plot(), width = 6, height = 8, uni
 
 
 
-```{r - Index change - MS ✏️📝}
+#### - Index by scenario - map
+
+```{r ... fig ex1}
+dfs_index_sf <- dfs_index %>%
+  spread(key = scenario, value = index) %>%
+  merge(x = shp, y = ., by.x = "iso_a3", by.y = "iso3",  all.x = T)
+
+hist(dfs_index_sf$value_rel, nclass = 50)
+hist(dfs_index_sf$value_not, nclass = 50)
+max_score <- (max(dfs_index_sf$value_rel, na.rm = T)/5) %>% ceiling() %>% "*"(5); max_score # 75
+min_score <- (min(dfs_index_sf$value_rel, na.rm = T)/5) %>% floor()   %>% "*"(5); min_score # 35
+
+### plot 
+p <- tm_shape(dfs_index_sf) +
+  tm_fill(c('value_rel', 'value_not'),
+          palette = 'YlGn', 
+          style = "cont",
+          ## "cat", "fixed", "sd", "equal", "pretty", "quantile", "kmeans", "hclust", "bclust", "fisher", "jenks"
+          # stretch.palette = T,
+          breaks = c(min_score, seq(50, max_score, by = 5), 100),
+          # labels = seq(0, 100, by = 10),
+          title  = c('SDG Index\n(Baseline)', 'SDG Index\n(Global autarky)'),
+          textNA = 'NA', colorNA = 'gray90',
+          legend.reverse = T) +
+  tm_borders(col = "white", lwd = 0.1, lty = "solid", alpha = 0.99) +
+  tm_layout(frame = F, frame.lwd = 0.1,
+    legend.position = c(0,0),
+    legend.title.size = 1.1, 
+    # legend.title.fontface = "bold",
+    legend.text.size  = 0.9,
+    legend.width = -0.7,
+    legend.height = -0.7,
+    outer.margins=0, inner.margins=0,
+    panel.show = F) +
+  tm_facets(free.scales.fill = F, ncol = 1)
+# p
+fname <- paste0(dir.fig, '01main/', 'ex_1_SDG_Index_Map_Baseline_Lockdown_', today, '.jpg'); fname
+tmap_save(tm = p, filename = fname, width=7, height=2.8*2, units="in", dpi = 300)
+```
+
+
+
+
+### Index change
+
+```{r}
 
 ### SDG Index change ---------------------------------------------------------------------
 dfs_index_chg <- dfs_index %>%
@@ -966,8 +1090,15 @@ dfs_index_chg_pct %>%
 ```
 
 
-```{r - Index change - MS ✏️📝}
+```{r - MS ✏️📝}
 ### numbers for writing ------------------------------------------------------------------
+
+index_glo_chg <- (dfs_index_glo['value_rel', 'index'] - dfs_index_glo['value_not', 'index']) %>% round(., digits = 1)
+index_glo_chg_pct <- (index_glo_chg/dfs_index_glo['value_not', 'index'] * 100) %>% round(., digits = 1)
+
+cat('Global SDG Index changed', index_glo_chg, '(or', index_glo_chg_pct, '% ). \n\n')
+
+
 cat('SDG Index of countries would improve', 
     mean(dfs_index_chg_pct$value_chg, na.rm = T) %>% round(., digits = 1),      ## 9.2
     'on average.\n')
@@ -980,9 +1111,7 @@ cat('SDG Index of countries in 2015:',
     mean(dfs_index_chg_pct$value_rel, na.rm = T) %>% round(., digits = 1),  ## 20.2% --> 19.4%
     ', sd =', 
     sd(dfs_index_chg_pct$value_rel, na.rm = T) %>% round(., digits = 1),  ## 20.2% --> 19.4%
-    '.\n')
-
-
+    '\n\n')
 
 
 dfs_index_chg_count <- dfs_index_chg %>%
@@ -995,78 +1124,42 @@ dfs_index_chg_count <- dfs_index_chg %>%
                 increase_pop = increase*pop)
 
 ## 1. number and % of country improved SDG index?
-sum(dfs_index_chg_count$increase, na.rm = T) %>%                    ## 181
-  cat(., 'countries improved their SDG Index.\n')
-(sum(dfs_index_chg_count$increase)/nrow(dfs_index_chg_count)) %>%   ## 96.8%
-  scales::percent(accuracy = .1) %>% 
-  cat(., '% of the world countries improved their SDG Index.\n')
+n_improved <- sum(dfs_index_chg_count$increase, na.rm = T) 
+pct_improved <- (n_improved/nrow(dfs_index_chg_count)*100) %>%   ## 96.8%
+   round(., digits = 0)
+cat(pct_improved, '% (n=', n_improved, ') of the world countries improved their SDG Index.\n')
 
 ## 2. number and % of population improved SDG Index?
 total_pop <- sum(dfs_index_chg_count$pop, na.rm = T); #total_pop
 total_pop_increased <- sum(dfs_index_chg_count$increase_pop, na.rm = T); #total_pop_increased
 (total_pop_increased/total_pop*100) %>%                             ## 98.5%
-  round(., digits = 1) %>%
-  cat(., '% of the world population improved their SDG Index.\n')
+  round(., digits = 0) %>%
+  cat('\t', ., '% of the world population improved their SDG Index.\n\n')
+
 
 
 ## 3. for countries with decreased SDG Index, how many are low-income and what it the % ?
+cat('The remaining', 100-pct_improved, '% of the countries (n = ', 189-n_improved, 
+    ') decreased their SDG Index.\n')
+ 
 df_chg_sf_count_lowincome <- dfs_index_chg_count %>%
   dplyr::filter(increase < 1) %>%
   dplyr::filter(!is.na(group)) %>%
-  dplyr::mutate(low_income = ifelse(stringr::str_detect(fixed(pattern = 'low', ignore_case = T), string = group), 1, 0)) %>%
+  dplyr::mutate(low_income = ifelse(
+    stringr::str_detect(fixed(pattern = 'low', ignore_case = T), string = group), 1, 0)) %>%
   as.data.frame()
   
-(sum(df_chg_sf_count_lowincome$low_income, na.rm = T)) %>% 
-  cat(., 'are low-income countries.\n') 
-## 13 are low-income 
+n_dec_low <- (sum(df_chg_sf_count_lowincome$low_income, na.rm = T)) 
 (sum(df_chg_sf_count_lowincome$low_income, na.rm = T)/nrow(df_chg_sf_count_lowincome)*100) %>%
-  cat(., '% are low-income countries.')
+  round(., digits = 0) %>%
+  cat('\t', ., '% (n=', n_dec_low, ') are low-income countries.')
 ## 76.5% are low-income
 ```
 
 
 
-```{r - map of index for 2 scenarios - fig ex1}
-dfs_index_sf <- dfs_index %>%
-  spread(key = scenario, value = index) %>%
-  merge(x = shp, y = ., by.x = "iso_a3", by.y = "iso3",  all.x = T)
 
-hist(dfs_index_sf$value_rel, nclass = 50)
-hist(dfs_index_sf$value_not, nclass = 50)
-max_score <- (max(dfs_index_sf$value_rel, na.rm = T)/5) %>% ceiling() %>% "*"(5); max_score # 75
-min_score <- (min(dfs_index_sf$value_rel, na.rm = T)/5) %>% floor()   %>% "*"(5); min_score # 35
-
-### plot 
-p <- tm_shape(dfs_index_sf) +
-  tm_fill(c('value_rel', 'value_not'),
-          palette = 'YlGn', 
-          style = "cont",
-          ## "cat", "fixed", "sd", "equal", "pretty", "quantile", "kmeans", "hclust", "bclust", "fisher", "jenks"
-          # stretch.palette = T,
-          breaks = c(min_score, seq(50, max_score, by = 5), 100),
-          # labels = seq(0, 100, by = 10),
-          title  = c('SDG Index\n(Baseline)', 'SDG Index\n(Global autarky)'),
-          textNA = 'NA', colorNA = 'gray90',
-          legend.reverse = T) +
-  tm_borders(col = "white", lwd = 0.1, lty = "solid", alpha = 0.99) +
-  tm_layout(frame = F, frame.lwd = 0.1,
-    legend.position = c(0,0),
-    legend.title.size = 1.1, 
-    # legend.title.fontface = "bold",
-    legend.text.size  = 0.9,
-    legend.width = -0.7,
-    legend.height = -0.7,
-    outer.margins=0, inner.margins=0,
-    panel.show = F) +
-  tm_facets(free.scales.fill = F, ncol = 1)
-
-fname <- paste0(dir.fig, '01main/', 'ex_1_SDG_Index_Map_Baseline_Lockdown_', today, '.jpg'); fname
-tmap_save(tm = p, filename = fname, width=7, height=2.8*2, units="in", dpi = 300)
-```
-
-
-
-```{r - map of Index change - fig 1a}
+```{r - Index change - map}
 dfs_index_chg_ <- dfs_index_chg %>%
   dplyr::select(-value_not, -value_rel)
 
@@ -1144,7 +1237,7 @@ col_tmap <- colors$chg_color
 ```
 
 
-```{r --- fig 1a}
+```{r ... fig 1a}
 fname <- paste0(dir.fig, '01main/', 'fig1a_SDG_Index_chg_Map_', today, '.jpg'); fname
 # jpeg(filename = fname, width=7, height=2.8, units="in", pointsize=18, res=300)
 
@@ -1211,7 +1304,10 @@ tmap_save(tm = p, filename = fname, width=7, height=2.8, units="in", dpi = 400)
 
 
 
-```{r - boxplot - change by 4 income group - fig ex_2}
+```{r - change by 4 income group - boxplot}
+```
+
+```{r ... fig ex_2}
 dfs_index_chg1 <- dfs_index_chg %>%
   merge(x = ., 
         y = grp_update, 
@@ -1244,7 +1340,11 @@ ggsave(filename = fname, plot = ggplot2::last_plot(), width = 6, height = 6, uni
 ```
 
 
-```{r - boxplot - change by 2 income group - fig ex_2}
+```{r - change by 2 income group - boxplot}
+```
+
+
+```{r ... fig ex_2}
 dfs_index_chg %>%
   merge(x = ., 
         y = grp_update, 
@@ -1273,11 +1373,107 @@ ggsave(filename = fname, plot = ggplot2::last_plot(), width = 6, height = 6, uni
 ```
 
 
-```{r - free momery}
+```{r include=FALSE}
+### free memory
 gc()
 ```
 
 
+#### - Change by scenario
+
+```{r ... fig3a - chg}
+
+dfs_index_chg_scr <- dfs_index %>%
+  # dplyr::select(-group) %>%
+  spread(key = scenario, value = index) %>%
+  dplyr::mutate(
+    value_chg_rel = value_rel - value_not, 
+    value_chg_dst = value_dst - value_not, 
+    value_chg_ner = value_ner - value_not, 
+    # value_chg = ifelse(iso3 =='GRL', NA, value_chg),
+    ) %>%
+  dplyr::filter(year == 2015) %>%
+  as.data.frame()
+
+dfs_index_chg_scr_summ <- dfs_index_chg_scr %>%
+  dplyr::select(iso3, group, year, starts_with('value_chg_')) %>%
+  gather(key = 'scenario', value = 'index', 4:ncol(.)) %>%
+  summarySE(measurevar= "index", groupvars = c("year", 'scenario', 'group'), na.rm = T) %>%
+  dplyr::mutate(scenario = factor(x = scenario, levels = snr_chg_levels)) %>%
+  dplyr::arrange(year, scenario, group) %>%
+  ### add global index data
+  rbind(dfs_index_glo_chg) %>%
+  as.data.frame() 
+
+y_upper <- ceiling(max(dfs_index_chg_scr_summ$index, na.rm = T) + max(dfs_index_chg_scr_summ$se, na.rm = T) + 1)
+y_lower <- floor(min(dfs_index_chg_scr_summ$index, na.rm = T) - max(dfs_index_chg_scr_summ$se, na.rm = T))
+
+
+str(dfs_index_chg_scr_summ)
+
+n_grp <- unique(dfs_index_chg_scr_summ$group) %>% length()
+if (n_grp == 3) {
+  pattern_fill <- c('High income' = "circle", 'Low income' = "none", 'Global' = 'crosshatch')
+  legend.y <- 0.891
+} else {
+  pattern_fill <- c('High income' = "circle", 'Low income' = "none")
+  legend.y <- 0.899
+}
+
+### plot ------------------
+p <- dfs_index_chg_scr_summ %>%
+  ggplot(data = ., 
+         aes(x = scenario, y = index,
+             ymin = index-se, ymax = index+se,
+             fill = fct_rev(scenario), pattern = group
+           )) +
+  # geom_bar(position = position_dodge(0.8), stat="identity", width = 0.8, show.legend = T, alpha = .9)+
+  
+  geom_col_pattern(
+    position = position_dodge(preserve = "single"),
+    color = "gray30",
+    pattern_density = 0.1, ## 0.1
+    pattern_spacing = 0.025,
+    pattern_key_scale_factor = 0.6,
+    alpha = .9) +
+  
+  scale_pattern_manual(
+    name = 'Group', 
+    values = pattern_fill) +
+  
+  scale_fill_manual(
+    name   = 'Scenarios',
+    values = rev(snr_colors[1:3]),
+    labels = rev(snr_labels[1:3]),
+    guide  = guide_legend(reverse = T)) +
+  scale_x_discrete(labels = snr_labels[1:3]) +
+  
+  geom_errorbar(position=position_dodge(.9), width=.4, color = 'gray30') +
+  scale_y_continuous(
+    breaks = seq(y_lower, y_upper, 2),
+    limits = c(y_lower, y_upper),
+    oob = rescale_none
+    ) +
+  
+  xlab('Scenarios') + ylab("SDG Index change") +
+  # coord_flip() +
+  theme_bar_my +
+  theme(panel.grid = element_blank(),
+        legend.position = c(0.875, legend.y), ## (0.894, 0.892)
+        legend.box.background = element_rect(colour = "black"),
+        legend.key.width = unit(0.4,"cm"),
+        legend.key.height = unit(0.3,"cm"), 
+        # legend.spacing.y = unit(0.0, 'cm'),
+        # legend.margin = margin(t = 0),
+        # axis.ticks.y = element_blank()
+        ) +
+  guides(pattern = guide_legend(override.aes = list(fill = "white")),
+         fill    = guide_legend(override.aes = list(pattern = "none"), reverse = T) ) 
+p
+p3a <- ggarrange(p, labels = "a", font.label = list(size = 20))
+fname <- paste0(dir.fig, '01main/fig3a_index_chg_snr_', today, '_addGlobal.jpg'); fname
+ggsave(filename = fname, plot = p3a, width = 6, height = 8, units = 'in', dpi = 300)
+```
 
 
 ### Indicator
