@@ -770,7 +770,7 @@ test <- net_imports_fromAll_use %>%
 
 ### Map
 
-```{r - fig2b - map - TNI Index}
+```{r - Map of TNI Index}
 ### map of spillover Index score ---------------------------------------------------------
 ### 
 spillover_index_shp <- shp %>%
@@ -785,9 +785,11 @@ spillover_index_shp_match_check <- spillover_index %>%
   dplyr::filter(year == 2015) %>%
   merge(y = shp %>% dplyr::select(-economy, -income_grp), 
         x = ., by.y = 'iso_a3', by.x = 'iso3', all.x = T) 
-nrow(spillover_index_shp_match_check) ## ROW was not included here. 
+nrow(spillover_index_shp_match_check) ## ROW was not included here.
+```
 
 
+```{r ... fig2b - map - TNI Index}
 ## decide color palette 
 hist(spillover_index_shp$index)
 index_max <- max(spillover_index_shp$index, na.rm = T) %>% ceiling()
@@ -807,7 +809,8 @@ map1 <- spillover_index_shp %>%
   dplyr::filter(year == 2015) %>%
   ggplot()+
   geom_sf(aes(fill = index), color='gray80', size = 0.1) +
-  scale_fill_distiller(palette = palette_map, direction = palette_drc, na.value = 'black', name = 'Transnational\nImpact\nIndex') +
+  scale_fill_distiller(palette = palette_map, direction = palette_drc, na.value = 'black', 
+                       name = 'Transnational\nImpact Index') +
   # scale_fill_viridis(direction = -1, option = 'C', discrete = F, name = 'Impact\nIndex') +
   
   scale_y_continuous(expand = c(0, 0)) + ## reduce the space between plot and border
@@ -829,23 +832,31 @@ fig <- ggarrange(map1, labels = "b", font.label = list(size = 12), vjust = 1, hj
 fignm <- paste0('fig2b_map_spillover_index_2015_', postfix, '_', today, '.jpg')
 fname <- paste0(dir.fig, '01main/', fignm);
 fname
-ggsave(filename = fname, plot = fig, width = width_2col, height = width_2col*2.8/7, units = unit_ns, dpi = 300)
+# ggsave(filename = fname, plot = fig, width = width_2col, height = width_2col*2.8/7, units = unit_ns, dpi = 300)
 
 # fname <- paste0(dir.fig, '01main/',    fignm);
 # ggsave(filename = fname, plot = fig, width = width_2col, height = width_2col*2.8/7, units = unit_ns, dpi = 300)
 ```
 
 
-```{r - fig2b - tmap - TNI Index}
+```{r ... fig2b - tmap - TNI Index}
 spillover_index_shp %>%
   dplyr::filter(!is.na(year)) %>%
   dplyr::filter(year == 2015) %>%
   
   tm_shape(.) +
   tm_borders(col = 'gray80', lwd = 0.1) +
-  tm_fill(col = "index", title = 'Transnational\nImpact\nIndex', 
+  tm_fill(col = "index", title = 'Transnational\nImpact Index', 
           palette = '-BrBG', #midpoint = 0, #n = 7, 
-          breaks = c(index_min, seq(-30, 30, 10), index_max), style = "cont", 
+          
+          # style = "cont", 
+          # breaks = c(index_min, seq(-30, 30, 10), index_max), 
+          
+          style = "pretty", stretch.palette = T,
+          
+          # style = "fixed",
+          # breaks = c(-Inf, seq(-30, 30, 10), Inf),
+          
           legend.reverse = T,
           colorNA = 'black') +
   tm_layout(
@@ -975,7 +986,7 @@ ggsave(filename = fname, plot = last_plot(), width = width_2col/3*2, height = wi
 ```
 
 
-```{r - fig2a - bar - index rank county-color-2-group}
+```{r ... fig2a - bar - index rank county-color-2-group}
 library(grid) ## linesGrob()
 
 p <- spillover_index_top_bottom %>%
@@ -993,17 +1004,16 @@ p <- spillover_index_top_bottom %>%
     xmin = 0, xmax = 0, ymin = 0, ymax = 40) +
   annotation_custom(grob = grid::textGrob(
     label = "Impacting", hjust=0, 
-    gp=gpar(col="#d8b365", cex=.6)),
+    gp=gpar(col="#d8b365", cex=.7)),
     xmin = 0, xmax = 0.1, ymin = 10) +
   annotation_custom(grob = linesGrob(
     arrow=arrow(type="open", ends="first", length=unit(2,"mm")), 
     gp=gpar(col="#5ab4ac", lwd=2)), 
-    xmin = 0, xmax = 0, ymin = 0, ymax = -20) +
+    xmin = 0, xmax = 0, ymin = 0, ymax = -25) +
   annotation_custom(grob = grid::textGrob(
-    label = "Impacted", hjust=4, 
-    gp=gpar(col="#5ab4ac", cex=.6)),
-    xmin = 0, xmax = 0.1, ymin = -30) +
-  
+    label = "Impacted", hjust=3.6, ## 4
+    gp=gpar(col="#5ab4ac", cex=.7)),
+    xmin = 0, xmax = 0.1, ymin = -20) +
   
   ggplot2::annotate("text", x = -.5, y = -1, label = "") +
   coord_cartesian(ylim = c(-100, 100), clip = "off") +
@@ -1022,11 +1032,11 @@ p <- spillover_index_top_bottom %>%
   guides(
    color = guide_legend(order = 2, title = NULL, override.aes = list(fill  = c(NA, NA)), reverse = F),
    fill  = guide_legend(order = 1, title = NULL, override.aes = list(shape = c(NA, NA)), reverse = T)) 
-p
-
-fig <- ggarrange(p, labels = "a", font.label = list(size = 12), vjust = 1, hjust = 0); fig
+(
+  p2a <- ggarrange(p, labels = "a", font.label = list(size = 12), vjust = 1, hjust = 0)
+)
 fname <- paste0(dir.fig, '01main/', 'fig2a_spillover_top_bot_color_2grp_', postfix, '_', today,'.jpg'); fname
-ggsave(filename = fname, plot = fig, width = width_2col/3*2, height = width_2col/2, units = 'cm', dpi = 600)
+ggsave(filename = fname, plot = p2a, width = width_2col/3*2, height = width_2col/2, units = 'cm', dpi = 600)
 ```
 
 
@@ -1036,7 +1046,7 @@ ggsave(filename = fname, plot = fig, width = width_2col/3*2, height = width_2col
   
   *To do*: order the list based on characters or property (social vs. environmental vs. economic vs. security ...)
 
-```{r - fig ex_4 - Index rank with MC categories}
+```{r ... fig ex_4 - Index rank with MC categories}
 n_type <- length(unique(net_imports_fromAll_use$ind)); n_type
 list20 <- unique(spillover_index_top_bottom$iso_a3); list20
 
@@ -1053,7 +1063,6 @@ spillover_index_type <- spillover_norm %>%
   merge(x = ., 
         y = direction %>% dplyr::select(ind, SDG_class), 
         by.x = 'indicator', by.y = 'ind', all.x = T) %>%
-  dplyr::mutate(SDG_class = as.factor(SDG_class)) %>%
   as.data.frame() %>%
   dplyr::group_by(iso3, rank, group, SDG_class) %>%
   dplyr::summarise(score_each = sum(score_each, na.rm = T),
@@ -1064,34 +1073,86 @@ spillover_index_type <- spillover_norm %>%
 str(spillover_index_type)  
 unique(spillover_index_type$indicator)
 levels(spillover_index_type$SDG_class)
-type_levels <- c("Envi", "Soci", "Econ",  "Secu")
-type_labels <- c("Environmental", "Social", "Economic",  "Security")
+n_class <- unique(spillover_index_type$SDG_class) %>% length()
+if(n_class == 3){
+  type_levels <- c("Envi", "Soci", "Econ")
+  type_labels <- c("Environmental", "Social", "Economic")
+  type_colors <- c('#33a02c', '#fdbf6f', '#ff7f00')
+} else {
+  type_levels <- c("Envi", "Soci", "Econ",  "Secu")
+  type_labels <- c("Environmental", "Social", "Economic",  "Security")
+  type_colors <- c('#33a02c', '#fdbf6f', '#ff7f00', '#6a3d9a')
+}
+
+
 
 spillover_index_type_SDGtype <- spillover_index_type %>%
-  dplyr::mutate(SDG_class = factor(SDG_class, levels = type_levels, labels = type_labels))
-  
+  dplyr::mutate(SDG_class = factor(SDG_class, levels = type_levels, labels = type_labels),
+                iso3 = factor(iso3, levels = list20)) ## make sure the order is the same as fig2a
+# str(spillover_index_type_SDGtype)
+
 
 # Stacked
-ggplot(spillover_index_type_SDGtype, 
-       aes(#fill = indicator, 
+p4ex <- spillover_index_type_SDGtype %>%
+  ggplot(data = ., 
+         aes(#fill = indicator, 
            fill = fct_rev(SDG_class),
-           y = score_each, 
-           x = reorder(iso3, index))) + 
-  scale_fill_manual(values = c('#33a02c', '#fdbf6f', '#ff7f00', '#6a3d9a') %>% rev(), name = '') +
+           # x = reorder(iso3, index),
+           x = iso3,
+           y = score_each)) + 
+  scale_fill_manual(values =  type_colors %>% rev(), name = '') +
   geom_bar(position="stack", stat="identity", alpha = 0.8) +
   coord_flip() +
   # geom_hline(yintercept = 0, color = 'red', alpha = .8) +
   theme(
-    legend.position = c(0.99, 0.01), 
+    legend.position = c(0.99, 0.06), ## 0.01
     legend.justification = c(1, 0), 
     legend.box.margin = margin(r = 0, b = 0, unit = "mm"), # small margin
     legend.key.size = unit(0.4,"cm"),
     panel.grid.major.y = element_blank(),
+    text = element_text(size = 10),
     legend.margin=margin(0, 0, 0, 0)) +
-  ylab('Transnational Impact Index') + xlab('Country')
-
+  
+  
+  annotation_custom(grob = linesGrob(
+    arrow=arrow(type="open", ends="last", length=unit(2,"mm")), 
+    gp=gpar(col="#d8b365", lwd=2)), 
+    xmin = 0, xmax = 0, ymin = 0, ymax = 40) +
+  # annotation_custom(grob = grid::textGrob(
+  #   label = "Impacting", hjust=0,
+  #   gp=gpar(col="#d8b365", cex=.7)),
+  #   xmin = 0, xmax = 0.1, ymin = 10) +
+  annotation_custom(grob = linesGrob(
+    arrow=arrow(type="open", ends="first", length=unit(2,"mm")),
+    gp=gpar(col="#5ab4ac", lwd=2)),
+    xmin = 0, xmax = 0, ymin = 0, ymax = -25) +
+  # annotation_custom(grob = grid::textGrob(
+  #   label = "Impacted", hjust=3,
+  #   gp=gpar(col="#5ab4ac", cex=.7)),
+  #   xmin = 0, xmax = 0.1, ymin = -20) +
+  ggplot2::annotate("text", x = -.5, y = -1, label = "") +
+  coord_cartesian(ylim = c(-100, 100), clip = "off") +
+  coord_flip() +
+  
+  
+  # xlab('Country') +
+  xlab(NULL) +
+  ylab('Transnational Impact Index') 
+p4ex <- ggarrange(p4ex, labels = "", font.label = list(size = 12), vjust = 1, hjust = 0)
+p4ex
 fname <- paste0(dir.fig, '01main/', 'ex_4_spillover_index_top_bottom_ByType_', postfix, '_', today, '.jpg'); fname
-ggsave(filename = fname, plot = ggplot2::last_plot(), width = width_2col/3*2, height = width_2col/2, units = 'cm', dpi = 600)
+ggsave(filename = fname, plot = p4ex, width = width_2col/3*2, height = width_2col/2, units = 'cm', dpi = 600)
+```
+
+
+
+```{r ... fig2a + ex4}
+(
+  fig2a <- ggarrange(p2a, p4ex, widths = c(0.58, 0.42), align = 'v', font.label = list(size = 12))
+ )
+
+fname <- paste0(dir.fig, '01main/', 'fig2a_4ex_combined', '_', today, '.jpg'); fname
+ggsave(filename = fname, plot = fig2a, width = width_2col, height = width_2col/2, units = 'cm', dpi = 600)
 ```
 
 
@@ -1137,7 +1198,7 @@ fname <- paste0(dir.fig, 'spillover/', 'map_spillover_index_se', '_', today, '.j
 
 
 
-```{r - fig ex5 - score map of each impact}
+```{r ... fig ex5 - score map of each impact}
 
 ## load ft indicator list and direction data ----------------------
 f <- paste0(dirname(dir.eora_cleaned), '/', 'direction_fts.rds'); f
@@ -1206,7 +1267,7 @@ map_each_p <- map_each %>%
         strip.text.x = element_text(size = 6)
         ) 
 # map_each_p
-fname <- paste0(dir.fig, '01main/', 'ex_5_map_spillover_norm_each_', yr, '_long_', today, '-.jpg'); #fname
+fname <- paste0(dir.fig, '01main/', 'ex_5_map_spillover_norm_each_', yr, '_long_', today, '.jpg'); #fname
 ggsave(filename = fname, plot = map_each_p, width = 7, height = n_row*7.2/8, units = 'in', dpi = 300)
 ```
 
