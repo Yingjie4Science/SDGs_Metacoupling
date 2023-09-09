@@ -2752,7 +2752,6 @@ func_plot_sdg_ScoreChange_byGroup(df_score = df_score)
 ```{r}
 ind_sdg  <- 'co2_per_gdp' ## kg/USD
 ind_ft   <- 'CO2'
-unit_check <- 1000
 direction_sdg <- -1
 
 ### Check the Unit!!!
@@ -2778,7 +2777,7 @@ oft <- net_imports_bind  %>%
   dplyr::filter(ind == ind_ft) %>%
   dplyr::select(ind, year, iso3, net_in, scenario) %>%
   dplyr::mutate(net_in = net_in*10^3) %>%  ## ton = 10^3 kg
-  dplyr::mutate(net_in = net_in*coef_correction_curb_10e_issue/10) %>%  
+  # dplyr::mutate(net_in = net_in*coef_correction_curb_10e_issue/10) %>%
   spread(key = scenario, value = net_in)
 
 
@@ -2790,10 +2789,10 @@ rel_not_merge <- rel %>%
   dplyr::filter(year %in% yrs) %>%
   dplyr::mutate(
     ind       = unique(oft$ind),
-    value_rel = (value +       0)/gdp_rel*1000,
-    value_not = (value + fromAll)/gdp_not*1000,
-    value_dst = (value + fromNer)/gdp_dst*1000,
-    value_ner = (value + fromDst)/gdp_ner*1000
+    value_rel = (value +       0)/gdp_rel,
+    value_not = (value + fromAll)/gdp_not,
+    value_dst = (value + fromNer)/gdp_dst,
+    value_ner = (value + fromDst)/gdp_ner
     ) %>%
   ### for easy-checking the numbers
   dplyr::select(ind, iso3, year, value, everything())
@@ -2808,9 +2807,9 @@ hist(rel_not$value_rel)
 ### big - better? --> func_norm_sdg_score_good
 ### big - bad?    --> func_norm_sdg_score_bad
 df_score <- func_norm_sdg_score_auto(
-  df = rel_not, trim = 0, trim.to.na = F,
-  # lower_bound = lower_probs, upper_bound = upper_probs, 
-  lower_bound = 0.01, upper_bound = 0.99, 
+  df = rel_not, trim = 0.025, trim.to.na = F,
+  # lower_bound = lower_probs, upper_bound = upper_probs,
+  lower_bound = 0, upper_bound = 1,
   direction = direction_sdg) %>%
   # spread(key = 'scenario', value = c('value_norm')) %>%
   dplyr::mutate(ind_sdg = ind_sdg) %>%
@@ -2821,6 +2820,11 @@ score_9_4_1x <- df_score
 
 func_plot_netImports_vs_rel(df = rel_not_merge)
 func_plot_sdg_ScoreChange_byGroup(df_score = df_score)
+
+df_score_chg <- df_score %>%
+  dplyr::select(-val) %>%
+  spread(key = scenario, value = value_norm) %>%
+  dplyr::mutate(value_chg = value_rel - value_not)
 
 
 ### for later use ---------------
@@ -2869,8 +2873,8 @@ co2_rel_not <- rel %>%
   
 ```{r}
 ind_sdg    <- 'ODA to infrastructure' ## USD
-ind_ft     <- 'ODA_OOF_oecd_matrix'
-# ind_ft     <- 'ODA_DACSECTOR_oecd_matrix'
+# ind_ft     <- 'ODA_OOF_oecd_matrix'
+ind_ft     <- 'ODA_DACSECTOR_oecd_Infrastructure_matrix'
 unit_check <- ''
 direction_sdg <- 1
 

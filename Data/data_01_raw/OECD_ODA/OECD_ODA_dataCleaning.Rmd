@@ -217,6 +217,7 @@ data_sec_agg <- data_sec %>%
   as.data.frame()
 
 
+sector_i <- 'Infrastructure'
 data_sec_agg_infr <- data_sec_agg %>%
   dplyr::filter(stringr::str_detect(Sector, regex('Infrastructure|Multisector|Transport', ignore_case=TRUE))) %>%
   group_by(Recipient, Donor, Year) %>%
@@ -428,8 +429,33 @@ cat('\n Total NA in', ind, 'in 2015:\t\t', sum(is.na(df_formatted.check$value)),
 ### save to the `eora_cleaned` folder ----------------------------------------------------
 df_formatted %>%
   group_by(year) %>% tally()
-fname <- paste0(dir.eora_cleaned, ind, '_matrix.xlsx'); fname
+fname <- paste0(dir.eora_cleaned, ind, '_', sector_i, '_matrix.xlsx'); fname
 writexl::write_xlsx(x = df_formatted, path = fname)
 gc()
+```
+
+
+```{r - compare, eval=FALSE, include=FALSE}
+f <- paste0(dir.eora_cleaned, 'ODA_OOF_oecd_matrix', '.xlsx')
+d1 <- readxl::read_excel(f) %>%
+  dplyr::filter(year == 2015) %>%
+  gather(key = 'to', value = 'value', 4:ncol(.))
+f <- paste0(dir.eora_cleaned, 'ODA_DACSECTOR_oecd_Infrastructure_matrix', '.xlsx')
+d2 <- readxl::read_excel(f)%>%
+  dplyr::filter(year == 2015) %>%
+  gather(key = 'to', value = 'value', 4:ncol(.))
+
+d3 <- d1 %>%
+  left_join(., d2, by=c("year","ctr","iso3", "to"))
+
+d3 %>%
+  ggplot(aes(x = value.x, y = value.y)) +
+  geom_point() +
+  geom_abline(slope = 1, color = 'red') +
+  scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+  scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+  theme_bw()
 ```
 
