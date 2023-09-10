@@ -94,12 +94,10 @@ not_any_na <- function(x) all(!is.na(x)) ## temp %>% select(where(not_any_na)) -
 ```{r - iso3}
 load('./Data/Ancillary_Data_ISO3code_shp.RData') ## iso_eora, pop, gdp, shp, grp, grp_update
 
-grp <- rbind(
-  grp, 
-  data.frame(name='SUN', iso_a3 = 'SUN', 
-             eco_group = '2.Developing', 
-             inc_group = '4. Low income', 
-             group = 'Low income'))
+# grp <- rbind(
+#   grp, 
+#   data.frame(name='SUN', iso_a3 = 'SUN', eco_group = '2.Developing', 
+#              inc_group = '4. Low income', group = 'Low income'))
 
 grp_update_net <- rbind(
   grp_update, 
@@ -147,7 +145,7 @@ direction_use <- direction %>%
 # nodes <- read.csv("https://kateto.net/workshops/data/Dataset1-Media-Example-NODES.csv", header=T, as.is=T)
 # links <- read.csv("https://kateto.net/workshops/data/Dataset1-Media-Example-EDGES.csv", header=T, as.is=T)
 
-## names(nodes) --> "id"            "media"         "type"    "type.label"    "audience.size"
+## names(nodes) --> "id"            "media"         "type"    "type.label"    "audience.size" (changed to `size_node`)
 ## names(links) --> "from"   "to"     "type"   "weight"
 
 # ind <- 'Water'
@@ -214,7 +212,7 @@ nodes <-
   arrange(iso3) %>%
   dplyr::mutate(node_type  = ifelse(group == 'High income', 1, 0), 
                 type.label = group) %>%
-  dplyr::rename('id' = 'iso3', 'audience.size' = '2015', 'label' = 'name') %>%
+  dplyr::rename('id' = 'iso3', 'size_node' = '2015', 'label' = 'name') %>%
   dplyr::mutate(label = id) %>%
   as.data.frame()
 
@@ -253,7 +251,7 @@ str(nodes)
 
 
 #### --> All indicators
-```{r}
+```{r eval=FALSE, include=FALSE}
 xls.ls <- list.files(path = dir.eora_cleaned, pattern = 'xlsx$', full.names = T); xls.ls
 
 ### Get the list of files for SHDB data, and remove them from the whole list
@@ -337,6 +335,10 @@ links_scaled_all_Net <- links_scaled_all %>%
 
 
 hist(links_scaled_all_Net$n_na)
+
+
+save(links_scaled_all_Net, grp_update_net, pop, 
+     file = paste0('./Data/data_02_intermediate/dt02_flows/', 'network_data_for_viz.RData'))
 ```
 
 
@@ -344,6 +346,8 @@ hist(links_scaled_all_Net$n_na)
 
 
 ```{r - simplify}
+f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'network_data_for_viz.RData')
+load(f) ## `links_scaled_all_Net`, `grp_update_net`, `pop`
 
 ### choose one of the indicators to compare 
 ind <- 'Landuse_forest'
@@ -374,18 +378,20 @@ nodes <-
         by.x = 'iso3', by.y = 'iso_a3', all.x = T) %>%
   dplyr::distinct(iso3, .keep_all = T) %>%
   dplyr::mutate(group = as.factor(group_income2)) %>%
-  merge(., pop %>% dplyr::select(iso3, `2015`), by.x = 'iso3', by.y = 'iso3', all.x = T) %>%
+  merge(x = ., 
+        y = pop %>% dplyr::select(iso3, `2015`), 
+        by.x = 'iso3', by.y = 'iso3', all.x = T) %>%
   arrange(iso3) %>%
   dplyr::mutate(node_type  = ifelse(group == 'High income', 1, 0), 
                 type.label = group) %>%
-  dplyr::rename('id' = 'iso3', 'audience.size' = '2015', 'label' = 'name') %>%
+  dplyr::rename('id' = 'iso3', 'size_node' = '2015', 'label' = 'name') %>%
   dplyr::mutate(label = id) %>%
   as.data.frame()
 ```
 
 
 
-### (2) Network
+### (2) Network - test
 ```{r}
 net <- graph_from_data_frame(d=links, vertices=nodes, directed=T) 
 
@@ -441,9 +447,9 @@ plot(net,
 
 
 
-# 3. Network plots in 'igraph'
+## 3. Network plots in 'igraph'
 
-## Plot parameters 
+### Plot parameters 
 
   We can set the node & edge options in two ways 
   - 1. to specify them in the plot() function
@@ -480,7 +486,7 @@ plot(net,
 ```
 
 
-### Nodes
+#### Nodes
 ```{r}
 ## (1) node colors ------------------------------------------
 unique(nodes$inc_group)
@@ -506,7 +512,7 @@ rescale = function(x,a,b,c,d){c + (x-a)/(b-a)*(d-c)}
 V(net)$size <- rescale(deg, min(deg), max(deg), 5, 20)
 
 ## (2.2) node size: Alternatively, we can set node size based on audience size:
-# V(net)$size <- log(V(net)$audience.size/10^3)
+# V(net)$size <- log(V(net)$size_node/10^3)
 
 # V(net)$size <- 10
 
@@ -518,7 +524,7 @@ V(net)$label.color <- "black"
 
 
 
-### Edges
+#### Edges
 ```{r}
 ## (4) Edge width
 ##  based on weight you choose
@@ -587,7 +593,7 @@ plot(net)
 
 
 
-### Network Layouts
+#### Network Layouts
 
 ```{r}
 # Network layouts are algorithms that return coordinates for each
@@ -820,7 +826,7 @@ dev.off()
 
 
 
-# 4. Plot network for each TNI
+## 4. Plot network for each TNI
 
 ```{r}
 ### functions
@@ -866,7 +872,7 @@ for (i in 1:nrow(direction_use)) {
     arrange(iso3) %>%
     dplyr::mutate(node_type  = ifelse(group == 'High income', 1, 0), 
                   type.label = group) %>%
-    dplyr::rename('id' = 'iso3', 'audience.size' = '2015', 'label' = 'name') %>%
+    dplyr::rename('id' = 'iso3', 'size_node' = '2015', 'label' = 'name') %>%
     dplyr::mutate(label = id) %>%
     as.data.frame()
   
@@ -914,7 +920,7 @@ for (i in 1:nrow(direction_use)) {
   
   ## (4) Edge width
   E(net)$width <- round(E(net)$weight/10000, digits = 2); 
-  hist(E(net)$width)
+  # hist(E(net)$width)
   
   #### normalize the width values
   w <- E(net)$width
@@ -978,8 +984,9 @@ for (i in 1:nrow(direction_use)) {
 
 
 
-## ---
-## --- END ---------------------------------
+## -----------------------------------------
+## END
+## -----------------------------------------
 
 ## Highlighting aspects of the network
 ```{r}
@@ -1063,10 +1070,10 @@ plot(net, vertex.color = colrs[V(net)$community])
 
 
 
+# Other network tools
 
-# 6. Beyond igraph: Statnet, ggraph, and simple charts
+## 6. Beyond igraph: Statnet, ggraph, and simple charts
 
-## network
 ```{r eval=FALSE, include=FALSE}
 
 # The 'igraph' package is only one of many available network visualization options in R.
@@ -1108,7 +1115,7 @@ net3 <- network::network(x = links,
 net3
 
 # You can access the edges, vertices, and the network matrix using:
-net3[,]
+# net3[,]
 # net3 %n% "net.name" <- "Media Network" #  network attribute
 net3 %v% "group"  # Node attribute
 net3 %e% "type"     # Edge attribute
@@ -1116,20 +1123,20 @@ net3 %e% "type"     # Edge attribute
 net3 %v% "col" <- c("gray70", "tomato", "gold", 'red')[net3 %v% "group"]
 
 # plot the network:
-plot(net3, vertex.cex=(net3 %v% "audience.size")/7, vertex.col= net3 %v% "col")
+plot(net3, vertex.cex=(net3 %v% "size_node")/7, vertex.col= net3 %v% "col")
 
 ### For a full list of parameters that you can use in this plot, heck out ?plot.network.
 # ?plot.network
 
 # Note that - as in igraph - the plot returns the node position coordinates.
-l <- plot(net3, vertex.cex=(net3 %v% "audience.size")/7, vertex.col="col")
-plot(net3, vertex.cex=(net3 %v% "audience.size")/7, vertex.col="col", coord=l)
+l <- plot(net3, vertex.cex=(net3 %v% "size_node")/7, vertex.col="col")
+plot(net3, vertex.cex=(net3 %v% "size_node")/7, vertex.col="col", coord=l)
 
 
 # The network package also offers the option to edit a plot interactively,
 # by setting the parameter interactive=T
 
-plot(net3, vertex.cex=(net3 %v% "audience.size")/7, vertex.col="col", interactive=T)
+plot(net3, vertex.cex=(net3 %v% "size_node")/7, vertex.col="col", interactive=T)
 
 
 detach("package:network")
@@ -1137,7 +1144,7 @@ detach("package:network")
 
 
 
-## ggraph
+## 7. ggraph
 
   A 'ggraph' package example (for ggplot2 fans)
 
@@ -1202,7 +1209,7 @@ ggraph(net, layout="lgl") +
   geom_node_point(aes(size = size), color=V(net)$color) +  # size by audience size  
   theme_void()
 
-# The edge attribute 'type' and node attribute 'audience.size' are 
+# The edge attribute 'type' and node attribute 'size_node' are 
 # taken from our data as they are included in the igraph object 'net'
 
 # One great thing about ggplot2 and ggraph is that they automatically
@@ -1251,7 +1258,7 @@ ggraph(net, layout = "centrality", cent = graph.strength(net))+
                 start_cap = circle(2, 'mm'),
                 end_cap = circle(5, 'mm'),
                 arrow = arrow(length = unit(3, 'mm'))) + 
-  geom_node_point(aes(fill = group, size = size), shape = 21) +
+  geom_node_point(aes(fill = group, size = size_node), shape = 21) +
   geom_node_text(aes(label = label), family = "Arial")+ # size = size, 
   scale_edge_width_continuous(range = c(1, 10))+
   scale_size_continuous(range = c(5, 15))+
@@ -1265,7 +1272,7 @@ ggraph(net, layout = "centrality", cent = graph.strength(net))+
 ```
 
 
-## heatmap
+## 7. heatmap
 ```{r }
 # -------~~ Other ways to represent a network -------- 
 
@@ -1287,7 +1294,7 @@ heatmap(netm[,17:1], Rowv = NA, Colv = NA, col = palf(20),
 
 # Degree distribution
 deg.dist <- degree_distribution(net, cumulative=T, mode="all")
-plot( x=0:max(degree(net)), y=1-deg.dist, pch=19, cex=1.4, col="orange", 
+plot( x=0:max(igraph::degree(net)), y=1-deg.dist, pch=19, cex=1.4, col="orange", 
       xlab="Degree", ylab="Cumulative Frequency")
 ```
 
@@ -1302,7 +1309,7 @@ plot( x=0:max(degree(net)), y=1-deg.dist, pch=19, cex=1.4, col="orange",
 
 
 
-# 8. Interactive JavaScript networks
+## 8. Interactive JavaScript networks
 ```{r}
 # ================ 8. Interactive JavaScript networks ================
 
@@ -1371,9 +1378,9 @@ visNetwork(vis.nodes, vis.links)
 
 # Below we change some of the visual properties of the edges:
 
-vis.links$width <- 1+links$weight/8 # line width
+vis.links$width <- log(links$weight) # line width
 vis.links$color <- "gray"    # line color  
-vis.links$arrows <- "middle" # arrows: 'from', 'to', or 'middle'
+vis.links$arrows <- "to" # arrows: 'from', 'to', or 'middle'
 vis.links$smooth <- FALSE    # should the edges be curved?
 vis.links$shadow <- FALSE    # edge shadow
 
@@ -1424,7 +1431,7 @@ detach("package:visNetwork")
 
 
 
-## threejs
+### threejs
 
   Interactive networks with threejs. Another package exporting networks from R to a js library is 'threejs'; The nice thing about it is that it can read igraph objects.
 
@@ -1492,7 +1499,7 @@ print(lemis.net)
 saveWidget(lemis.net, file="LeMis-Network-gjs.html")
 browseURL("LeMis-Network-gjs.html")
  
-detach(package: igraph)
+# detach(package: igraph)
 detach(package: threejs)
 detach(package: htmlwidgets)
 ```
@@ -1500,7 +1507,7 @@ detach(package: htmlwidgets)
 
 
 
-## networkD3 ?
+### networkD3 ?
 
   Another package using JavaScript to export networks: networkD3
 
@@ -1520,9 +1527,10 @@ links.d3 <- data.frame(from=as.numeric(factor(links$from))-1,
 nodes.d3 <- cbind(idn=factor(nodes$label, levels=nodes$label), nodes) 
 
 nodes_d3 <- mutate(nodes, id = as.numeric(rownames(nodes))-1)
-links.d3 <- mutate(links, from=as.numeric(factor(links$from))-1, 
+links.d3 <- mutate(links, 
+                   from=as.numeric(factor(links$from))-1, 
                    to=as.numeric(factor(links$to))-1,
-                   w = (weight)/100)
+                   w = (weight)/1000)
 
 # The `Group` parameter is used to color the nodes.
 # Nodesize is not (as you might think) the size of the node, but the
@@ -1531,7 +1539,7 @@ links.d3 <- mutate(links, from=as.numeric(factor(links$from))-1,
 # attraction (if positive).
 
 forceNetwork(Links = links.d3, Nodes = nodes.d3, Source="from", Target="to",
-             NodeID = "idn", Group = "type.label", Value = 'w',
+             NodeID = "idn", Group = "type.label", Value = 'w', 
              linkColour = "#afafaf", arrows = T, 
              fontSize=12, legend = T,
              # Nodesize=6, 
@@ -1546,9 +1554,9 @@ detach(package: networkD3)
 
 
 
-# 9. Interactive and dynamic networks with ndtv-d3
+## 9. Interactive and dynamic networks with ndtv-d3
 
-## ndtv
+### ndtv
 
 ```{r}
 
@@ -1574,7 +1582,7 @@ net3
 
 render.d3movie(net3, usearrows = F, displaylabels = F, bg="#111111", 
                vertex.border="#ffffff", vertex.col =  net3 %v% "col",
-               vertex.cex = (net3 %v% "audience.size")/8, 
+               vertex.cex = (net3 %v% "size_node")/8, 
                edge.lwd = (net3 %e% "weight")/3, edge.col = '#55555599',
                vertex.tooltip = paste("<b>Name:</b>", (net3 %v% 'media') , "<br>",
                                     "<b>Type:</b>", (net3 %v% 'type.label')),
@@ -1643,7 +1651,7 @@ net3.dyn <- networkDynamic(base.net=net3, edge.spells=es, vertex.spells=vs)
 
 
 # Plot the network (all elements present at any time point): 
-plot(net3.dyn, vertex.cex=(net3 %v% "audience.size")/7, vertex.col="col")
+plot(net3.dyn, vertex.cex=(net3 %v% "size_node")/7, vertex.col="col")
 
 
 # Plot static images showing network evolution:
@@ -1681,7 +1689,7 @@ render.d3movie(net3.dyn, usearrows = F,
                bg="#ffffff", vertex.border="#333333",
                vertex.cex = degree(net3)/2,  
                vertex.col = net3.dyn %v% "col",
-               edge.lwd = (net3.dyn %e% "weight")/3, 
+               edge.lwd = (net3.dyn %e% "weight")/3000, 
                edge.col = '#55555599',
                vertex.tooltip = paste("<b>Name:</b>", (net3.dyn %v% "media") , "<br>",
                                     "<b>Type:</b>", (net3.dyn %v% "type.label")),
@@ -1729,7 +1737,7 @@ detach("package:network")
 
 
 
-# 10. Plotting networks on a geographic map
+## 10. Plotting networks on a geographic map
 
   The example below plots a network on a map using base R and mapping libraries.
 Note that for those familiar with it, the package 'ggplot2' may provide
@@ -1750,15 +1758,14 @@ library("maps")
 library("geosphere")
  conflicts_prefer(maps::map)
 
-# Package 'maps' has built-in maps it can plot for you. For example:
-# ('col' is map fill, 'border' is  border color, 'bg' is  background color)
-par(mfrow = c(2,2))
-map("usa", col="tomato",  border="gray10", fill=TRUE, bg="gray30")
-map("state", col="orange",  border="gray10", fill=TRUE, bg="gray30")
-map("county", col="palegreen",  border="gray10", fill=TRUE, bg="gray30")
-map("world", col="skyblue",  border="gray10", fill=TRUE, bg="gray30")
-
-dev.off()
+###' Package 'maps' has built-in maps it can plot for you. For example:
+###'   ('col' is map fill, 'border' is  border color, 'bg' is  background color)
+# par(mfrow = c(2,2))
+# map("usa", col="tomato",  border="gray10", fill=TRUE, bg="gray30")
+# map("state", col="orange",  border="gray10", fill=TRUE, bg="gray30")
+# map("county", col="palegreen",  border="gray10", fill=TRUE, bg="gray30")
+# map("world", col="skyblue",  border="gray10", fill=TRUE, bg="gray30")
+# dev.off()
 
 # The data we will use contains US airports and flights among them. 
 # The airport file includes info about latitude and longitude.
@@ -1809,4 +1816,5 @@ for(i in 1:nrow(flights))  {
 
 
 ```
+
 
