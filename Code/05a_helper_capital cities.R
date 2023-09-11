@@ -57,7 +57,9 @@ capital_city <- world.cities %>%
   rbind(
     data.frame(city_name = "Hong Kong", country.etc = "China:Hong Kong", 
                pop = 7491609, lat = 22.3193, long = 114.1694, capital=1)
-  )
+  ) %>%
+  ## there are two duplicates: capitals for "Costa Rica" and "Cyprus"
+  dplyr::distinct(city_name, country.etc, .keep_all = T)
 
 
 capital_city_data <-  capital_city %>%
