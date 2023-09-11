@@ -1,0 +1,357 @@
+---
+title: "Untitled"
+author: "Yingjie"
+date: "6/30/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+# Overview
+
+  To get the output for the analysis, we only need to run these two chunks
+  - `#### --> All indicators`
+  - `# 4. Plot network for each TNI`
+  
+  Other sections/chunks are for testing and selecting the best viz option. 
+  
+  
+
+# 1. Introduction 
+
+
+```{r include=FALSE}
+
+### To clear your environment  -----------------------------------------------------------
+# remove(list = ls())
+
+
+# Download the workshop materials: bit.ly/sunbelt-2021
+# Online tutorial: kateto.net/sunbelt2021
+
+
+# KEY PACKAGES
+# Install those now if you do not have the latest versions. 
+# (please do NOT load them yet!)
+
+# install.packages("igraph") 
+# install.packages("network") 
+# install.packages("sna")
+# install.packages("visNetwork")
+# install.packages("threejs")
+# install.packages("ndtv")
+
+
+# OPTIONAL PACKAGES
+# Install those if you  would like to run through all of the
+# examples below (those are not critical and can be skipped).
+
+# install.packages("png")
+# install.packages("ggraph")
+# install.packages("networkD3")
+# install.packages("animation")
+# install.packages("maps")
+# install.packages("geosphere")
+
+### packages -----------------------------------------------------------------------------
+source('./Code/_package list.R')
+# Download an archive with the data files from http://bit.ly/sunbelt-2021
+# Load the 'igraph' library:
+library(igraph)
+
+
+
+
+### set work dir -------------------------------------------------------------------------
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+setwd(dir)
+setwd('..') # set directory by one folder up
+getwd()
+
+### data path
+source('./Code/_path of data.R')
+
+today <- format(Sys.time(), "%Y%m%d"); today
+```
+
+
+```{r - functions}
+## Remove columns from dataframe where ALL values are NA
+not_all_na <- function(x) any(!is.na(x)) ## temp %>% select(where(not_all_na)) --> allow a few NA in the column 
+not_any_na <- function(x) all(!is.na(x)) ## temp %>% select(where(not_any_na)) --> not allow any NA in the column
+
+source('./Code/function_scale_spillover_score.R')
+```
+
+
+
+
+
+# 2. Data
+
+
+## Ancillary data
+
+```{r - iso3}
+load('./Data/Ancillary_Data_ISO3code_shp.RData') ## iso_eora, pop, gdp, shp, grp, grp_update
+
+# grp <- rbind(
+#   grp, 
+#   data.frame(name='SUN', iso_a3 = 'SUN', eco_group = '2.Developing', 
+#              inc_group = '4. Low income', group = 'Low income'))
+
+grp_update_net <- rbind(
+  grp_update, 
+  data.frame(name='ROW', iso_a3 = 'ROW', group_income4 = 'Low income', 
+             group_income2 = 'Low income', group_economies = 'Developing'),
+  data.frame(name='SUN', iso_a3 = 'SUN', group_income4 = 'Low income', 
+             group_income2 = 'Low income', group_economies = 'Developing')
+)
+
+### extended country-iso3 pair list for matching
+load('./Data/Ancillary_Data_iso_eora_ex.RData')  ## ## iso_eora_ex
+```
+
+
+```{r - direction}
+### loop the normalization based on direction ------------------------------------------------------
+# xls <- paste0('./Data/data_02_intermediate/dt02_flows/', "spillover_name_list_directions.xlsx"); xls
+# direction <- readxl::read_excel(path = xls) %>%
+#   dplyr::filter(!is.na(ind) & !is.na(direction))
+
+f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'direction.RData')
+load(f) ## `direction`, `direction_clean`
+
+direction_use <- direction %>%
+  dplyr::filter(!is.na(direction)) %>%
+  dplyr::filter(Used == 1) %>%
+  # dplyr::filter(!ind %in% c('Material_footprint')) %>% ## need to update this data!
+  dplyr::select(ind, direction, Impact_direction, everything())
+
+
+# ind_selected <- unique(direction_use$ind)
+```
+
+
+
+## Network Data
+
+### Links and nodes
+
+#### One indicator
+```{r}
+# -------~~ DATASET 1: edgelist  --------
+ 
+# Read in the data:
+# nodes <- read.csv("https://kateto.net/workshops/data/Dataset1-Media-Example-NODES.csv", header=T, as.is=T)
+# links <- read.csv("https://kateto.net/workshops/data/Dataset1-Media-Example-EDGES.csv", header=T, as.is=T)
+
+## names(nodes) --> "id"            "media"         "type"    "type.label"    "audience.size" (changed to `size_node`)
+## names(links) --> "from"   "to"     "type"   "weight"
+
+# ind <- 'Water'
+ind <- 'student_flow'
+ind <- 'Landuse_forest'
+# ind <- 'osh_fatal'
+xls <- paste0(dir.eora_cleaned, ind, '.xlsx'); xls
+
+
+mat <- readxl::read_excel(xls) %>% 
+  ungroup() %>%
+  dplyr::filter(year == 2015) 
+
+links <- mat %>%
+  gather(key = 'to', value = 'weight', 4:ncol(.)) %>%
+  dplyr::rename('from' = 'iso3') %>%
+  dplyr::mutate(type = ind) %>%
+  dplyr::select(-ctr, -year) %>%
+  arrange(from, to) %>%
+  distinct(from, to, .keep_all = T) %>%  ## ??? --> need to find out why
+  
+  dplyr::filter(!is.na(weight) & weight > 0) %>%
+  # dplyr::filter(weight >= 5*10^3) %>%      ## ??? --> to reduce edges
+  dplyr::mutate(pct = weight/sum(weight, na.rm = T)*100) %>%
+  arrange(desc(pct)) %>%
+  dplyr::mutate(pct_cumsum = cumsum(pct)) %>%
+  # dplyr::filter(pct_cumsum < 80) %>%
+  
+  #########################################
+  ## remove domestic flows -------------------
+  dplyr::filter(from != to) %>%
+
+  ## look at the top 15 flows
+  # head(55) %>% ## 15
+  ##########################################
+
+  ## remove nodes with too few links (< 5 links)
+  group_by(from) %>%
+  dplyr::mutate(freq_from = n()) %>%
+  dplyr::filter(freq_from >= 1) %>%   
+  ungroup() %>%
+  as.data.frame()
+
+nodes <- 
+  # readxl::read_excel(xls) %>%
+  # ungroup() %>%
+  # dplyr::filter(year == 2015) %>%
+  # distinct(iso3, .keep_all = F) %>%
+  
+  data.frame(iso3 = c(links$from, links$to)) %>%
+  dplyr::mutate(iso3 = as.character(iso3)) %>%
+  dplyr::distinct(iso3, .keep_all = T) %>%
+  
+  merge(x = ., 
+        y = grp_update_net, 
+        by.x = 'iso3', by.y = 'iso_a3', all.x = T) %>%
+  # dplyr::filter(name != 'N. Cyprus') %>%
+  dplyr::distinct(iso3, .keep_all = T) %>%
+  # dplyr::select(-group_income2) #%>%
+  dplyr::mutate(group = as.factor(group_income2)) %>%
+  merge(x = ., 
+        y = pop %>% dplyr::select(iso3, `2015`), 
+        by.x = 'iso3', by.y = 'iso3', all.x = T) %>%
+  arrange(iso3) %>%
+  dplyr::mutate(node_type  = ifelse(group == 'High income', 1, 0), 
+                type.label = group) %>%
+  dplyr::rename('id' = 'iso3', 'size_node' = '2015', 'label' = 'name') %>%
+  dplyr::mutate(label = id) %>%
+  as.data.frame()
+
+# Examine the data:
+head(nodes)
+head(links)
+str(nodes)
+str(links)
+
+# setdiff(unique(links$from), nodes$id)
+# setdiff(nodes$id, unique(links$from))
+
+
+### to only include nodes listed in `links`
+length(unique(nodes$id))
+
+nodes_in_links <- c(links$from, links$to); nodes_in_links
+nodes_in_links <- unique(nodes_in_links)
+length(nodes_in_links)
+
+nodes <- nodes %>%
+  dplyr::filter(id %in% nodes_in_links)
+
+str(nodes)
+
+# Converting the data to an igraph object:
+# The graph_from_data_frame() function takes two data frames: 'd' and 'vertices'.
+# 'd' describes the edges of the network - it should start with two columns 
+# containing the source and target node IDs for each network tie.
+# 'vertices' should start with a column of node IDs.
+# Any additional columns in either data frame are interpreted as attributes.
+
+# ?graph.data.frame
+```
+
+
+
+#### All indicators
+```{r}
+xls.ls <- list.files(path = dir.eora_cleaned, pattern = 'xlsx$', full.names = T); xls.ls
+
+### Get the list of files for SHDB data, and remove them from the whole list
+library(stringr)
+# xls.ls.SHDB <- str_subset(xls.ls, pattern="SHDB")
+# xls.ls.other<- setdiff(xls.ls, xls.ls.SHDB); xls.ls.other; length(xls.ls.other)
+# xls <- xls.ls.other[4]; xls 
+
+
+### put all spillover indicators in one table 
+links_scaled_all <- data.frame()
+
+frac <- 0.025
+
+for (i in 1:nrow(direction_use)) {
+
+  ind <- direction_use[i, 1] %>% unlist() %>% paste(sep = '', collapse = ''); 
+  drt <- direction_use[i, 2] %>% unlist() %>% paste(sep = '', collapse = '') %>% as.numeric()
+  in_out <- direction_use[i, 'Impact_direction'] %>% unlist() %>% paste(sep = '', collapse = '')
+  cat('\n\n', i, '\t', ind, '\t', drt, '\t', in_out, '\n')
+  
+  xls <- paste0(dir.eora_cleaned, ind, '.xlsx'); print(xls);
+  mat <- readxl::read_excel(xls) %>% 
+    ungroup() %>%
+    ### use SHDB 2019 for 2015 --------------------!!!
+    dplyr::mutate(year = ifelse(
+      str_detect(string = ind, pattern = 'SHDB') & year == 2019, 2015, year)) %>%
+    dplyr::filter(year == 2015) 
+
+  links <- mat %>%
+    gather(key = 'to', value = 'weight', 4:ncol(.)) %>%
+    dplyr::rename('from' = 'iso3') %>%
+    dplyr::mutate(type = ind) %>%
+    dplyr::select(-ctr, -year) %>%
+    arrange(from, to) %>%
+    dplyr::distinct(from, to, .keep_all = T) %>%  
+    ## remove domestic flows -------------------
+    dplyr::filter(from != to) %>%
+    as.data.frame()
+
+  ### to re-scale each impact to 0-100 -------------------------------------------------------------
+  links_scaled <- links %>%
+    dplyr::mutate(x = weight) %>%
+    ###' remove any values < 0 
+    dplyr::filter(x >= 0) %>% 
+    ungroup() %>%
+    dplyr::mutate(
+      ### cal upper/lower bounds ----------------------------
+      max0  = max(x, na.rm = T),
+      min0  = min(x, na.rm = T),
+      max1  = x %>% unlist() %>% na.omit() %>% sort(decreasing = T) %>% dplyr::nth(n = round(length(.)*frac)),
+      min1  = x %>% unlist() %>% na.omit() %>% sort(decreasing = T) %>% dplyr::nth(n = round(length(.)*(1-frac))),
+      ### to decide which upper/lower bounds to use ---------
+      max = max0,
+      min = min0) %>% as.data.frame() %>%
+    dplyr::mutate(
+      # --> higher value means larger negative impact  ---------------------------------------------
+      score = dplyr::case_when(drt < 0    ~ (x-min)/(max-min)*100,  ## the larger the larger
+                               is.na(drt) ~ NA_real_,
+                               TRUE       ~ (max-x)/(max-min)*100), ## the larger the smaller
+      # --> to keep score value ranging from 0-100 -------------------------------------------------
+      score = dplyr::case_when(is.na(score) ~ NA_real_,
+                               score > 100  ~ 100,
+                               score > 0    ~ score,
+                               TRUE         ~ 0)
+      ) %>%
+    arrange(desc(x)) %>% 
+    as.data.frame()
+  
+  
+  ###' since we aim to quantify the total negative spillovers, a new function is used to 
+  ###'    subtract those positive spillover (i.e., scale good spillovers to range between -100 and 0)
+  max2 <- unique(links_scaled$max)
+  min2 <- unique(links_scaled$min)
+  
+  links_scaled2 <- links_scaled %>%
+    function_scale_spillover_score(df = ,, direction_i = drt, in_or_out = in_out, 
+                                   max_positive = max2, min_positive = min2)
+  
+  links_scaled_all <- rbind(links_scaled_all, links_scaled2)
+}
+
+
+
+links_scaled_all_Net <- links_scaled_all %>%
+  dplyr::select(from, to, type, score) %>%
+  spread(key = type, value = score) %>%
+  dplyr::select(where(not_all_na)) %>% 
+  ### total impact 
+  dplyr::mutate(total = rowSums(across(where(is.numeric)), na.rm = T),
+                n_na  = rowSums(is.na(.))) %>%  ## count NA in all the indicators
+  dplyr::filter(n_na < ncol(.)/3) %>%           ## remove country-pair without sufficient available data
+  as.data.frame()
+
+
+hist(links_scaled_all_Net$n_na)
+
+
+save(links_scaled_all_Net, grp_update_net, pop, 
+     file = paste0('./Data/data_02_intermediate/dt02_flows/', 'network_data_for_viz.RData'))
+```
