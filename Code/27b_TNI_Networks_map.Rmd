@@ -22,6 +22,7 @@ editor_options:
 Plot a network graph of nodes with geographic coordinates on a map.
 Author: Markus Konrad <markus.konrad@wzb.eu>
 May 2018
+https://www.r-bloggers.com/2018/05/three-ways-of-visualizing-a-graph-on-a-map/
 https://gist.github.com/internaut/a9a274c72181eaa7f5c3ab3a5f54b996#file-networkmap-r
 
 This script shows three ways of plotting a network graph on a map.
@@ -38,7 +39,7 @@ The following information should be visualized (with the respective aestethics a
 ```{r}
 
 ### To clear your environment 
-remove(list = ls())
+# remove(list = ls())
 
 ### set work dir
 # path <- rstudioapi::getSourceEditorContext()$path
@@ -47,6 +48,9 @@ remove(list = ls())
 # setwd('..') # set directory by one folder up
 getwd()
 
+### data path
+source('./Code/_path of data.R')
+
 library(assertthat)
 library(dplyr)
 library(purrr)
@@ -54,6 +58,9 @@ library(igraph)
 library(ggplot2)
 library(ggraph)
 library(ggmap)
+library(ggpubr)
+
+today <- format(Sys.time(), "%Y%m%d"); today
 ```
 
 
@@ -116,16 +123,54 @@ edges
   
 
 ```{r - your data - simplify}
+
+n_flows_to_show <- 200 ## 105
+
+load('./Data/Ancillary_Data_ISO3code_shp.RData') ## `iso_eora`, `pop`, `gdp` (USD), `shp`, `grp`, `grp_update`
+rm(pop, gdp, grp)
+
+
+###' the data were derived from `27a_TNI_Networks.Rmd`
+###'  - The countries in the `to` represents who impose negative impacts on others
 f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'network_data_for_viz.RData')
 load(f) ## `links_scaled_all_Net`, `grp_update_net`, `pop`
 
+
 ### load capital city data
 f <- "./Data/capital_city_data.rds"
-capital_city_data <- readRDS(file = f)
+capital_city_data <- readRDS(file = f) %>%
+  dplyr::rename('lon' = 'long') %>%
+  dplyr::mutate(
+    lon = case_when(
+      iso3=='AUS' ~ lon-15,
+      iso3=='CAN' ~ lon-35,
+      iso3=='CHN' ~ lon-5,
+      iso3=='DEU' ~ lon-3,
+      iso3=='GBR' ~ lon-1,
+      iso3=='FIN' ~ lon+1,
+      iso3=='MEX' ~ lon-5,
+      iso3=='RUS' ~ lon+65,
+      iso3=='SWE' ~ lon-1,
+      iso3=='USA' ~ lon-20,
+      T           ~ lon),
+    lat = case_when(
+      iso3=='AUS' ~ lat+10,
+      iso3=='CHN' ~ lat-5,
+      iso3=='CAN' ~ lat+15,
+      iso3=='DEU' ~ lat-2,
+      iso3=='GBR' ~ lat+1,
+      iso3=='FIN' ~ lat+5,
+      iso3=='IND' ~ lat-15,
+      iso3=='RUS' ~ lat+5,
+      iso3=='SWE' ~ lat+5,
+      T           ~ lat)
+  ) %>%
+  dplyr::select(iso3, lat, lon)
 
 ### choose one of the indicators to compare 
 ind <- 'Landuse_forest'
 ind <- 'total'
+
   
 source('https://raw.githubusercontent.com/Yingjie4Science/functionX/main/scaling_normalization_Pro.R')
 
@@ -136,15 +181,13 @@ edges <- links_scaled_all_Net %>%
                 weight = ifelse(weight<0, 0, weight)) %>%
   ##' look at the top 15 flows
   arrange(desc(weight)) %>%
-  head(105) %>% ## 55
+  head(n_flows_to_show) %>%
   ## remove nodes with too few links (< 5 links)
   group_by(from) %>%
   dplyr::mutate(freq_from = n()) %>%
   dplyr::filter(freq_from >= 1) %>%  
   dplyr::select(-freq_from) %>%
   ungroup() %>%
-  
-  dplyr::mutate(category = 1) %>%
   as.data.frame()
 
 
@@ -152,33 +195,36 @@ nodes <-
   data.frame(iso3 = c(edges$from, edges$to)) %>%
   dplyr::mutate(iso3 = as.character(iso3)) %>%
   dplyr::distinct(iso3, .keep_all = T) %>%
-
   merge(x = ., 
         y = grp_update_net, 
         by.x = 'iso3', by.y = 'iso_a3', all.x = T) %>%
   dplyr::distinct(iso3, .keep_all = T) %>%
   dplyr::mutate(group = as.factor(group_income2)) %>%
-  merge(x = ., 
-        y = pop %>% dplyr::select(iso3, `2015`), 
-        by.x = 'iso3', by.y = 'iso3', all.x = T) %>%
+  # merge(x = ., 
+  #       y = pop %>% dplyr::select(iso3, `2015`), 
+  #       by.x = 'iso3', by.y = 'iso3', all.x = T) %>%
+  # dplyr::rename('size_node' = '2015') %>%
   arrange(iso3) %>%
-  dplyr::mutate(node_type  = ifelse(group == 'High income', 1, 0), 
-                type.label = group) %>%
-  dplyr::rename('id' = 'iso3', 'size_node' = '2015', 'label' = 'name') %>%
-  dplyr::mutate(label = id) %>%
-  
+  # dplyr::mutate(node_type  = ifelse(group == 'High income', 1, 0), 
+  #               type.label = group) %>%
+  dplyr::mutate(id    = iso3, 
+                label = iso3) %>%
   ### add capital city's lon and lat info
-  left_join(., capital_city_data, by = c('id' = 'iso3')) %>%
-  dplyr::rename('lon' = 'long') %>%
+  left_join(., capital_city_data, by = c('iso3')) %>%
+  # dplyr::distinct(id, .keep_all = T) %>%
+  dplyr::select(id, iso3, everything()) %>%
   as.data.frame()
+
+# Remove duplicates based on Sepal.Width columns
+nodes[duplicated(nodes$id), ]
 ```
 
 
 
-```{r}
+```{r - plot}
 # create the igraph graph object
 
-g <- graph_from_data_frame(edges, directed = F, vertices = nodes)
+g <- graph_from_data_frame(edges, directed = T, vertices = nodes)
 
 # --------------------------------------------------------------------- #
 # Common data structures and ggplot objects for all the following plots #
@@ -189,15 +235,45 @@ g <- graph_from_data_frame(edges, directed = F, vertices = nodes)
 # edge (x, y and xend, yend)
 
 edges_for_plot <- edges %>%
-  inner_join(nodes %>% select(id, lon, lat), by = c('from' = 'id')) %>%
+  ### keep the top n edges
+  arrange(desc(weight)) %>%
+  head(n_flows_to_show) %>%
+  inner_join(nodes %>% dplyr::select(id, lon, lat), by = c('from' = 'id')) %>%
   rename(x = lon, y = lat) %>%
-  inner_join(nodes %>% select(id, lon, lat), by = c('to' = 'id')) %>%
-  rename(xend = lon, yend = lat)
-
-assert_that(nrow(edges_for_plot) == nrow(edges))
+  inner_join(nodes %>% dplyr::select(id, lon, lat, group), by = c('to' = 'id')) %>%
+  rename(xend = lon, yend = lat) %>%
+    dplyr::mutate(category = group)
+# assert_that(nrow(edges_for_plot) == nrow(edges))
 
 # use the node degree for scaling the node sizes
-nodes$weight = igraph::degree(g)
+nodes_for_plot <- nodes %>%
+  dplyr::mutate(weight = igraph::degree(g, mode="in")) %>%
+  dplyr::filter(id %in% c(edges_for_plot$from, edges_for_plot$to))
+
+
+
+# common polygon geom for plotting the country shapes
+country_shapes <- geom_polygon(
+  data = map_data('world') %>% dplyr::filter(region != 'Antarctic'), 
+  aes(x = long, y = lat, group = group),
+  # fill = "transparent", 
+  fill = "gray90", 
+  color = "gray70", size = 0.05, alpha = .5)
+
+dd <- map_data('world')
+# country_shapes <- geom_sf(
+#   data = shp, 
+#   fill = "transparent", color = "gray50", size = 0.05, alpha = .5)
+
+
+
+# common coordinate system for all the following plots
+mapcoords    <- coord_fixed(xlim = c(-150, 180), ylim = c(-55, 80))
+mapcoords_eu <- coord_fixed(xlim = c(-10, 36),   ylim = c(34, 65), clip = 'on')
+
+
+color_label <- "black"
+color_label <- "transparent"
 
 # common plot theme
 maptheme <- theme(
@@ -206,20 +282,35 @@ maptheme <- theme(
   theme(axis.text = element_blank()) +
   theme(axis.ticks = element_blank()) +
   theme(axis.title = element_blank()) +
-  theme(legend.position = "bottom") +
+  theme(#legend.position = "bottom", 
+        legend.background = element_rect(fill = "transparent")) +
   theme(panel.grid = element_blank()) +
   theme(panel.background = element_rect(fill = "transparent")) +
-  theme(plot.margin = unit(c(0, 0, 0.5, 0), 'cm'))
-
-# common polygon geom for plotting the country shapes
-country_shapes <- geom_polygon(data = map_data('world'), aes(x = long, y = lat, group = group),
-                               fill = "transparent", color = "gray50", size = 0.01, alpha = .8)
-# common coordinate system for all the following plots
-mapcoords <- coord_fixed(xlim = c(-150, 180), ylim = c(-55, 80))
+  theme(plot.margin = unit(c(0, 0, 0.5, 0), 'cm')) ## t, r, b, l
 
 
-color_label <- "black"
-color_label <- "transparent"
+
+unique(nodes_for_plot$group)
+n_grp <- unique(nodes_for_plot$group) %>% length()
+source('./Code/helper_color_scheme.R')
+if (n_grp > 2) {
+  fill_color <- c('High income'         = color_income_group_4[1],
+                  'Upper middle income' = color_income_group_4[2],
+                  'Lower middle income' = color_income_group_4[3],
+                  'Low income'          = color_income_group_4[4])
+  label_edge <- c('Impact by High income', 
+                  'Impact by Upper middle income',
+                  'Impact by Lower middle income',
+                  'Impact by Low income' 
+                  )
+} else {
+  fill_color <- c('High income' = color_income_group_2[1], 
+                  'Low income'  = color_income_group_2[2])
+  
+  label_edge <- c('Impact by High income', 
+                  'Impact by Low income' 
+                  )
+}
 ```
 
 
@@ -232,23 +323,23 @@ color_label <- "transparent"
 
 # try to plot with scaled edge widths and node sizes
 # this will fail because we can only use the "size" aesthetic twice
-ggplot(nodes) + 
-  country_shapes +
-  geom_curve(aes(x = x, y = y, xend = xend, yend = yend,     # draw edges as arcs
-                 color = category, size = weight/5),
-             arrow = arrow(length = unit(0.2, "in"), ends = 'last', 
-                           angle = '20', # default = 30
-                           type = 'open'),
-             data = edges_for_plot, curvature = 0.33, alpha = 0.5) +
-  scale_size_continuous(guide = FALSE, range = c(0.25, 2)) + # scale for edge widths
-  geom_point(aes(x = lon, y = lat, size = weight),           # draw nodes
-             shape = 21,   
-             fill = 'white', color = 'black', stroke = 0.5) +
-  scale_size_continuous(guide = FALSE, range = c(1, 6)) +    # scale for node size
-  geom_text(aes(x = lon, y = lat, label = label),             # draw text labels
-            hjust = 0, nudge_x = 1, nudge_y = 4,
-            size = 3, color = color_label) +
-  mapcoords + maptheme
+# ggplot(nodes_for_plot) + 
+#   country_shapes +
+#   geom_curve(aes(x = x, y = y, xend = xend, yend = yend,     # draw edges as arcs
+#                  color = category, size = weight),
+#              arrow = arrow(length = unit(0.2, "in"), ends = 'last', 
+#                            angle = '20', # default = 30
+#                            type = 'open'),
+#              data = edges_for_plot, curvature = 0.33, alpha = 0.5) +
+#   scale_size_continuous(guide = FALSE, range = c(0.25, 2)) + # scale for edge widths
+#   geom_point(aes(x = lon, y = lat, size = weight),           # draw nodes
+#              shape = 21,   
+#              fill = 'white', color = 'black', stroke = 0.5) +
+#   scale_size_continuous(guide = FALSE, range = c(1, 6)) +    # scale for node size
+#   geom_text(aes(x = lon, y = lat, label = label),             # draw text labels
+#             hjust = 0, nudge_x = 1, nudge_y = 4,
+#             size = 3, color = color_label) +
+#   mapcoords + maptheme
 
 
 
@@ -256,35 +347,53 @@ ggplot(nodes) +
 ##'   Adding another scale for 'size', which will replace the existing scale."
 ##' now a plot with static node size:
 
-ggplot(nodes) + 
+ggplot(nodes_for_plot) + 
   country_shapes +
-  geom_curve(aes(x = x, y = y, xend = xend, yend = yend,     # draw edges as arcs
-                 color = category, size = weight),
+  geom_curve(
+    data = edges_for_plot %>% head(100), 
+    aes(x = x, y = y, xend = xend, yend = yend,     # draw edges as arcs
+                 color = category, 
+                 alpha = weight,
+                 size = weight),
              # arrow = arrow(length = unit(0.1, "in"), ends = 'last', 
              #               angle = '20', # default = 30
              #               type = 'open'),
-             data = edges_for_plot, curvature = 0.33, alpha = 0.5) +
-  scale_size_continuous(guide = FALSE, range = c(0.25, 2)) + # scale for edge widths
-  geom_point(aes(x = lon, y = lat),                          # draw nodes
-             shape = 21, size = 3,
-             fill = 'white', color = 'black', stroke = 0.5) +
+             arrow = arrow(length = unit(0.04, "inches"), ends = 'first'), ## One of "last" , "first" , or "both"
+             lineend = 'butt', show.legend = F,
+             curvature = 0.33) +
+  scale_size_continuous(guide = FALSE, range = c(0.1, .8)) + # scale for edge widths
+  scale_alpha_continuous(range = c(0.2, 1)) +
+  scale_color_manual(values = fill_color) +
+  geom_point(aes(x = lon, y = lat,
+                 fill = group),                          # draw nodes
+             shape = 21, size = 1.5, alpha = .7, show.legend = F,
+             # fill = 'white', 
+             color = 'black', stroke = 0.1) +
+  # scale_size_continuous(guide = FALSE, range = c(.5, 1.5)) +    # scale for node size
+  scale_fill_manual(values = fill_color) +
   geom_text(aes(x = lon, y = lat, label = label),             # draw text labels
-            hjust = 0, nudge_x = 1, nudge_y = 4,
-            size = 3, color = color_label) + # , fontface = "bold"
-  mapcoords + maptheme
+            hjust = 0, nudge_x = .5, nudge_y = .5,
+            size = 1, color = 'black') + # , fontface = "bold"
+  # mapcoords + 
+  mapcoords_eu +
+  maptheme +
+  theme(legend.position = c(.1,0))
+
+fname <- paste0(dir.fig, '01main/fig2c_network_', n_flows_to_show, '_', today, 'eu2.jpg'); fname
+ggsave(filename = fname, plot = ggplot2::last_plot(), width = 3, height = 2, units = 'in', dpi = 600)
 ```
 
 
 ### Solution 2: ggplot2 + ggmap + ggraph
-```{r}
+```{r eval=FALSE, include=FALSE}
 # ------------------------------------ #
-# Solution 2: ggplot2 + ggmap + ggraph #--------------
+# Solution 2: ggplot2 + ggmap + ggraph #
 # ------------------------------------ #
 
 # prepare layout: use "manual" layout with geo-coordinates
-node_pos <- nodes %>% select(lon, lat) %>% rename(x = lon, y = lat)
-lay <- create_layout(g, 'manual', node.positions = node_pos)
-assert_that(nrow(lay) == nrow(nodes))
+node_pos <- nodes_for_plot %>% select(lon, lat) %>% rename(x = lon, y = lat)
+lay <- ggraph::create_layout(graph = g, layout = 'manual', node.positions = node_pos)
+assert_that(nrow(lay) == nrow(nodes_for_plot))
 
 # use the node degree for scaling the node sizes
 lay$weight <- igraph::degree(g)
@@ -309,14 +418,20 @@ ggraph(lay) + country_shapes +
 ### Solution 3: the hacky way (overlay several ggplot "plot grobs")
 ```{r}
 # --------------------------------------------------------------- #
-# Solution 3: the hacky way (overlay several ggplot "plot grobs") # -----------
+# Solution 3: the hacky way (overlay several ggplot "plot grobs") #
 # --------------------------------------------------------------- #
+
+test_postfix <- '7'
 
 theme_transp_overlay <- theme(
   panel.background = element_rect(fill = "transparent", color = NA),
   plot.background = element_rect(fill = "transparent", color = NA), 
   panel.border = element_blank(),
-)
+) #+
+  # scale_y_continuous(expand = c(0, 0)) + ## reduce the space between plot and border
+  # scale_x_continuous(expand = c(0, 0)) ## reduce the space between plot and border
+
+
 
 # the base plot showing only the world map
 p_base <- ggplot() + country_shapes + mapcoords + maptheme
@@ -324,34 +439,86 @@ p_base <- ggplot() + country_shapes + mapcoords + maptheme
 # first overlay: edges as arcs
 p_edges <- ggplot(edges_for_plot) +
   geom_curve(aes(x = x, y = y, xend = xend, yend = yend,     # draw edges as arcs
-                 color = category, size = weight),
-             curvature = 0.33, alpha = 0.5) +
-  scale_size_continuous(guide = FALSE, range = c(0.5, 2)) +  # scale for edge widths
+                 color = category, 
+                 alpha = weight,
+                 size = weight),
+             curvature = 0.45, ## 0.33
+             # alpha = 0.5,
+             arrow = arrow(length = unit(0.06, "inches"), ends = 'first'), ## One of "last" , "first" , or "both"
+             lineend = 'butt', 
+             show.legend = T,
+             ) +
+  scale_size_continuous(guide = FALSE, range = c(0.1, .8)) +  # scale for edge widths
+  scale_alpha_continuous(range = c(0.2, .8)) +
+  scale_color_manual(values = fill_color, labels = label_edge, name = 'Impact direction') +
   mapcoords + maptheme + theme_transp_overlay +
-  theme(legend.position = c(0.5, -0.1), legend.direction = "horizontal")
+  theme(
+    legend.position = c(0, 0), 
+    legend.justification = c(0, 0), # left bottom justification
+    legend.box.margin = margin(r = 0, b = 0, unit = "mm"), # small margin)
+    legend.background = element_rect(fill = "transparent", color = NA),
+  ) +
+  guides(alpha = "none")  ## , size = "none"
 
 # second overlay: nodes as points
-p_nodes <- ggplot(nodes) +
-  geom_point(aes(x = lon, y = lat, size = weight),
-             shape = 21, fill = "white", color = "black",    # draw nodes
-             stroke = 0.5) +
-  scale_size_continuous(guide = FALSE, range = c(1, 6)) +    # scale for node size
+p_nodes <- ggplot(nodes_for_plot) +
+  geom_point(aes(x = lon, y = lat, 
+                 fill = group,
+                 size = weight
+                 ),
+             shape = 21, show.legend = T,
+             # fill = "white",
+             color = "black",    # draw nodes
+             # size = 1.5, 
+             alpha = .7,
+             stroke = 0.1) + # stroke = 0.1
+  scale_size_continuous(guide = F, ## to show legend or not
+                        range = c(0.5, 1.6), ) +    # scale for node size
+  scale_fill_manual(values = fill_color, name = 'Country group') +
   geom_text(aes(x = lon, y = lat, label = label),             # draw text labels
             hjust = 0, nudge_x = 1, nudge_y = 4,
             size = 3, color = color_label) +
-  mapcoords + maptheme + theme_transp_overlay
+  mapcoords + maptheme + theme_transp_overlay +
+  theme(
+    legend.position = c(0, 0.3), 
+    legend.justification = c(0, 0), # left bottom justification
+    legend.box.margin = margin(r = 0, b = 0, unit = "mm"), # small margin)
+    legend.background = element_rect(fill = "transparent", color = NA),
+  )
 
 # combine the overlays to a full plot
 
 # proper positioning of the grobs can be tedious... I found that
 # using `ymin` works quite well but manual tweeking of the
 # parameter seems necessary
-
+ymin_my <- -74 ## -74
 p <- p_base +
-  annotation_custom(ggplotGrob(p_edges), ymin = -74) +
-  annotation_custom(ggplotGrob(p_nodes), ymin = -74)
+  annotation_custom(ggplotGrob(p_edges), ymin = ymin_my) +
+  annotation_custom(ggplotGrob(p_nodes), ymin = ymin_my) 
 
-print(p)
+# print(p)
 
+(p2c <- ggarrange(p, labels = "c"))
+fname <- paste0(dir.fig, '01main/fig2c_network_', n_flows_to_show, '_', today, test_postfix,  '.jpg'); fname
+ggsave(filename = fname, plot = p2c, width = 7, height = 3.2, units = 'in', dpi = 600)
+```
+
+
+
+
+  Test code - not working
+```{r eval=FALSE, include=FALSE}
+library(ggforce)
+#> Loading required package: ggplot2
+#> 
+
+ymin_my2 <- 35
+
+p_base2 <- ggplot() + country_shapes + mapcoords_eu + maptheme
+
+
+p_base2 + 
+  annotation_custom(ggplotGrob(p_edges), xmin = -105, xmax = 100, ymin = ymin_my2) +
+  annotation_custom(ggplotGrob(p_nodes), xmin = -105, xmax = 100, ymin = ymin_my2)
 ```
 
