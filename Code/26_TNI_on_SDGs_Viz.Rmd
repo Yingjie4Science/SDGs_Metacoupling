@@ -166,6 +166,10 @@ dfs_score <- dfs %>%
 str(dfs_score)
 cat('The final data include', length(unique(dfs_score$iso3)), 'countries.') ## 189
 
+
+### 
+f <- paste0(dir.output, "SDG_score_byGoal_byISO3_byYear.rds")
+saveRDS(dfs_score, file = f)
 ```
 
 
@@ -858,6 +862,10 @@ dfs_index <- dfs_score %>%
   ungroup() %>%
   dplyr::mutate(index = as.numeric(index)) %>%
   as.data.frame() 
+
+### 
+f <- paste0(dir.output, "SDG_index_byISO3_byYear.rds")
+saveRDS(dfs_index, file = f)
 
 
 ### global SDG index

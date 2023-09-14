@@ -1,0 +1,211 @@
+---
+title: "Compare SDG results to the SDSN"
+author: "Yingjie Li"
+date: "2023-09-13"
+output: pdf_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+# Set up
+```{r Dirs and packages, include=FALSE}
+
+### To clear your environment 
+remove(list = ls())
+
+getwd()
+### data path
+source('./Code/_path of data.R')
+dir.input1 <- dir.cleaned       ## data for country profile, which are cleaned 
+dir.input2 <- dir.flowScenario  ## data for no_trade, no_dst_trade, no_nearby_trade scenarios
+dir.output <- './Data/data_03_results/'
+dir.sdsn   <- 'G:/Shared drives/gdrive/_paper/SDGs/Refs/SDSN Reports/SDR2023/'
+
+### packages
+source('./Code/_package list.R')
+library(Rmisc) ## for `summarySE`
+library(scales)
+library(tmap)
+library(RColorBrewer)
+
+### Disable Scientific Notation in R
+options(scipen = 999) # Modify global options in R
+
+today <- format(Sys.time(), "%Y%m%d"); today
+```
+
+
+
+# Load data
+
+## Ancillary data
+```{r}
+load('./Data/Ancillary_Data_ISO3code_shp.RData') ## `iso_eora`, `pop`, `gdp` (USD), `shp`, `grp`, `grp_update`
+pop_l <- pop %>% as.data.frame() %>%
+  gather(key = 'year', value = 'pop', `2000`:ncol(.)) %>%
+  dplyr::select(-ctr) %>%
+  as.data.frame()
+```
+
+
+## SDG - our data
+```{r}
+f <- paste0(dir.output, "SDG_score_byGoal_byISO3_byYear.rds")
+score <- readRDS(f) %>%
+  dplyr::filter(scenario == 'value_rel') %>%
+  dplyr::mutate(goal = paste0('goal_', goal))
+
+f <- paste0(dir.output, "SDG_index_byISO3_byYear.rds")
+index <- readRDS(f) %>%
+  dplyr::filter(scenario == 'value_rel') %>%
+  dplyr::mutate(goal = 'Index') %>%
+  dplyr::rename('score' = 'index') %>%
+  dplyr::select(all_of(names(score)), everything()) %>%
+  as.data.frame()
+
+names(score)
+names(index)
+
+score_my <- rbind(score, index) %>%
+  dplyr::select(-year) %>%
+  as.data.frame()
+```
+
+
+## SDG - SDSN
+```{r}
+
+year.i <- 2015
+
+f <- paste0(dir.sdsn, 'SDR2023-data.xlsx')
+sdsn <- readxl::read_excel(f, sheet = 'Backdated SDG Index') %>%
+  dplyr::filter(year == year.i) %>%
+  dplyr::select(-population, -year)
+
+
+
+score_sdsn <- sdsn %>%
+  gather(key = 'col_names', value = 'value', 3:ncol(.)) %>%
+  dplyr::mutate(col_names = gsub('SDG ', '', col_names),
+                col_names = gsub('Goal ', 'goal_', col_names),
+                col_names = gsub(' Score', '', col_names)) %>%
+  dplyr::rename('iso3' = 'Country Code ISO3', 
+                'goal' = 'col_names',
+                'score' = 'value') %>%
+  as.data.frame()
+
+# unique(score_sdsn$goal)
+
+
+
+## may only used the overlapped indicators for comparison  
+ind_both <- readxl::read_excel(f, sheet = 'Codebook_YL') %>%
+  dplyr::filter(used_by_Li_et_al > 0.5) %>%
+  dplyr::select(1:10)
+unique(ind_both$IndCode)
+
+names(sdsn)
+score_sdsn_ <- sdsn %>%
+  dplyr::select(1, starts_with('n_sdg')) %>%
+  gather(key = 'col_names', value = 'value', 2:ncol(.)) %>%
+  dplyr::mutate(col_names = gsub('n_', '', col_names)) %>%
+  dplyr::filter(col_names %in% unique(ind_both$IndCode)) %>%
+  dplyr::mutate(goal = gsub("\\_.*", "" ,col_names),
+                goal = gsub("sdg*", "goal_" ,goal)
+                ) %>%
+  dplyr::select(-col_names) %>%
+  dplyr::rename('iso3' = 'Country Code ISO3') 
+
+score_sdsn_selected <- score_sdsn_ %>%
+  ## calculate score
+  group_by(iso3, goal) %>%
+  dplyr::summarise_at('value', mean, na.rm = TRUE) %>%
+  dplyr::rename('score' = 'value') %>%
+  as.data.frame()
+
+unique(score_sdsn_selected$goal)
+```
+
+
+## UN
+```{r eval=FALSE, include=FALSE}
+# Extracting API data in R
+#you only need jsonlite to get data from API
+##' can also refer to https://github.com/DrMattG/SDGsR
+library(jsonlite)
+## Warning: package 'jsonlite' was built under R version 3.5.3
+#make an object and paste the URL you got from above
+api <- "https://unstats.un.org/SDGAPI/"
+# api <- "https://unstats.un.org/UNSDGAPIV5"
+
+indicator.un <- '13.2.2'
+year <- 2015
+
+url <- paste0(api, '/v1/sdg/Series/Data?areaCode=156')
+url <- paste0(api, '/v1/sdg/GlobalDatabase/GetGlobalDataBase?areaCode=156')
+url <- paste0(api, '/v1/sdg/Indicator/Data?areaCode=156', "&pageSize=10000")
+# url <- paste0(api, '/v1/sdg/Series/DataCSV')
+url <- paste0(api, '/v1/sdg/Indicator/Data?indicator=', indicator.un, "&pageSize=10000")
+
+
+datcall <- jsonlite::fromJSON(url) #depending on the data you are calling, you will get a list 
+names(datcall)
+
+dat <- as.data.frame(datcall$data) %>%
+  dplyr::filter(timePeriodStart >= year)
+
+
+```
+
+
+
+
+
+## Merge 2 data
+```{r}
+
+## decide which SDSN data to use ------------------ !?
+data_sdsn <- score_sdsn
+data_sdsn <- score_sdsn_selected; pfix <- 'selected'
+
+## merge data
+names(score_my)
+names(data_sdsn)
+score_comp <- score_my %>%
+  left_join(., data_sdsn, 
+            by = c("iso3", "goal")) 
+
+
+unique(score_comp$goal)
+levels_goal <- c('Index', paste0('goal_', 1:17))
+
+score_comp <- score_comp %>% 
+  dplyr::mutate(goal = factor(goal, levels = levels_goal))
+```
+
+
+## Plot
+```{r - by index}
+# p1 <- 
+  score_comp %>%
+  dplyr::filter(goal == 'Index') %>%
+  ggplot(aes(x=score.x, y=score.y)) +
+  geom_point() +
+  geom_abline(slope = 1, color = 'red')
+```
+
+```{r - by goal}
+# p2 <-
+  score_comp %>%
+  dplyr::filter(goal != 'Index') %>%
+  ggplot(aes(x=score.x, y=score.y)) +
+  geom_point(alpha = 0.5, shape = 16) +
+  geom_abline(slope = 1, color = 'red') +
+  facet_wrap(~goal) +
+  xlab('This study') + ylab('SDSN')
+
+fname <- paste0(dir.fig, 'SDSN_score_index_compare_',year.i, pfix, '_', today, '.jpg'); fname
+ggsave(filename = fname, plot = ggplot2::last_plot(), width = 7, height = 7, units = 'in', dpi = 300)
+```
+
