@@ -542,20 +542,56 @@ f <- 'marine_capture_trade_5yrave_20220107.csv'   ## 2nd version 2022-01-07
 file <- paste0(dir.fish, f)
 
 
-df0 <- readr::read_csv(file = file) %>%
+df0 <- readr::read_csv(file = file, show_col_types = FALSE) %>%
   # dplyr::distinct(exporter_iso3c, importer_iso3c, .keep_all = T) %>%
+  dplyr::select(exporter_iso3c, importer_iso3c, `q.live`) %>%
   as.data.frame()
 
 
-df <- df0 %>%
-  rename(year = time_period) %>%
+df1 <- df0 %>%
   dplyr::mutate(year = 2015) %>%
-  dplyr::select(year, exporter_iso3c, importer_iso3c, `q.live`) %>%
   spread(key = importer_iso3c, value = `q.live`)
 
-df %>%
+df1 %>%
   group_by(year) %>% tally() ## 220 countries are in the raw data, but we need to only include the 189 countries
+```
 
+
+
+```{r - update data}
+f <- 'artis_marine_capture_20230915.csv'   ## 3rd version 2023-09-15
+file <- paste0(dir.fish, f)
+
+df02 <- readr::read_csv(file = file, show_col_types = FALSE) %>%
+  # dplyr::distinct(exporter_iso3c, importer_iso3c, .keep_all = T) %>%
+  as.data.frame()
+
+## compare with last version 
+df0.compare <- merge(df0, df02, by=c('exporter_iso3c', 'importer_iso3c'), all = T)
+df0.compare %>%
+  ggplot(aes(x = q.live, y = live_weight_t)) +
+  geom_point(alpha = 0.3) +
+  geom_abline(slope = 1, color = 'red') +
+  scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                  labels = trans_format("log10", math_format(10^.x))) +
+  scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+  xlab('Old data - 20220107') + ylab('New data - 20230915') +
+  theme_bw()
+
+df2 <- df02 %>%
+  dplyr::mutate(year = 2015) %>%
+  dplyr::select(year, exporter_iso3c, importer_iso3c, `live_weight_t`) %>%
+  spread(key = importer_iso3c, value = `live_weight_t`)
+
+df2 %>% group_by(year) %>% tally()
+```
+
+
+```{r, eval=FALSE, include=FALSE}
+
+### choose data version to use for further analysis
+df <- df2
 
 
 ### Format the data in the same way as Eora cleaned
@@ -570,7 +606,7 @@ df_formatted <- df_formatted %>%
   ungroup() %>%
   arrange(year, iso3, to) %>%
   dplyr::select(year, ctr, everything()) %>%
-  spread(key = to, value = value) %>%
+  spread(key = 'to', value = 'value') %>%
   arrange(year, iso3)
 
 

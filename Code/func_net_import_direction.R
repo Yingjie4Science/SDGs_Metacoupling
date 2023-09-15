@@ -52,11 +52,12 @@ func_net_import_direction <- function(df, in_or_out, direction_i, frac = 0.025){
   ####'   Rather, we need to scale data to [-100, 100], in which positive values (net_imports > 0) indicates impacting others,
   ####'   while negative values indicates being impacted. 
   ####'     here, `min3` is not a min value, but the max of the values in the negative side 
-  ####'   For positive values   
+  ####' For positive values   
   x_positive <- (total_net_in$x)[total_net_in$x>0]
   x_negative <- (total_net_in$x)[total_net_in$x<0]
   max_positive <- x_positive %>% unlist(.) %>% na.omit(.) %>% sort(decreasing = T) %>% dplyr::nth(n = round(length(.)*frac));
   min_positive <- x_positive %>% unlist(.) %>% na.omit(.) %>% sort(decreasing = T) %>% dplyr::nth(n = round(length(.)*(1-frac)));
+  ####'  for negative values 
   max_negative <- x_negative %>% unlist(.) %>% na.omit(.) %>% sort(decreasing = T) %>% dplyr::nth(n = round(length(.)*(1-frac))) %>% abs();
   min_negative <- x_negative %>% unlist(.) %>% na.omit(.) %>% sort(decreasing = T) %>% dplyr::nth(n = round(length(.)*frac)) %>% abs();
 
