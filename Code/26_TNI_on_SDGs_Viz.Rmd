@@ -1085,15 +1085,23 @@ dfs_index_chg_pct <- dfs_index_chg %>%
   dplyr::filter(!is.na(value_not) & value_not != 0) %>%
   dplyr::mutate(value_chg_pct = value_chg/value_not*100)
 
+mean_change <- mean(dfs_index_chg_pct$`value_chg_pct`, na.rm = T) %>% round(digits = 1)
+sd_change <- sd(dfs_index_chg_pct$`value_chg_pct`, na.rm = T) %>% round(digits = 1)
 
 hist(dfs_index_chg_pct$value_chg)
 boxplot(dfs_index_chg_pct$value_chg)
 summary(dfs_index_chg_pct$value_chg)
 dfs_index_chg_pct %>%
   ggplot(aes(x=value_chg, fill = value_chg<0)) +
-  geom_histogram(binwidth=1, na.rm = T, alpha = 0.7) +
+  geom_histogram(binwidth=1, na.rm = T, alpha = 0.7, show.legend = F) +
   scale_fill_manual(values = c('#3182bd', '#feb24c')) +
   geom_vline(aes(xintercept=0), color="red", linetype="dashed", linewidth=1) +
+  # ggplot2::annotate("0", x = 0, y = 25, label = "") +
+  geom_vline(aes(xintercept=mean_change), color="black", alpha=0.6, linewidth=1.5) +
+  scale_x_continuous(breaks = seq(-15, 30, 5)) +
+  ggplot2::annotate("text", x = mean_change+3, y = 20, label = paste0("mean = ", mean_change, '\nsd = ', sd_change)) +
+  xlab('Difference of national SDG Index between the real-world scenario and an autarky scenario') + 
+  ylab('Number of copuntries') +
   theme_bw()
 ```
 
@@ -1101,18 +1109,22 @@ dfs_index_chg_pct %>%
 ```{r - MS ✏️📝}
 ### numbers for writing ------------------------------------------------------------------
 
-index_glo_chg <- (dfs_index_glo['value_rel', 'index'] - dfs_index_glo['value_not', 'index']) %>% round(., digits = 1)
-index_glo_chg_pct <- (index_glo_chg/dfs_index_glo['value_not', 'index'] * 100) %>% round(., digits = 1)
-
-cat('Global SDG Index changed', index_glo_chg, '(or', index_glo_chg_pct, '% ). \n\n')
+##' ! Since global SDG Index is rarely used in literature, we won't include such a score. 
+##'   G_Index = (Index_c1 + Index_c2 + … + Index_c189)/189
+##'   G_Index* = (Index*_c1 + Index*_c2 + … + Index*_c189)/189
+# index_glo_chg <- (dfs_index_glo['value_rel', 'index'] - dfs_index_glo['value_not', 'index']) %>% round(., digits = 1)
+# index_glo_chg_pct <- (index_glo_chg/dfs_index_glo['value_not', 'index'] * 100) %>% round(., digits = 1)
+# 
+# cat('Global SDG Index changed', index_glo_chg, '(or', index_glo_chg_pct, '% ). \n\n')
+# # Global SDG Index changed 4.2 (or 7.7 % ). 
 
 
 cat('SDG Index of countries would improve', 
-    mean(dfs_index_chg_pct$value_chg, na.rm = T) %>% round(., digits = 1),      ## 9.2
+    mean(dfs_index_chg_pct$value_chg, na.rm = T) %>% round(., digits = 1),      ## 9.2 -> 4.1
     'on average.\n')
 cat('SDG Index of countries would improve', 
-    mean(dfs_index_chg_pct$value_chg_pct, na.rm = T) %>% round(., digits = 1),  ## 20.2% --> 19.4%
-    '% on average.\n')
+    paste0(mean_change,  ## 20.2% --> 9.1%
+    '% (SD = ', sd_change, '%) on average.\n'))
 
 cat('SDG Index of countries in 2015:', 
     'mean =', 
