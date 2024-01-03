@@ -633,7 +633,7 @@ ggsave(filename = fname, plot = net_imp_vs_i.p, width = 10, height = 20, units =
 
 ```{r - choose data️️️ ❗}
 ###
-ls_f
+# ls_f
 f <- subset(x = ls_f, subset = grepl(pattern = postfix, x = ls_f)); f
 f <- f[length(f)]; cat('\n we will use this version for final analysis: \n\t', f)
 load(f) ## load the latest data `net_imports_fromAll`
@@ -675,6 +675,20 @@ spillover_index <- net_imports_fromAll_use %>%
   arrange(iso3, year)
 
 hist(spillover_index$index)
+
+
+### add "index" as a column of `spillover_norm`
+spillover_norm_index <- spillover_norm %>%
+  left_join(., spillover_index, by = c('iso3', 'year')) %>%
+  dplyr::select(index, everything())
+
+### Rank each column
+# Identify numeric columns
+spillover_norm_index_ranked <- spillover_norm_index
+numeric_columns <- sapply(spillover_norm_index_ranked, is.numeric)
+spillover_norm_index_ranked[numeric_columns] <- lapply(spillover_norm_index_ranked[numeric_columns], rank)
+write_xlsx(x = spillover_norm_index_ranked, 
+           path = paste0(dir_results, 'results_check/spillover_norm_index_ranked.xlsx'))
 
 
 

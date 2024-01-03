@@ -70,6 +70,11 @@ dir.fig          <- './Figure/'
 
 
 
+## final data ----------------------------------------------------------------------------
+dir_results <- paste0(dir.root, 'Data/data_03_results/')
+
+
+
 
 
 
