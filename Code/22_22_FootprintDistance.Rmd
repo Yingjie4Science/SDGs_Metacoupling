@@ -607,7 +607,7 @@ p1 <- ft_d_i %>%
 ggarrange(p1, labels = '')
 fname <- paste0(dir.fig, '01main/', 'ex_6_ImpactDistance_byFT',
                 '_class', od_direction_count, '_', today, '_', prefix, '.jpg'); fname
-ggsave(filename = fname, plot = ggplot2::last_plot(), width = 7, height = p_height+1, units = 'in', dpi = 300)
+ggsave(filename = fname, plot = ggplot2::last_plot(), width = 7, height = p_height, units = 'in', dpi = 300)
 ```
 
 
@@ -701,7 +701,7 @@ p <- ft_d_summary %>%
   geom_point(data = ft_d_summary_group, aes(x=d_avg_select, y = 1, color = od_direction), show.legend = F) +
   geom_errorbarh(data = ft_d_summary_group, 
                  aes(xmax = d_avg_select + sd, xmin = d_avg_select - sd, y = 1, color = od_direction), 
-                 height = 1, alpha = .8, linewidth = 0.4, show.legend = F) +
+                 height = 1.5, alpha = .8, linewidth = 0.4, show.legend = F) +
   ### 3. use mean geographic distance by nearby and distant
   # geom_point(data = neighbor_matrix_od_group_help, aes(x=dist_e3, y = 5, color = od_direction), show.legend = F) +
   # geom_errorbarh(data = neighbor_matrix_od_group_help, 
