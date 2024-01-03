@@ -92,11 +92,19 @@ grp_id <- grp_use %>%
   
   https://pacha.dev/cepiigeodist/reference/dist_cepii.html
   
-```{r}
+  dist        Simple distance (most populated cities, km)
+
+  distcap     Simple distance between capitals (capitals, km)
+  
+  distw       Weighted distance (pop-wt, km) with theta=1 (theta measures the sensitivity of trade flows to bilateral distance dkl)
+  
+  distwces    Weighted distance (pop-wt, km) theta=-1
+  
+```{r - prep data}
+
 library(cepiigeodist)
 ### filter countries that share borders
 # dist_cepii[dist_cepii$contig == 1, ]
-
 
 dist_cepii <- dist_cepii %>%
   dplyr::mutate(iso_o = ifelse(iso_o == 'ZAR', 'COD', iso_o), iso_d = ifelse(iso_d == 'ZAR', 'COD', iso_d))
@@ -104,7 +112,7 @@ dist_cepii <- dist_cepii %>%
 geo_cepii  <- geo_cepii
 
 
-### corrections to the `geo` data ------------------------------------------------------------------
+### corrections to the `geo` data --------------------------------------------------------
 s <- 'Congo'          ## --> code change
 s <- 'Romania'        ## --> code change
 s <- 'Serbia'         ## --> code change
@@ -190,20 +198,21 @@ geo  <- geo_cepii %>%
 
 
 
-### corrections to the `dist` data -----------------------------------------------------------------
+### corrections to the `dist` data -------------------------------------------------------
 
 dist <- dist_cepii %>%
   dplyr::mutate(iso_o = ifelse(iso_o == 'ZAR', 'COD', iso_o), iso_d = ifelse(iso_d == 'ZAR', 'COD', iso_d)) %>%
   dplyr::mutate(iso_o = ifelse(iso_o == 'ROM', 'ROU', iso_o), iso_d = ifelse(iso_d == 'ROM', 'ROU', iso_d)) %>%
   dplyr::mutate(iso_o = ifelse(iso_o == 'YUG', 'SRB', iso_o), iso_d = ifelse(iso_d == 'YUG', 'SRB', iso_d)) %>%
   dplyr::mutate(iso_o = ifelse(iso_o == 'PAL', 'PSE', iso_o), iso_d = ifelse(iso_d == 'PAL', 'PSE', iso_d)) %>%
-  rbind(., dist_cuw, dist_mne, dist_ssd, dist_sun, dist_lie, dist_mco)
+  rbind(., dist_cuw, dist_mne, dist_ssd, dist_sun, dist_lie, dist_mco) %>%
+  dplyr::distinct(iso_o, iso_d, .keep_all = T)
 
 
 
 head(dist)
 
-d <- dist$dist %>% as.numeric()
+# d <- dist$dist %>% as.numeric() ## delete?
 
 ctr_list_cepii <- dist %>%
   dplyr::select(1:2) %>%
@@ -212,6 +221,50 @@ ctr_list_cepii <- dist %>%
   arrange(iso)
 
 ```
+
+
+```{r - distance stats}
+
+## load data from `helper_adjancet_distant_matrix.Rmd`
+f <- './Data/_neighbor_matrix/_input_ctr_matrix_neighbor.xlsx'
+neighbor_matrix <- readxl::read_excel(path = f) 
+
+## convert to od (long) format
+neighbor_matrix_od <- neighbor_matrix %>%
+  dplyr::select(-Country, -Neighbors) %>%
+  pivot_longer(cols = 2:ncol(.), names_to = 'd', values_to = 'adjacent') %>%
+  ## add distance data from cepii
+  merge(x = ., y = dist %>% dplyr::select(-c('comlang_off':'smctry', 'distcap':'distwces')), 
+        by.x = c('o', 'd'), by.y = c('iso_o', 'iso_d'), all.x = T) %>%
+  ## to check the consistency between the two classifications
+  dplyr::mutate(consistency = ifelse(adjacent == contig, 1, 0))
+
+## count the number of consistency
+neighbor_matrix_od %>% count(consistency)
+
+
+## average distance of nearby (or distant) countries, unit = km
+neighbor_matrix_od %>% 
+  ## remove self-loop
+  dplyr::filter(o != d) %>%
+  summarise_at(vars(dist), list(mean = mean, median = median, min = min, max = max), na.rm=TRUE)
+
+neighbor_matrix_od %>% 
+  ## remove self-loop
+  dplyr::filter(o != d) %>%
+  group_by(adjacent) %>%
+  # group_by(contig) %>%
+  summarise_at(vars(dist), list(mean = mean, median = median, min = min, max = max), na.rm=TRUE)
+
+
+
+neighbor_matrix_od_group <- neighbor_matrix_od %>%
+  dplyr::mutate(dist_e3 = dist/10^3) %>%
+  Rmisc::summarySE(measurevar= "dist_e3", groupvars = c('adjacent'), na.rm = T) %>%
+  as.data.frame()
+
+```
+
 
 
 
@@ -300,9 +353,9 @@ for (ind in unique(ft_ind$ind)) {
     dplyr::mutate(weight = func_norm_minmax(weight, a=0.01, b=100))
   
   links_dist <- 
-    merge(x = links, y = dist, by.x = c('from', 'to'), by.y = c('iso_o', 'iso_d'), all.x = T) %>%
-    merge(x = ., y = grp_id, by.x = 'from', by.y = 'iso_a3', all.x = T) %>% dplyr::rename('group_from' = 'group_id') %>%
-    merge(x = ., y = grp_id, by.x = 'to',   by.y = 'iso_a3', all.x = T) %>% dplyr::rename('group_to'   = 'group_id') %>%
+    merge(x = links, y = dist,   by.x = c('from', 'to'), by.y = c('iso_o', 'iso_d'), all.x = T) %>%
+    merge(x = .,     y = grp_id, by.x = 'from', by.y = 'iso_a3', all.x = T) %>% dplyr::rename('group_from' = 'group_id') %>%
+    merge(x = .,     y = grp_id, by.x = 'to',   by.y = 'iso_a3', all.x = T) %>% dplyr::rename('group_to'   = 'group_id') %>%
     
     ## check NA in iso3 matches
     arrange(!is.na(group_from), !is.na(group_to)) %>%
@@ -368,6 +421,11 @@ for (ind in unique(ft_ind$ind)) {
 }
 
 cat(length(unique(links_dist_type_collection$type)), 'indicators were included in the analysis.\n')
+
+
+## save result
+f <- paste0(dir_results, 'links_dist_type_collection.rds') 
+saveRDS(object = links_dist_type_collection, file = f)
 ```
 
 
@@ -382,9 +440,13 @@ cat(length(unique(links_dist_type_collection$type)), 'indicators were included i
 ## distance measure  
 ```{r}
 
+## load data
+f <- paste0(dir_results, 'links_dist_type_collection.rds') 
+links_dist_type_collection <- readRDS(file = f)
+
 ##' check on data to see the distribution, and if there are NA values, or negative values
 ##'     in the data. 
-hist(links_dist_type_collection$weight, nclass = 1000)
+hist(links_dist_type_collection$weight, nclass = 20)
 
 links_dist_type_collection %>%
   ggplot(., aes(weight)) +
@@ -413,10 +475,12 @@ ft_d <- links_dist_type_collection %>%
   dplyr::mutate(ftd = weight * dist) %>%                  ## flow * distance
   dplyr::group_by(to, type, od_direction) %>%
   dplyr::summarise(dq_sum = sum(ftd, na.rm = T),          ## total (flow * distance)
-                   q_sum  = sum(weight, na.rm = T)) %>%   ## total flow
+                   q_sum  = sum(weight, na.rm = T),       ## total flow
+                   d_avg_geo = mean(dist, na.rm = T)
+                   ) %>%   
   ungroup() %>%
   as.data.frame() %>%
-  dplyr::mutate(d_avg_ft = dq_sum/q_sum/1000) %>%         ## average distance of each unit of flows
+  dplyr::mutate(d_avg_ft = dq_sum/q_sum) %>%              ## average distance (km) of each unit of flows
   merge(x = ., 
         y = ft_ind %>% dplyr::select(-direction), 
         by.x = 'type', by.y = 'ind', all.x = T)
@@ -444,11 +508,13 @@ mean(dist_cepii$dist, na.rm=T) ## --> 8481.7 km
 
 ## 2. mean impact distance between countries 
 hist(ft_d$d_avg_ft)
-mean(ft_d$d_avg_ft, na.rm=T)       ## --> 5780.7 km
-d_max <- max(ft_d$d_avg_ft, na.rm=T) %>% round(., digits = 1); d_max
+mean(ft_d$d_avg_ft, na.rm=T)   ## --> 4948.6 km
 
 
-firstup <- function(x) {
+mean(ft_d$d_avg_geo, na.rm=T)  ## --> 5912.5 km
+
+
+first_upper <- function(x) {
   substr(x, 1, 1) <- toupper(substr(x, 1, 1))
   x
 }
@@ -463,7 +529,7 @@ ft_ind_ls_labels <- ft_ind_ls_levels %>%
   gsub('Nitrogen', 'Nitrogen ', x = .) %>%
   gsub('Phosphorus', 'Phosphorus ', x = .) %>%
   trimws(.) %>%
-  firstup(.)
+  first_upper(.)
 ```
 
 
@@ -471,10 +537,31 @@ ft_ind_ls_labels <- ft_ind_ls_levels %>%
 
 ```{r plot - by ft indicator - ex6}
 
+### 1. use ft distance
+###'   used this footprint distance before 01/01/2024
+prefix <- 'ft'
+ft_d_i <- ft_d %>%
+  dplyr::rename('d_avg_select' = "d_avg_ft") %>%
+  dplyr::mutate(d_avg_select = d_avg_select/10^3) %>%
+  as.data.frame()
+
+
+### 2. use geographic distance 
+###'  Better to use geographic distance so that we can also add the mean distance of adjacent countries, 
+###'    and the mean distance of distant countries. 
+prefix <- 'geo'
+ft_d_i <- ft_d %>%
+  dplyr::rename('d_avg_select' = "d_avg_geo") %>%
+  dplyr::mutate(d_avg_select = d_avg_select/10^3) %>%
+  as.data.frame()
+
+
+### plot ---------------------------------------------------------------------------------
+d_max <- max(ft_d_i$d_avg_select, na.rm=T) %>% ceiling(.); d_max ## --> 20 
 n_plots  <- length(unique(ft_d$type))
 p_height <- ceiling(n_plots/4) * 7/8
 
-p1 <- ft_d %>% 
+p1 <- ft_d_i %>% 
   # dplyr::filter(SDG_class != 'Soci') %>% ## subset for easy plot
   dplyr::mutate(od_direction = factor(x = od_direction, levels = od_direction_levels, labels = od_direction_labels)) %>%
   
@@ -487,17 +574,18 @@ p1 <- ft_d %>%
   
   ### - plot
   ggplot() +
-  geom_histogram(aes(x = d_avg_ft, fill = od_direction), position="identity", alpha=0.5, show.legend = T) +
-  geom_vline(aes(xintercept=mean(d_avg_ft, na.rm=T)), color="red", linewidth = .5) + # linetype="dashed", alpha = .5, 
+  geom_histogram(aes(x = d_avg_select, fill = od_direction), position="identity", alpha=0.5, show.legend = T) +
+  geom_vline(aes(xintercept=mean(d_avg_select, na.rm=T)), color="red", linewidth = .5) + # linetype="dashed", alpha = .5,
+  
   # ggplot2::annotate(
   #   "text", 
-  #   x = round(mean(ft_d$d_avg_ft, na.rm=T)*1, digits = 1),
+  #   x = round(mean(ft_d_i$d_avg_select, na.rm=T)*1, digits = 1),
   #   y = 2, 
-  #   label = round(mean(ft_d$d_avg_ft, na.rm=T), digits = 1), 
+  #   label = round(mean(ft_d_i$d_avg_select, na.rm=T), digits = 1), 
   #   colour = "red", size = 2) +
   # facet_wrap(~od_direction, ncol = 1) + ## for one indicator
   # facet_grid(type~od_direction) +
-  facet_wrap(~type, ncol = 4) +
+  facet_wrap(~type, ncol = 4, scales = 'free_y', labeller = labeller(type = label_wrap_gen(31))) +
   theme_ns +
   # theme_minimal() +
   theme(
@@ -505,21 +593,21 @@ p1 <- ft_d %>%
     legend.position = c(0.99, 0.01),
     legend.justification = c(1, 0), # right bottom justification
     legend.box.margin = margin(r = 0, b = 0, unit = "mm"), # small margin
+    strip.text = element_text(size = 8),
     axis.title.y = element_blank(), 
     panel.grid = element_blank(),
     ) +
-  ylim(0,20) + 
+  scale_y_continuous(n.breaks = 4) +
   scale_x_continuous(
-    limits = c(0, ceiling(d_max+0.01)), 
-    breaks = c(seq(0, d_max, 9), round(mean(ft_d$d_avg_ft, na.rm=T), digits = 1))) +
+    breaks = c(seq(0, d_max+.5, 9), round(mean(ft_d_i$d_avg_select, na.rm=T), digits = 1))) +
   xlab(label = bquote('Distance (10'^3~'km)')) + 
   labs(fill='') # Impact pairs
 
 
 ggarrange(p1, labels = '')
 fname <- paste0(dir.fig, '01main/', 'ex_6_ImpactDistance_byFT',
-                '_class', od_direction_count, '_', today, '.jpg'); fname
-ggsave(filename = fname, plot = ggplot2::last_plot(), width = 7, height = p_height, units = 'in', dpi = 300)
+                '_class', od_direction_count, '_', today, '_', prefix, '.jpg'); fname
+ggsave(filename = fname, plot = ggplot2::last_plot(), width = 7, height = p_height+1, units = 'in', dpi = 300)
 ```
 
 
@@ -529,18 +617,97 @@ ggsave(filename = fname, plot = ggplot2::last_plot(), width = 7, height = p_heig
 
 ```{r plot - summary across indicators - 2d}
 ind <- 'AvgAcrossFT'
+
+### 1. use ft distance
+###'   used this footprint distance before 01/01/2024
+# prefix <- 'ft'
+# ft_d_summary <- ft_d %>%
+#   dplyr::rename('d_avg_select' = "d_avg_ft") %>%
+#   Rmisc::summarySE(measurevar= "d_avg_select", groupvars = c('to', 'od_direction'), na.rm = T) %>%
+#   as.data.frame()
+# 
+# ft_d_summary_group <- ft_d %>%
+#   dplyr::rename('d_avg_select' = "d_avg_ft") %>%
+#   Rmisc::summarySE(measurevar= "d_avg_select", groupvars = c('od_direction'), na.rm = T) %>%
+#   as.data.frame() %>%
+#   dplyr::mutate(od_direction = factor(x = od_direction, levels = od_direction_levels, labels = od_direction_labels)) %>%
+#   data.table::as.data.table()
+# 
+# ft_d_i <- ft_d %>% 
+#   dplyr::rename('d_avg_select' = "d_avg_ft") %>%
+#   dplyr::mutate(d_avg_select = d_avg_select/10^3) %>%
+#   as.data.frame()
+
+
+
+### 2. use geographic distance 
+###'  Better to use geographic distance so that we can also add the mean distance of adjacent countries, 
+###'    and the mean distance of distant countries. 
+prefix <- 'geo'
 ft_d_summary <- ft_d %>%
-  Rmisc::summarySE(measurevar= "d_avg_ft", groupvars = c('to', 'od_direction'), na.rm = T) %>%
+  dplyr::rename('d_avg_select' = "d_avg_geo") %>%
+  dplyr::mutate(d_avg_select = d_avg_select/10^3) %>%
+  Rmisc::summarySE(measurevar= "d_avg_select", groupvars = c('to', 'od_direction'), na.rm = T) %>%
   as.data.frame()
-  
-d_max_ <- max(ft_d_summary$d_avg_ft, na.rm=T) %>% ceiling(.); d_max_
+
+ft_d_summary_group <- ft_d %>%
+  dplyr::rename('d_avg_select' = "d_avg_geo") %>%
+  dplyr::mutate(d_avg_select = d_avg_select/10^3) %>%
+  Rmisc::summarySE(measurevar= "d_avg_select", groupvars = c('od_direction'), na.rm = T) %>%
+  # as.data.frame() %>%
+  dplyr::mutate(od_direction = factor(x = od_direction, levels = od_direction_levels, labels = od_direction_labels)) %>%
+  data.table::as.data.table()
+
+ft_d_i <- ft_d %>%
+  dplyr::rename('d_avg_select' = "d_avg_geo") %>%
+  dplyr::mutate(d_avg_select = d_avg_select/10^3) %>%
+  as.data.frame()
+
+
+
+### plot -------------------------------------- 
+d_max_ <- max(ft_d_summary$d_avg_select, na.rm=T) %>% ceiling(.); d_max_  ## --> 15
+
+ft_d_summary %>% 
+  group_by(od_direction) %>%
+  summarise_at(vars(d_avg_select), list(mean = mean, median = median, min = min, max = max), na.rm=TRUE)
+
+
+
+## mean distance for the Horizontal and Vertical groups
+mean_d_h <- ft_d_summary_group[od_direction == 'Horizontal flows', d_avg_select]
+mean_d_v <- ft_d_summary_group[od_direction == 'Vertical flows', d_avg_select]
+
+
+neighbor_matrix_od_group_help <- neighbor_matrix_od_group %>%
+  dplyr::mutate(od_direction = ifelse(adjacent == 0, 'Vertical flows', 'Horizontal flows')) %>%
+  dplyr::mutate(od_direction = factor(x = od_direction, levels = od_direction_levels, labels = od_direction_labels)) %>%
+  data.table::as.data.table()
 
 p <- ft_d_summary %>% 
   # dplyr::filter(SDG_class != 'Soci') %>% ## subset for easy plot
   dplyr::mutate(od_direction = factor(x = od_direction, levels = od_direction_levels, labels = od_direction_labels)) %>%
   ggplot() +
-  geom_histogram(aes(x = d_avg_ft, fill = od_direction), position="identity", alpha=0.5, show.legend = F) +
-  geom_vline(aes(xintercept=mean(d_avg_ft, na.rm=T)), color="red", size = .5) + # linetype="dashed", alpha = .5, 
+  geom_histogram(aes(x = d_avg_select, fill = od_direction), position="identity", alpha=0.4, show.legend = F) +
+  
+  ## add the average distance among all countries
+  geom_vline(aes(xintercept= round(mean(ft_d_i$d_avg_select, na.rm=T), digits = 1) ), 
+             color="red", alpha = .7, size = 0.5) + # linetype="dashed", 
+  
+  ## add the average distance of Horizontal and Vertical groups
+  ### 1. use mean ft distance by v and h
+  # geom_vline(data = ft_d_summary_group, aes(xintercept=d_avg_select, color = od_direction), linetype="dashed", show.legend = F) +
+  ### 2. use mean ft distance by v and h + SD error bar
+  geom_point(data = ft_d_summary_group, aes(x=d_avg_select, y = 1, color = od_direction), show.legend = F) +
+  geom_errorbarh(data = ft_d_summary_group, 
+                 aes(xmax = d_avg_select + sd, xmin = d_avg_select - sd, y = 1, color = od_direction), 
+                 height = 1, alpha = .8, linewidth = 0.4, show.legend = F) +
+  ### 3. use mean geographic distance by nearby and distant
+  # geom_point(data = neighbor_matrix_od_group_help, aes(x=dist_e3, y = 5, color = od_direction), show.legend = F) +
+  # geom_errorbarh(data = neighbor_matrix_od_group_help, 
+  #                aes(xmax = dist_e3 + sd, xmin = dist_e3 - sd, y = 5, color = od_direction), 
+  #                height = 2, alpha = .5, show.legend = F) +
+
   facet_wrap(~od_direction, ncol = 1) + ## for one indicator
   theme_ns +
   # theme_minimal() +
@@ -549,21 +716,21 @@ p <- ft_d_summary %>%
     axis.title.y = element_blank(), 
     panel.grid = element_blank(),
     ) +
-  ylim(0,20) + 
+  # ylim(0,20) + 
   scale_x_continuous(
-    limits = c(0, d_max_), 
-    breaks = c(seq(0, d_max_, 9), round(mean(ft_d$d_avg_ft, na.rm=T), digits = 1))) +
+    # limits = c(0, d_max_), 
+    breaks = c(seq(0, d_max_, 3.5), round(mean(ft_d_i$d_avg_select, na.rm=T), digits = 1))) +
   xlab(label = bquote('Distance (10'^3~'km)')) + 
   labs(fill='Impact pair')
 ggarrange(p, labels = 'd')
 fname <- paste0(dir.fig, '01main/', 'fig2d_ImpactDistance_', ind, '_',
-                od_direction_count, 'grp_', today, '.jpg'); fname
+                od_direction_count, 'grp_', today, '_', prefix, '.jpg'); fname
 ggsave(filename = fname, plot = ggplot2::last_plot(), width = 7.5/2, height = 7.5/2, units = 'in', dpi = 300)
 ```
 
 
 
-## count % of nearby (contiguous) or not
+### count % of nearby (contiguous) or not
 ```{r}
 
 ## impact distance by group of 'nearby or not'
@@ -588,5 +755,6 @@ ft_FarNear_n <- links_dist_type_collection %>%
     pct = n/sum
     ) %>%
   as.data.frame()
+
 ```
 

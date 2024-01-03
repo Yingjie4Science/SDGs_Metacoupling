@@ -7,6 +7,10 @@ editor_options:
   chunk_output_type: console
 ---
 
+# Intro
+
+  Pull country data from wiki, tidy the data, and format as a SI table for analysis & publication. 
+
 # Set up
 ```{r Dirs and packages}
 
