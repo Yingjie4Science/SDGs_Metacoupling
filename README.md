@@ -51,18 +51,18 @@ All analysis code are deposited in the folder ***Code/***
 
 ### scenario analysis & SDG score calculation
 ```
-22_10_TNI_rel_not.Rmd
-22_20_TNI_dst_ner.Rmd
-22_22_FootprintDistance.Rmd
+22_10_TNI_rel_not.Rmd ------------------ Figures 2a, 2b, Ex4, Ex5
+22_20_TNI_dst_ner.Rmd  
+22_22_FootprintDistance.Rmd ------------ Figures 2d, Ex6
 25_TNI_on_SDGs_Data.Rmd
 ```
 
 ## visualize result 
 ```
-26_TNI_on_SDGs_Viz.Rmd
+26_TNI_on_SDGs_Viz.Rmd ----------------- Figures 1a, 1b, 1c, 1d, 3a, 3b, Ex1, Ex2, Ex3, 
 27a1_TNI_Networks_data.Rmd
 27a2_TNI_Networks_plot.Rmd
-27b_TNI_Networks_map.Rmd
+27b_TNI_Networks_map.Rmd --------------- Figure 2c
 ```
 
 
