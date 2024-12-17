@@ -676,7 +676,7 @@ df_formatted <- readxl::read_excel(fname)
 ### get the indicator name
 ind <- 'CPIS_matrix'
 yrs <- c(2000, 2005, 2010, 2015)
-dir.i <- './Data/data_01_raw/FDI/IMF/'
+dir.i <- './Data/data_01_raw/IMF_CPIS/'
 
 fname <- paste0(dir.eora_cleaned, ind, '.xlsx'); fname
 df_formatted <- readxl::read_excel(fname)
@@ -698,6 +698,23 @@ dir.i <- './Data/data_01_raw/OECD_ODA/'
 fname <- paste0(dir.eora_cleaned, ind, '.xlsx'); fname
 df_formatted <- readxl::read_excel(fname)
 ```
+
+
+
+### - Refugee - UNHCR
+
+  See `Refugee_data_prep.Rmd` in "./Data/data_01_raw/IMF_CPIS/"
+  
+```{r}
+### get the indicator name
+ind <- 'Refugee'
+yrs <- c(2000, 2005, 2010, 2015)
+dir.i <- './Data/data_01_raw/UNHCR_Refugee Data Finder/'
+
+fname <- paste0(dir.eora_cleaned, ind, '_matrix.xlsx'); fname
+df_formatted <- readxl::read_excel(fname)
+```
+
 
 
 

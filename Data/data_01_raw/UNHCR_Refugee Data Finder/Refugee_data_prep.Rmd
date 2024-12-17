@@ -1,0 +1,203 @@
+---
+title: "FDI"
+author: "Yingjie"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+# Set up
+```{r Paths and packages, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+### To clear your environment 
+remove(list = ls())
+
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+getwd()
+
+### data path 
+source('./Code/_path of data.R')
+
+
+### packages
+source('./Code/_package list.R')
+source('./Code/function_scatter_plot.R')
+
+```
+
+
+# Data
+
+## Ancillary data
+```{r}
+
+### extended country-iso3 pair list for matching
+load('./Data/Ancillary_Data_iso_eora_ex.RData')  ## ## iso_eora_ex
+
+
+### use the Eora data as the template 
+f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'template_eora.RData')
+load(f) # `temp_eora`
+```
+
+
+
+## Refugee Data Finder - UNHCR
+
+  The UN Refugee Agency, UNHCR, collates population data relating to persons who are forcibly displaced or stateless. The data is sourced primarily from governments and also from UNHCR operations.
+  
+  People that UNHCR protects and/or assists include those 
+  
+  * who have been *forcibly displaced* (refugees, asylum-seekers, other people in need of international protection and internally displaced people); 
+  * those who are *stateless* (most of whom are not forcibly displaced); 
+  * and other groups of concern to whom UNHCR has extended its protection or provided assistance on a humanitarian basis. 
+  
+  Refugee and IDP returnees are included in the solutions datasets. 
+
+  https://www.unhcr.org/refugee-statistics/methodology
+  
+  https://www.unhcr.org/refugee-statistics/methodology/data-content (*metadata*)
+
+```{r - preprocessing}
+### get the indicator name
+ind <- 'Refugee'
+
+library(countrycode)
+
+yrs <- c(2000, 2005, 2010, 2015)
+
+f <- paste0(dir.refugee, 'query_data_1990_2020/data.csv'); f
+
+d <- readr::read_csv(file = f, show_col_types = F, skip = 14) 
+names(d)
+
+names(d) <- c('year', 'o_name', 'd_name', 'refugees', 'asylum_seekers', 'returned_refugees', 
+              'idps', 'returned_idps', 'stateless', 'ooc', 'oip', 'hst')
+
+
+df <- d %>%
+  select(1:`refugees`) 
+names(df)
+
+```
+
+
+  Country/territory of asylum and origin – the full list of *UN countries* is available on the UNSD methodology page. 
+  ISO3 country codes are included. UNHCR uses the following non-standard ISO3 country codes:
+  - UKN for Various/unknown
+  - STA for Stateless
+
+```{r - preprocessing - country code}
+
+
+## convert country code using https://github.com/vincentarelbundock/countrycode
+ctr_code <- df %>%
+  distinct(o_name, d_name) %>%
+  pivot_longer(names_to = 'name', values_to = 'ctr_name', cols = 1:2) %>%
+  distinct(ctr_name) %>%
+  as.data.frame() %>%
+  dplyr::mutate(
+    # ctr_name = str_to_upper(ctr_name),
+    iso = countrycode(
+      sourcevar = ctr_name, 
+      origin = 'country.name', 
+      destination = 'iso3c')) %>%
+  dplyr::mutate(
+    iso = case_when(
+      ctr_name == 'Various' ~ 'UKN',
+      ctr_name == 'Unknown' ~ 'UKN',
+      ctr_name == 'Stateless' ~ 'STA',
+      ctr_name == 'Tibetan' ~ 'TBT', ## "CHN" would cause duplicated iso3c 
+      T ~ iso) ) %>%
+  arrange(!is.na(iso))
+
+```
+
+
+```{r - final 📁}
+
+dfl_ <- df %>%
+  left_join(x = .,
+            y = ctr_code,
+            by=c('o_name' = 'ctr_name')) %>%
+  dplyr::rename("o_iso" = "iso") %>%
+  select(1:o_name, o_iso, everything()) %>%
+  left_join(x = .,
+            y = ctr_code,
+            by=c('d_name' = 'ctr_name')) %>%
+  dplyr::rename("d_iso" = "iso") %>%
+  select(1:d_name, d_iso, everything())
+
+
+
+## format as the same as EORA data
+df_m <- dfl_ %>%
+  ## put year as column and fill na if needed
+  pivot_wider(names_from = 'year', values_from = 'refugees') 
+
+
+
+# Target years to fill
+target_years <- yrs
+
+# Function to fill NA values in target year columns
+fill_na_adjacent_cols <- function(df, target_years) {
+  for (year in target_years) {
+    year <- as.character(year)  # Ensure year is a string
+    
+    # Find the previous and next year columns
+    year_next <- as.character(as.numeric(year) + 1)
+    year_prev <- as.character(as.numeric(year) - 1)
+    
+    # Check if these columns exist in the data
+    if (year_next %in% colnames(df)) {
+      df[[year]][is.na(df[[year]])] <- df[[year_next]][is.na(df[[year]])]
+    }
+    if (year_prev %in% colnames(df)) {
+      df[[year]][is.na(df[[year]])] <- df[[year_prev]][is.na(df[[year]])]
+    }
+  }
+  return(df)
+}
+
+# Apply the function to the data frame
+df_m_filled <- fill_na_adjacent_cols(df_m, target_years) %>%
+  dplyr::select(-c(o_name, d_name)) %>%
+  pivot_longer(cols = `1990`:ncol(.), names_to = 'year', values_to = 'value') %>%
+  dplyr::mutate(year = as.numeric(year)) %>%
+  dplyr::filter(year %in% yrs) %>%
+  ## the template can limit the years included
+  merge(x = temp_eora,
+        y = .,
+        by.x = c('year', 'iso3', 'to'),
+        by.y = c('year', 'o_iso', 'd_iso'), 
+        all.x = T) %>%
+  as.data.frame()
+
+
+
+### To generate the same format as Eora in Matrix
+df_m_formatted <- df_m_filled %>%
+  ungroup() %>%
+  arrange(year, iso3, to) %>%
+  dplyr::select(year, ctr, everything()) %>%
+  spread(key = to, value = value) %>%
+  arrange(year, iso3)
+
+df_m_formatted %>%
+  group_by(year) %>% tally()
+
+
+
+### save to the `eora_cleaned` folder ----------------------------------------------------
+fname <- paste0(dir.eora_cleaned, ind, '_matrix.xlsx'); fname
+writexl::write_xlsx(x = df_m_formatted, path = fname)
+```
+
+
+
+
+
