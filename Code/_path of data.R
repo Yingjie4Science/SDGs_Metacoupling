@@ -21,6 +21,7 @@ dir.traffick     <- './Data/data_01_raw/Human trafficking/'
 dir.student_flow <- './Data/data_01_raw/International Student flows/'
 dir.oecd         <- './Data/data_01_raw/OECD/'
 dir.imf          <- './Data/data_01_raw/FDI/IMF/'
+dir.cpis         <- './Data/data_01_raw/IMF_CPIS/'
 
 
 

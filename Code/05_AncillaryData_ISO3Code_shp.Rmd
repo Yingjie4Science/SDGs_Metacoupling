@@ -83,7 +83,7 @@ iso_eora_ex <- iso_eora %>%
   as.data.frame()
 
 fname <- './Data/Ancillary_Data_iso_eora_ex.RData'
-save(iso_eora_ex, file = fname)
+save(iso_eora, iso_eora_ex, file = fname)
 
 
 ### 3. overlap? --> yes
