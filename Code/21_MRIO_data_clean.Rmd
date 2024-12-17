@@ -668,6 +668,22 @@ df_formatted <- readxl::read_excel(fname)
 
 
 
+### - Portfolio Investment - IMF-CPIS
+
+  See `CPIS_data_prep.Rmd` in "./Data/data_01_raw/IMF_CPIS/"
+  
+```{r}
+### get the indicator name
+ind <- 'CPIS_matrix'
+yrs <- c(2000, 2005, 2010, 2015)
+dir.i <- './Data/data_01_raw/FDI/IMF/'
+
+fname <- paste0(dir.eora_cleaned, ind, '.xlsx'); fname
+df_formatted <- readxl::read_excel(fname)
+```
+
+
+
 
 ### - ODA OECD
 

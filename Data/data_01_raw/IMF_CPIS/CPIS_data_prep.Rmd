@@ -57,7 +57,6 @@ ind <- 'CPIS'
 library(countrycode)
 
 yrs <- c(2000, 2005, 2010, 2015)
-yrs <- c(2000, 2005, 2010, 2015, 2021)
 
 cc <- load(paste0(dir.cpis,'codelist_panel.rda'))
 
@@ -139,9 +138,9 @@ ctr_code <- rbind(ctr_code1, ctr_code2) %>%
 ```
 
 
-```{r - preprocessing}
+```{r - final 📁}
 
-dt <- dfl %>%
+dfl_ <- dfl %>%
   mutate(o_code = as.numeric(o_code),
          d_code = as.numeric(d_code) ) %>%
   left_join(x = .,
@@ -156,61 +155,73 @@ dt <- dfl %>%
   select(1:d_code, d_iso, everything())
 
 
-```
-
-
-
-
-
-
-
-```{r - final 📁}
-## use both data to further clean the dataset 
-dcomp_ <- d1 %>%
-  left_join(., d2, 
-            by = c("year","iso3","to")) %>%
-  dplyr::select(year, iso3, to, everything()) %>%
-  dplyr::mutate(value = case_when(
-    !is.na(value_in) & is.na(value_out)  ~ value_in,
-    is.na(value_in) & !is.na(value_out)  ~ value_out,
-    !is.na(value_in) & !is.na(value_out) ~ (value_in + value_out)/2,
-    T ~ NA
-  )) %>%
-  dplyr::select(-value_in,-value_out)
-
 
 ## format as the same as EORA data
-dfs_flow_f <- dcomp_ %>%
-  dplyr::mutate(value = value * 10^6) %>%   ## change the unit to USD
-  dplyr::select(year, iso3, everything()) %>%
-  
-  ## use data in 2009 to represent data in 2005
-  dplyr::mutate(year = ifelse(year == 2009, 2005, year)) %>%
+df_m <- dfl_ %>%
+  ## put year as column and fill na if needed
+  pivot_wider(names_from = 'year', values_from = 'value') %>%
+  ## fill data gap using adjacent years
+  dplyr::mutate(
+    `2000` = `2001`
+  ) %>%
+  dplyr::select(1:`1997`, `2000`, everything())
+
+
+
+# Target years to fill
+target_years <- yrs
+
+# Function to fill NA values in target year columns
+fill_na_adjacent_cols <- function(df, target_years) {
+  for (year in target_years) {
+    year <- as.character(year)  # Ensure year is a string
+    
+    # Find the previous and next year columns
+    year_next <- as.character(as.numeric(year) + 1)
+    year_prev <- as.character(as.numeric(year) - 1)
+    
+    # Check if these columns exist in the data
+    if (year_next %in% colnames(df)) {
+      df[[year]][is.na(df[[year]])] <- df[[year_next]][is.na(df[[year]])]
+    }
+    if (year_prev %in% colnames(df)) {
+      df[[year]][is.na(df[[year]])] <- df[[year_prev]][is.na(df[[year]])]
+    }
+  }
+  return(df)
+}
+
+# Apply the function to the data frame
+df_m_filled <- fill_na_adjacent_cols(df_m, target_years) %>%
+  dplyr::select(-c(o_name, d_name, o_code, d_code)) %>%
+  pivot_longer(cols = `1997`:`2023`, names_to = 'year', values_to = 'value') %>%
+  dplyr::mutate(year = as.numeric(year)) %>%
   dplyr::filter(year %in% yrs) %>%
-  
-  ## the template can limit the years included 
-  merge(x = temp_eora, 
-        y = ., 
-        by.x = c('year', 'iso3', 'to'), 
-        by.y = c('year', 'iso3', 'to'), all.x = T) %>%
+  ## the template can limit the years included
+  merge(x = temp_eora,
+        y = .,
+        by.x = c('year', 'iso3', 'to'),
+        by.y = c('year', 'o_iso', 'd_iso'), all.x = T) %>%
   as.data.frame()
 
 
 
 ### To generate the same format as Eora in Matrix
-df_formatted <- dfs_flow_f %>%
+df_m_formatted <- df_m_filled %>%
   ungroup() %>%
   arrange(year, iso3, to) %>%
   dplyr::select(year, ctr, everything()) %>%
   spread(key = to, value = value) %>%
   arrange(year, iso3)
 
-
-### save to the `eora_cleaned` folder --------------------------------------------------------------
-df_formatted %>%
+df_m_formatted %>%
   group_by(year) %>% tally()
+
+### save to the `eora_cleaned` folder ----------------------------------------------------
+
+
 fname <- paste0(dir.eora_cleaned, ind, '_matrix.xlsx'); fname
-writexl::write_xlsx(x = df_formatted, path = fname)
+writexl::write_xlsx(x = df_m_formatted, path = fname)
 ```
 
 
