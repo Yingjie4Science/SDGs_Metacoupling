@@ -667,6 +667,21 @@ df_formatted <- readxl::read_excel(fname)
 ```
 
 
+### - ODA OECD
+
+  See `FDI_data_prep.Rmd` in "./Data/data_01_raw/OECD_ODA/"
+
+```{r}
+ind <- 'ODA_OOF_oecd_matrix'
+ind <- 'ODA_DACSECTOR_oecd_Infrastructure_matrix'
+yrs <- c(2000, 2005, 2010, 2015)
+dir.i <- './Data/data_01_raw/OECD_ODA/'
+
+fname <- paste0(dir.eora_cleaned, ind, '.xlsx'); fname
+df_formatted <- readxl::read_excel(fname)
+```
+
+
 
 ### - Portfolio Investment - IMF-CPIS
 
@@ -712,7 +727,7 @@ df_formatted <- readxl::read_excel(fname)
 ```
 
 
-### High-skilled immigrants
+### - High-skilled immigrants
 
   See `Immigrants_data_prep.Rmd` in './Data/data_01_raw/OECD_Immigrants/'
   
@@ -724,24 +739,6 @@ yrs <- c(2000, 2005, 2010, 2015)
 fname <- paste0(dir.eora_cleaned, ind, '_matrix.xlsx'); fname
 df_formatted <- readxl::read_excel(fname)
 ```
-
-
-
-
-### - ODA OECD
-
-  See `FDI_data_prep.Rmd` in "./Data/data_01_raw/OECD_ODA/"
-
-```{r}
-ind <- 'ODA_OOF_oecd_matrix'
-ind <- 'ODA_DACSECTOR_oecd_Infrastructure_matrix'
-yrs <- c(2000, 2005, 2010, 2015)
-dir.i <- './Data/data_01_raw/OECD_ODA/'
-
-fname <- paste0(dir.eora_cleaned, ind, '.xlsx'); fname
-df_formatted <- readxl::read_excel(fname)
-```
-
 
 
 ### - Refugee - UNHCR
