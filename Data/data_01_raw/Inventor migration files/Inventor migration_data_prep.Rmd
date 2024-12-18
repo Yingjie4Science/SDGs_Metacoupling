@@ -106,9 +106,7 @@ ctr_code <- d1 %>%
   rename(iso3c = iso_alpha3_code) %>%
   arrange(!is.na(iso3c))
 
-  
-
-names(ctr_code) <- c('name', 'iso')
+names(ctr_code)
 
 ```
 
@@ -118,50 +116,29 @@ names(ctr_code) <- c('name', 'iso')
 dfl_ <- df %>%
   left_join(x = .,
             y = ctr_code,
-            by=c('o_name' = 'name')) %>%
-  dplyr::rename("o_iso" = "iso") %>%
-  select(1:o_name, o_iso, everything()) %>%
+            by=c('iso2_ori' = 'iso2')) %>%
+  dplyr::rename("o_iso" = "iso3c") %>%
+  select(1:iso2_ori, o_iso, everything()) %>%
   left_join(x = .,
             y = ctr_code,
-            by=c('d_name' = 'name')) %>%
-  dplyr::rename("d_iso" = "iso") %>%
-  select(1:d_name, d_iso, everything())
+            by=c('iso2_des' = 'iso2')) %>%
+  dplyr::rename("d_iso" = "iso3c") %>%
+  select(1:iso2_des, d_iso, everything())
 
-
-
-dfl_check <- dfl_ %>%
-  distinct(o_name, o_iso, d_name, d_iso)
-
-
-## check iso match
-dfl_1 <- dfl_ %>%
-  distinct(o_name, o_iso) %>%
-  arrange(!is.na(o_iso))
-
-dfl_2 <- dfl_ %>%
-  distinct(d_name, d_iso) %>%
-  arrange(!is.na(d_iso))
 
 
 ## format as the same as EORA data
 df_m <- dfl_ %>%
+  dplyr::select(-c(iso2_ori, iso2_des)) %>%
   filter(!is.na(o_iso), !is.na(d_iso)) %>%
-  ## put year as column and fill na if needed
-  mutate(`2000` = NA, 
-         `2005` = NA,
-         `2010` = NA,
-         `2015` = `2017`) %>%
   arrange(o_iso, d_iso)
-
-
 
 # Target years to fill
 target_years <- yrs
 
 df_m_filled <- df_m %>%
   ## to re-sort years in column
-  gather(key = 'year', value = 'value', `2017`:ncol(.)) %>%
-  dplyr::select(-c(o_name, d_name)) %>%
+  gather(key = 'year', value = 'value', `1990`:ncol(.)) %>%
   dplyr::mutate(year = as.numeric(year)) %>%
   dplyr::filter(year %in% yrs) %>%
   ## the template can limit the years included
