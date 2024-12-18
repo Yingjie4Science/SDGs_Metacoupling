@@ -712,6 +712,20 @@ df_formatted <- readxl::read_excel(fname)
 ```
 
 
+### High-skilled immigrants
+
+  See `Immigrants_data_prep.Rmd` in './Data/data_01_raw/OECD_Immigrants/'
+  
+```{r}
+### get the indicator name
+ind <- 'High-skilled immigrants'
+yrs <- c(2000, 2005, 2010, 2015)
+
+fname <- paste0(dir.eora_cleaned, ind, '_matrix.xlsx'); fname
+df_formatted <- readxl::read_excel(fname)
+```
+
+
 
 
 ### - ODA OECD
