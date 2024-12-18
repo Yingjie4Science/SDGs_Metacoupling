@@ -912,17 +912,19 @@ gc()
 
 
 
+#### Index rank
+```{r}
+### which generate the most impacts and which were most impacted?
 
-```{r - Index rank}
-### which generate the most impacts and which were most impacted? 
-spillover_index_top_bottom <- spillover_index_shp %>%
+spillover_index_rank <- spillover_index_shp %>%
   st_drop_geometry() %>%
   dplyr::filter(year == 2015) %>%
   arrange(index) %>%
-  
   ## remove countries with very few available data ---------------
-  dplyr::filter(non_na_count > 5) %>%
+  dplyr::filter(non_na_count > 5)
   
+  
+spillover_index_top_bottom <- spillover_index_rank %>%
   ## to get the top 10 and bottom 10 -----------------------------
   dplyr::filter(dense_rank(index) <= 10 | dense_rank(desc(index)) <= 10) %>%
   
