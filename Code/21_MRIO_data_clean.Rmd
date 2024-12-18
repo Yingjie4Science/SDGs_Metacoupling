@@ -698,6 +698,21 @@ df_formatted <- readxl::read_excel(fname)
 
 
 
+### - Inventor migration
+
+  See `Inventor migration_data_prep.Rmd` in './Data/data_01_raw/Inventor migration files/'
+  
+```{r}
+### get the indicator name
+ind <- 'Inventor migration'
+yrs <- c(2000, 2005, 2010, 2015)
+
+fname <- paste0(dir.eora_cleaned, ind, '_matrix.xlsx'); fname
+df_formatted <- readxl::read_excel(fname)
+```
+
+
+
 
 ### - ODA OECD
 
