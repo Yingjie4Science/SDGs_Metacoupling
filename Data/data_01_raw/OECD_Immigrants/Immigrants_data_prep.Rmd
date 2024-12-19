@@ -51,7 +51,8 @@ load(f) # `temp_eora`
   The datasets include information on demographic characteristics (age and gender), duration of stay, labour market outcomes (labour market status, occupations, sectors of activity), fields of study, educational attainment and the place of birth.
   * DIOC: Contains data on 34 destination countries and more than 200 countries of origin.
   * DIOC-E (DIOC extended): Contains data on 100 destination countries and more than 200 countries of origin. 
-    *Data range*: 2000, 2010
+  
+  **Data range**: 2000, 2010
   
   **Variables**: 
   `country` country of residence ISO 3166-1 (alpha 3)
@@ -133,7 +134,7 @@ names(d) <- c("o_name", "o_iso", "Gender", "Gender_Code",
 
 unique(d$Gender)
 ## aggregate data 
-df_2 <- d %>%
+df_2wb <- d %>%
   filter(Gender == 'Total') %>%
   select(-Gender, -Gender_Code, -o_name, -d_name) %>%
   ungroup() %>%
@@ -146,15 +147,15 @@ df_2 <- d %>%
 ```{r - Combine data}
 
 ## combine two data sets
-df_ <- 
-  rbind(df_1, df_2) %>% ## WB data do NOT have education/skill levels information
+df_12 <- 
+  rbind(df_1, df_2wb) %>% ## WB data do NOT have education/skill levels information
   mutate(n = as.numeric(n)) %>%
   spread(key = year, value = n) %>%
   as.data.frame()
 
 
 ## plot to check data
-df_ %>%
+df_12 %>%
   ggplot() +
   geom_point(aes(x = `2000`, y = `2010`), alpha = 0.3) +
   scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
@@ -221,7 +222,55 @@ fname <- paste0(dir.eora_cleaned, ind, '_matrix.xlsx'); fname
 writexl::write_xlsx(x = df_m_formatted, path = fname)
 ```
 
+```{r - flows_summary - net inflow}
+
+flows <- df_m_formatted %>%
+  select(-ctr) %>%
+  filter(year == 2015) %>%
+  select(-year) %>%
+  column_to_rownames(var = 'iso3')
+
+# Calculate total inflows (sum of columns)
+inflows <- colSums(flows, na.rm = T)
+
+# Calculate total outflows (sum of rows)
+outflows <- rowSums(flows, na.rm = T)
+
+# Calculate net inflows
+net_inflows <- inflows - outflows
+
+# Combine results into a data frame for clarity
+flows_summary <- data.frame(
+  Country = rownames(flows),
+  Inflows = inflows,
+  Outflows = outflows,
+  NetInflows = net_inflows
+)
+
+```
 
 
+
+## Flow map data 
+  https://www.flowmap.blue/how-to-make-a-flow-map
+  
+```{r - flow data format}
+
+df_l <- df_m_formatted %>%
+  gather(4:ncol(.), key = 'dest', value = 'count') %>%
+  rename('origin' = 'iso3', 
+         'time' = 'year') %>%
+  select(-ctr) %>%
+  filter(time == 2015, 
+         !origin %in% c('CIV', 'SUN'),
+         !dest %in% c('CIV', 'SUN'),
+         !is.na(count),
+         count > 0) %>%
+  select(origin, dest, count, time, everything())
+
+f <- paste0(dir.dico, 'od_flow_', ind, '_2015.csv'); f
+readr::write_csv(x = df_l, file = f)
+
+```
 
 
