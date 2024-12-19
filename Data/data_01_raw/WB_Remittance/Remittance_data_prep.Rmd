@@ -47,10 +47,13 @@ load(f) # `temp_eora`
 
 ## Bilateral Remittance Matrix 
 
+  *Data range*: 2017, 2018
+
   Data is provided by the KNOMAD (the Global Knowledge Partnership on Migration and Development) and World Bank
 
   - Bilateral Remittance Estimates for 2017 using Migrant Stocks, Host Country Incomes, and Origin Country Incomes (millions of US$) (April 2018 Version)		
-  - Bilateral Remittance Estimates for 2018 using Migrant Stocks, Host Country Incomes, and Origin Country Incomes (millions of US$) (October 2019 Version)			
+  - Bilateral Remittance Estimates for 2018 using Migrant Stocks, Host Country Incomes, and Origin Country Incomes (millions of US$) (October 2019 Version)	
+  
 ```{r - preprocessing}
 ### get the indicator name
 ind <- 'Remittance'
@@ -216,7 +219,27 @@ fname <- paste0(dir.eora_cleaned, ind, '_matrix.xlsx'); fname
 writexl::write_xlsx(x = df_m_formatted, path = fname)
 ```
 
+## Flow map data 
+  https://www.flowmap.blue/how-to-make-a-flow-map
+  
+```{r - flow data format}
 
+df_l <- df_m_formatted %>%
+  gather(4:ncol(.), key = 'dest', value = 'count') %>%
+  rename('origin' = 'iso3', 
+         'time' = 'year') %>%
+  select(-ctr) %>%
+  filter(time == 2015, 
+         !origin %in% c('CIV', 'SUN'),
+         !dest %in% c('CIV', 'SUN'),
+         !is.na(count),
+         count > 0) %>%
+  select(origin, dest, count, time, everything())
+
+f <- paste0(dir.data, 'od_flow_', ind, '_2015.csv'); f
+readr::write_csv(x = df_l, file = f)
+
+```
 
 
 

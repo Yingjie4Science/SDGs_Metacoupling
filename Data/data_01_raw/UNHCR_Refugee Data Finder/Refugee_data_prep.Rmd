@@ -92,7 +92,6 @@ names(df)
 
 ```{r - preprocessing - country code}
 
-
 ## convert country code using https://github.com/vincentarelbundock/countrycode
 ctr_code <- df %>%
   distinct(o_name, d_name) %>%
@@ -196,6 +195,39 @@ df_m_formatted %>%
 fname <- paste0(dir.eora_cleaned, ind, '_matrix.xlsx'); fname
 writexl::write_xlsx(x = df_m_formatted, path = fname)
 ```
+
+
+## Flow map data 
+  https://www.flowmap.blue/how-to-make-a-flow-map
+  
+```{r - flow data format}
+
+df_l <- df_m_formatted %>%
+  gather(4:ncol(.), key = 'dest', value = 'count') %>%
+  rename('origin' = 'iso3', 
+         'time' = 'year') %>%
+  select(-ctr) %>%
+  filter(time == 2015, 
+         !origin %in% c('CIV', 'SUN'),
+         !dest %in% c('CIV', 'SUN'),
+         !is.na(count),
+         count > 0) %>%
+  select(origin, dest, count, time, everything())
+
+f <- paste0(dir.refugee, 'od_flow_', ind, '_2015.csv'); f
+readr::write_csv(x = df_l, file = f)
+
+
+# ## country data
+# ctr_list <- df_m_formatted %>%
+#   select(ctr, iso3) %>%
+#   distinct() %>%
+#   filter(!iso3 %in% c('CIV', 'SUN'))
+# 
+# f <- paste0(dir.refugee, 'od_flow_country_list.csv'); f
+# readr::write_csv(x = ctr_list, file = f)  
+```
+
 
 
 
