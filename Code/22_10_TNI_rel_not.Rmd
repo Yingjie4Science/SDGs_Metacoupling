@@ -10,7 +10,7 @@ editor_options:
 
   This script aims to 
   
-  1. Read the combined EORA indicator data (4 years data in one table), and calculate `net imports` for each indicator, each year, and each country. 
+  1. Load the combined EORA indicator data (4 years data in one table), and calculate `net imports` for each indicator, each year, and each country. 
   
   2. Calculate `spillover score` and `spillover index`, according to SDSN's approach. 
   
@@ -424,9 +424,7 @@ for (i in 1:nrow(direction_all)) {
   ind <- direction_all[i, 'ind']       %>% unlist() %>% paste(sep = '', collapse = ''); 
   drt <- direction_all[i, 'direction'] %>% unlist() %>% paste(sep = '', collapse = '') %>% as.numeric()
   in_out <- direction_all[i, 'Impact_direction'] %>% unlist() %>% paste(sep = '', collapse = '')
-  print(ind)
-  print(drt)
-  print(in_out)
+  print( paste(ind, drt, in_out, sep = '    ') ) 
   
   
   ### if the direction is specified, read data; if not, skip. 
@@ -573,7 +571,7 @@ ggplot_x_y_compare <- function(x, y) {
                 labels = trans_format("log10", math_format(10^.x))) +
     scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
             labels = trans_format("log10", math_format(10^.x))) +
-    geom_abline(slope = 1) +
+    geom_abline(slope = 1, color = 'red') +
     xlab('con-based') + 
     ylab('pro-based') +
     theme_bw() 
@@ -585,7 +583,9 @@ ggplot_x_y_compare(x = net_imp_con_i$total_in, y = net_imp_pro_i$total_in) +
   ggtitle(paste0(ind_i, ' - total imports'))
 ggplot_x_y_compare(x = net_imp_con_i$net_in, y = net_imp_pro_i$net_in) +
   ggtitle(paste0(ind_i, ' - net imports'))
-ggplot() + geom_point(aes(x = net_imp_con_i$net_in, y = net_imp_pro_i$net_in)) + 
+ggplot() + 
+  geom_point(aes(x = net_imp_con_i$net_in, y = net_imp_pro_i$net_in)) + 
+  geom_abline(slope = 1, color = 'red') +
   ggtitle(paste0(ind_i, ' - net imports')) +
   xlab('con-based') + 
   ylab('pro-based') +
@@ -1017,17 +1017,17 @@ p <- spillover_index_top_bottom %>%
   annotation_custom(grob = linesGrob(
     arrow=arrow(type="open", ends="last", length=unit(2,"mm")), 
     gp=gpar(col="#d8b365", lwd=2)), 
-    xmin = 0, xmax = 0, ymin = 0, ymax = 40) +
+    xmin = 0, xmax = 0, ymin = 0, ymax = 35) + ## 40
   annotation_custom(grob = grid::textGrob(
-    label = "Impacting", hjust=0, 
+    label = "Impacting", hjust=-0.2, ## 0; negative value -> move right
     gp=gpar(col="#d8b365", cex=.7)),
     xmin = 0, xmax = 0.1, ymin = 10) +
   annotation_custom(grob = linesGrob(
     arrow=arrow(type="open", ends="first", length=unit(2,"mm")), 
     gp=gpar(col="#5ab4ac", lwd=2)), 
-    xmin = 0, xmax = 0, ymin = 0, ymax = -25) +
+    xmin = 0, xmax = 0, ymin = 0, ymax = -20) + ## -25
   annotation_custom(grob = grid::textGrob(
-    label = "Impacted", hjust=3.6, ## 4
+    label = "Impacted", hjust=3.6, ## larger positive value -> move left
     gp=gpar(col="#5ab4ac", cex=.7)),
     xmin = 0, xmax = 0.1, ymin = -20) +
   
@@ -1052,7 +1052,9 @@ p <- spillover_index_top_bottom %>%
   p2a <- ggarrange(p, labels = "a", font.label = list(size = 12), vjust = 1, hjust = 0)
 )
 fname <- paste0(dir.fig, '01main/', 'fig2a_spillover_top_bot_color_2grp_', postfix, '_', today,'.jpg'); fname
-ggsave(filename = fname, plot = p2a, width = width_2col/3*2, height = width_2col/2, units = 'cm', dpi = 600)
+# ggsave(filename = fname, plot = p2a, width = width_2col/3*2, height = width_2col/2, units = 'cm', dpi = 600)
+##' note: this figure will be combined with Figure ex_4, so 
+##' there is no need to save this as a separate figure
 ```
 
 
@@ -1062,7 +1064,7 @@ ggsave(filename = fname, plot = p2a, width = width_2col/3*2, height = width_2col
   
   *To do*: order the list based on characters or property (social vs. environmental vs. economic vs. security ...)
 
-```{r ... fig ex_4 - Index rank with MC categories}
+```{r ... figEx_4 - Index rank with MC categories}
 n_type <- length(unique(net_imports_fromAll_use$ind)); n_type
 list20 <- unique(spillover_index_top_bottom$iso_a3); list20
 
@@ -1157,7 +1159,7 @@ p4ex <- spillover_index_type_SDGtype %>%
 p4ex <- ggarrange(p4ex, labels = "", font.label = list(size = 12), vjust = 1, hjust = 0)
 p4ex
 fname <- paste0(dir.fig, '01main/', 'ex_4_spillover_index_top_bottom_ByType_', postfix, '_', today, '.jpg'); fname
-ggsave(filename = fname, plot = p4ex, width = width_2col/3*2, height = width_2col/2, units = 'cm', dpi = 600)
+# ggsave(filename = fname, plot = p4ex, width = width_2col/3*2, height = width_2col/2, units = 'cm', dpi = 600)
 ```
 
 
@@ -1173,7 +1175,7 @@ ggsave(filename = fname, plot = fig2a, width = width_2col, height = width_2col/2
 
 
 *NOT in use*
-```{r - score of SE [X], eval=FALSE, include=FALSE}
+```{r ... score of SE [X], eval=FALSE, include=FALSE}
 spillover_index_se_shp <- shp %>%
   merge(x = ., y = spillover_index_se, by.x = 'iso_a3', by.y = 'iso3', all.x = T) %>%
   arrange(!is.na(year))
@@ -1214,7 +1216,7 @@ fname <- paste0(dir.fig, 'spillover/', 'map_spillover_index_se', '_', today, '.j
 
 
 
-```{r ... fig ex5 - score map of each impact}
+```{r ... figEx5 - score map of each impact}
 
 ## load ft indicator list and direction data ----------------------
 f <- paste0(dirname(dir.eora_cleaned), '/', 'direction_fts.rds'); f
@@ -1274,7 +1276,7 @@ map_each_p <- map_each %>%
   #                   name= 'Transnational Impact Score') +
   facet_wrap(~ShortName, ncol = n_col, nrow = n_row) +
   # ggtitle(yr)+
-  theme(legend.position = c(0.9, 0.07)) +
+  theme(legend.position = c(0.9, 0.05)) +
   theme(panel.grid = element_blank(),
         axis.ticks = element_blank(),
         axis.text  = element_blank(),

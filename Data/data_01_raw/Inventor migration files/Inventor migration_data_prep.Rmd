@@ -58,7 +58,7 @@ load(f) # `temp_eora`
   `prio_year`- "Priority year"	Priority year refers to the first year of the patent application in any patent office
   `flow` - "Flows of inventors" Number of inventors' names, by patent number, with residence (iso2_des) and nationality (iso2_ori), per year
   
-  Data range: 1978-2012
+  *Data range*: 1978-2012
   
 ```{r - preprocessing}
 ### get the indicator name

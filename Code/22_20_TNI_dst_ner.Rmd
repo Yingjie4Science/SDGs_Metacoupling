@@ -55,7 +55,7 @@ ner_stat <- ner.matrix %>%
   gather(key = 'd', value = 'scenario', 2:ncol(.)) %>%
   group_by(scenario) %>%
   tally() %>%
-  dplyr::mutate(total = sum(n),
+  dplyr::mutate(total = sum(n, na.rm = T),
                 percent = scales::percent(n/total, accuracy = 0.1))
 ner_stat
 ner_stat$n/sum(ner_stat$n) * 100
@@ -260,6 +260,7 @@ net_imports_fromDst  <- net_imports
 
 
 #### - Save R data
+
 ```{r}
 
 ###' unify the year list ------------------------------------------------------------------

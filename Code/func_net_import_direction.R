@@ -1,7 +1,7 @@
 
-#' df:          trade matrix
-#' direction_i: positive impact or negative
-#' frac:        take the top `0.025` as the upper bound
+#' @param df:          trade matrix
+#' @param direction_i: positive impact or negative
+#' @param frac:        take the top `0.025` as the upper bound
 
 func_net_import_direction <- function(df, in_or_out, direction_i, frac = 0.025){
   
@@ -31,8 +31,9 @@ func_net_import_direction <- function(df, in_or_out, direction_i, frac = 0.025){
       net_in      = total_in - total_ex,
       net_in_adj  = ifelse(net_in < 0, 0, net_in), ## make an adjustment (is this correct???)
       
-    )   %>%
-    dplyr::mutate(x = net_in) ## or net_in_adj?
+    ) %>%
+    dplyr::mutate(
+      x = net_in) ## or net_in_adj?
   
   
   ### --> calculate transnational impact score (or spillover score) ----------------------
@@ -110,8 +111,8 @@ func_net_import_direction <- function(df, in_or_out, direction_i, frac = 0.025){
         in_or_out == 'out' & direction_i > 0  & x >= 0  ~      (x-min_positive)/(max_positive - min_positive)*100*(-1), # net importer, not help others
         in_or_out == 'out' & direction_i > 0  & x <  0  ~ (abs(x)-min_negative)/(max_negative - min_negative)*100,      # net exporter, help others
 
-        in_or_out == 'both' & direction_i > 0 & x >= 0  ~      (x-min_positive)/(max_positive - min_positive)*100,  # net exporter, help others
-        in_or_out == 'both' & direction_i > 0 & x <  0  ~ (abs(x)-min_negative)/(max_negative - min_negative)*100,  # net exporter, help others
+        in_or_out == 'both' & direction_i > 0 & x >= 0  ~      (x-min_positive)/(max_positive - min_positive)*100,      # net importer, help others
+        in_or_out == 'both' & direction_i > 0 & x <  0  ~ (abs(x)-min_negative)/(max_negative - min_negative)*100,      # net exporter, help others
 
         TRUE ~ 999),
       ###' --> Need to reverse score, so that "positive larger score" indicates `overall larger negative impacts`
