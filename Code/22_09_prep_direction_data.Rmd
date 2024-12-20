@@ -37,6 +37,9 @@ link <- 'https://docs.google.com/spreadsheets/d/13Di8K8ObDFfdALxrf-YjlGyYf_tNrm1
 
 ```{r - sheet1}
 
+# # Re-authenticate with the correct scope
+# gs4_auth(scopes = "https://www.googleapis.com/auth/spreadsheets")
+
 ### Footprint indicators (to use the `ShortName`)
 direction_ft  <- googlesheets4::read_sheet(link, sheet = "eora_indicators") %>%
   as.data.frame() %>%
@@ -71,6 +74,9 @@ saveRDS(object = direction_fts, file = f)
 direction <- googlesheets4::read_sheet(link, sheet = 'Eora_match_SDG', range = 'C:K', col_types = 'ccccccccc') %>%
   dplyr::select(FT_Indicators, Filename, Used, SDG_class, starts_with('direction')) %>%
   dplyr::rename(ind = Filename) %>%
+  ##' to make sure `Used == 1` won't be removed by `distinct()`
+  arrange(desc(Used)) %>%
+  dplyr::filter(Used == '1') %>%
   dplyr::distinct(ind, .keep_all = T) %>%
   dplyr::filter(!is.na(ind) &              ## remove rows with NA
                   !grepl("\\?", ind)) %>%  ## remove rows contain "?"
@@ -94,7 +100,6 @@ direction <- googlesheets4::read_sheet(link, sheet = 'Eora_match_SDG', range = '
 direction_clean <- direction %>%
   dplyr::filter(!is.na(direction)) %>%
   dplyr::filter(!is.na(ShortName)) %>%
-  # dplyr::filter(Used == 1) %>%
   dplyr::select(FT_Indicators, ind, ShortName, Used, SDG_class, direction, Impact_direction) %>%
   as.data.frame()
 # str(direction_clean)
