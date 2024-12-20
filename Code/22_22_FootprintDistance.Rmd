@@ -269,8 +269,8 @@ neighbor_matrix_od_group <- neighbor_matrix_od %>%
 
 
 ## Footprint data
-```{r include=FALSE}
 
+```{r}
 ## load ft indicator list and direction data ----------------------
 f <- paste0(dirname(dir.eora_cleaned), '/', 'direction_fts.rds'); f
 direction_fts <- readRDS(file = f)
@@ -285,9 +285,12 @@ ft_ind <- direction_clean %>%
   dplyr::filter(Used == '1') %>%
   arrange(SDG_class)
 
-cat(length(unique(ft_ind$ind)), 'indicators were included in the analysis.\n')
+cat('\n', length(unique(ft_ind$ind)), 'indicators were included in the analysis.\n')
+```
 
 
+
+```{r include=FALSE}
 ### !!! ** Choose how many type of flows will be used**
 class_detail <- F   ## use aggregated 
 # class_detail <- T
@@ -348,14 +351,26 @@ for (ind in unique(ft_ind$ind)) {
     dplyr::select(from, to, everything()) %>%
     as.data.frame()
   
-  ## need to normalize the weight factor for calculation 
-  links <- func_robust_scaling(data = links, var = 'weight') %>%
-    dplyr::mutate(weight = func_norm_minmax(weight, a=0.01, b=100))
+  ##' need to normalize the weight factor for calculation
+  ##' --> If iqr == 0, `robust_scaling` will not work as iqr will be used as the denominator
+  ##'     in the function.
+  ##' --> To address the issue, we will use Z-Score Scaling when iqr == 0.
+  which_scaling <- IQR(links$weight, na.rm = TRUE)
+  if (which_scaling == 0) {
+    links_w <- func_z_scaling(data = links, var = 'weight') %>%
+      dplyr::mutate(weight = func_norm_minmax(weight, a=0.01, b=100))
+  } else {
+    links_w <- func_robust_scaling(data = links, var = 'weight') %>%
+      dplyr::mutate(weight = func_norm_minmax(weight, a=0.01, b=100))
+  }
   
   links_dist <- 
-    merge(x = links, y = dist,   by.x = c('from', 'to'), by.y = c('iso_o', 'iso_d'), all.x = T) %>%
-    merge(x = .,     y = grp_id, by.x = 'from', by.y = 'iso_a3', all.x = T) %>% dplyr::rename('group_from' = 'group_id') %>%
-    merge(x = .,     y = grp_id, by.x = 'to',   by.y = 'iso_a3', all.x = T) %>% dplyr::rename('group_to'   = 'group_id') %>%
+    merge(x = links_w, y = dist,   
+          by.x = c('from', 'to'), by.y = c('iso_o', 'iso_d'), all.x = T) %>%
+    merge(x = ., y = grp_id, 
+          by.x = 'from', by.y = 'iso_a3', all.x = T) %>% dplyr::rename('group_from' = 'group_id') %>%
+    merge(x = ., y = grp_id, 
+          by.x = 'to',   by.y = 'iso_a3', all.x = T) %>% dplyr::rename('group_to' = 'group_id') %>%
     
     ## check NA in iso3 matches
     arrange(!is.na(group_from), !is.na(group_to)) %>%
@@ -535,7 +550,7 @@ ft_ind_ls_labels <- ft_ind_ls_levels %>%
 
 
 
-```{r plot - by ft indicator - ex6}
+```{r plot fig ex6 - by ft indicator}
 
 ### 1. use ft distance
 ###'   used this footprint distance before 01/01/2024
@@ -615,7 +630,7 @@ ggsave(filename = fname, plot = ggplot2::last_plot(), width = 7, height = p_heig
 
 
 
-```{r plot - summary across indicators - 2d}
+```{r plot fig 2d - summary across indicators}
 ind <- 'AvgAcrossFT'
 
 ### 1. use ft distance
