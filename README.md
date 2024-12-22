@@ -1,9 +1,15 @@
+![Visitor Badge](https://visitor-badge.laobi.icu/badge?page_id=yingjie4science.SDGs_global_metacouplings)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
+
 
 ## Software requirements
 
-The R scripts were prepared using R version 3.6.1 on Windows 11 Pro.
+The R scripts were prepared using *R version 4.3.2* on Windows 11 Pro.
+
 The following R packages were used in this analysis:
 
+*This project does not involve any non-standard hardware.* 
 ```
 library(readr)
 library(readxl)
@@ -29,12 +35,16 @@ library(RColorBrewer)
 
 ## Data
 
-All the data that support the findings of this study are publicly available. Please refer to Supplementary Table 1 and Supplementary Table 2 for detailed data source information. 
+All the data that support the findings of this study are publicly available. 
+
+Please refer to Supplementary Table 1 and Supplementary Table 2 for detailed data source information. 
 
 
 ## Code
 
-All analysis code are deposited in the folder ***Code/*** 
+All analysis code are deposited in the folder `Code`.
+
+*Users can refer to the detailed annotations in the main scripts below to execute the code.*
 
 ### data preprocessing
 ```
