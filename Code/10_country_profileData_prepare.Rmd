@@ -7,9 +7,9 @@ editor_options:
 
 # Set up
 
-```{r Dirs and Packages}
+```{r Dirs and Packages, include=FALSE}
 ### To clear your environment 
-remove(list = ls())
+# remove(list = ls())
 
 ### set work dir
 path <- rstudioapi::getSourceEditorContext()$path
@@ -3968,6 +3968,108 @@ df3 <- df_ghg %>%
 fname <- paste0(dir.cleaned, iname, '_4yrs.xlsx'); fname
 writexl::write_xlsx(x = df3, path = fname)
 ```
+
+
+
+#### - Researchers
+  9.5.2 Researchers (in full-time equivalent) per million inhabitants
+```{r }
+# SP.POP.TECH.RD.P6	  + Technicians in R&D (per million people) ## 45% NA
+# SP.POP.SCIE.RD.P6	  + Researchers in R&D (per million people) ## 37.6% NA
+# SP.POP.TECH.RD  	 -- Technicians in research and development  (per million people)
+
+# ind <- 'SP.POP.TECH.RD.P6'
+ind <- 'SP.POP.SCIE.RD.P6'
+
+### 1. download data from WB
+dfwb  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(dfwb)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## 
+```
+
+
+
+
+#### - Population with tertiary education
+  9.5.2 Researchers (in full-time equivalent) per million inhabitants
+  
+  https://databank.worldbank.org/indicator/SE.TER.ENRL?id=c755d342&report_name=EdStats_Indicators_Report&populartype=series#advancedDownloadOptions
+  
+```{r }
+
+### 1. download data from WB
+ind <- 'SE.TER.ENRL' ## Enrolment in tertiary education, all programmes, both sexes (number)
+dfwb2  <- wb(indicator = ind, country = "countries_only",
+            startdate = yr_start, enddate = yr_end) %>%
+  as.data.frame() %>%
+  spread(key = date, value = value) %>%
+  left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+
+
+
+# ### 1. download data from the data link
+# f <- paste0(dir.raw, 'World Bank/P_EdStats_Indicators_Report_POPtertiary.xlsx')
+# d <- readxl::read_excel(f) %>%
+#   as.data.frame() %>%
+#   gather(key = 'year', value = 'value', 5:ncol(.)) %>%
+#   # Remove parentheses and text within
+#   mutate(year = gsub("\\[.*?\\]", "", year),
+#          year = as.numeric(year),
+#          iso2c = '',
+#          value = as.numeric(value)) %>%
+#   filter(!is.na(`Series Code`), 
+#          year >= yr_start, 
+#          year <= yr_end, 
+#          `Series Code` == 'SE.TER.ENRL') %>%
+#   spread(key = 'year', value = 'value') %>%
+#   rename('indicator' = 'Series', 
+#          'indicatorID' = "Series Code",
+#          'country' = "Country Name",
+#          'iso3c' = "Country Code"
+#          )
+# 
+# unique(d$Series)
+# names(d)
+# # names(d) <- c("indicator", 'indicatorID',  "ctr",  "iso3c",  "year", "value")
+# 
+# dfwb <- d %>%
+#   left_join(x = ctr_eora, y = ., by = c("iso3_eora" = "iso3c"))
+  
+
+names(dfwb)
+
+iname <- unique(dfwb$indicator)[!is.na(unique(dfwb$indicator))]; iname
+### 2. fill NA
+function_fill_na_wb(dfwb)
+### 3. get a cleaned data and save to dir
+function_format_4yrData_save(iname = iname) ## 6.8% NA
+```
+
+
+
+```{r}
+library(jsonlite)
+##' https://ourworldindata.org/grapher/share-of-the-population-with-completed-tertiary-education
+##' Percentage of the population aged 25 to 65 years who have either completed or partially completed tertiary education.
+##' # Fetch the data
+d <- read.csv("https://ourworldindata.org/grapher/share-of-the-population-with-completed-tertiary-education.csv?v=1&csvType=full&useColumnShortNames=false");
+
+names(d) <- c('ctr', 'iso3', 'year', 'value')
+rel <- d %>%
+  dplyr::select(-ctr) %>%
+  filter(year %in%  c(2000, 2005, 2010, 2015),
+         !iso3 %in% c(NA, '') ) %>%
+  as.data.frame()
+
+```
+
 
 
 
