@@ -12,7 +12,7 @@ editor_options:
 ```{r Dirs and packages, include=FALSE}
 
 ### To clear your environment 
-remove(list = ls())
+# remove(list = ls())
 
 ### set work dir
 path <- rstudioapi::getSourceEditorContext()$path
@@ -119,7 +119,7 @@ coef_correction_curb_10e_issue_P        <- 10^2
 
 ```{r --- check - SDG change plot function}
 
-func_plot_sdg_ScoreChange_byGroup <- function(df_score) {
+func_plot_sdg_ScoreChange_byGroup <- function(df_score, bar_or_violin = 'bar') {
   # df_score_chg <- df_score_scaled_robust %>%
   # df_score_chg <- df_score_scaled_z %>%
   df_score_chg <- df_score %>%
@@ -138,43 +138,95 @@ func_plot_sdg_ScoreChange_byGroup <- function(df_score) {
     merge(x = ., 
           y = df_score_chg, 
           by.x = 'iso_a3', by.y = 'iso3', all.x = T) %>%
+    dplyr::mutate(goal = 'x') %>%
     as.data.frame()
   
   
   chg_err_group  <- df_shp %>% 
     dplyr::filter(year != 'na') %>%
-    dplyr::mutate(goal = 'x') %>%
     summarySE(measurevar= "value_chg", groupvars = c("year", 'group', "goal"), na.rm = T)
   
   # str(chg_err_group)
   # levels(chg_err_group$group)
   color_grp <- c('#F26463', '#2371A6') 
   
-  p <- ggplot(data = chg_err_group, 
+  p1 <- ggplot(data = chg_err_group, 
          aes(x = as.factor(goal),
              y = value_chg,
              fill = group)) +
-    geom_bar(position = position_dodge(0.8), stat="identity", width = 0.8, show.legend = T)+
+    geom_bar(
+      position = position_dodge(0.8), stat="identity", 
+      width = 0.8, 
+      alpha = 0.5,
+      show.legend = T)+
     geom_errorbar(aes(ymin=value_chg-se, ymax=value_chg+se), 
                   width=.3, 
                   position=position_dodge(.8)) +
-    ylab("Impact on SDG score") + xlab('SDGs') + labs(fill = "Group")+
+    # Add raw data points
+    geom_point(data = df_shp,
+               aes(color = group),
+               show.legend = F, 
+               position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.7),
+               shape = 21, 
+               alpha = 0.4, size = 2) +
+    ylab("Impact on SDG score") + 
+    xlab('SDGs') + 
+    labs(fill = "Group", color = "Group")+
     ggtitle(ind_sdg) + 
+    labs(subtitle = "Score_rel - Score_not") +
     # scale_fill_brewer(palette = "Blues", direction = -1) +
     scale_fill_manual(values = color_grp, guide = guide_legend(reverse = T)) +
+    scale_color_manual(values = color_grp, guide = guide_legend(reverse = T)) +
+    guides(color=FALSE) +
     scale_y_continuous(n.breaks = 6) +
     coord_flip()+
     
     theme(
       legend.position = c(0.86, 0.16),    ## 0.15, 0.06
       # legend.key.size = unit(0.2,"cm"), 
-      legend.box.background = element_rect(colour = "black"),
+      # legend.box.background = element_rect(colour = "black"),
       legend.key.width  = unit(0.4,"cm"), 
       legend.key.height = unit(0.4,"cm"), 
       legend.text=element_text(size=rel(.9)),
       panel.grid.minor = element_blank())
+  
+  
+  
+  ### Create a dodged violin plot with jittered points
+  p2 <- ggplot(df_shp, aes(x = as.factor(goal), y = value_chg, fill = group)) +
+    # Dodged violin plots
+    geom_violin(position = position_dodge(width = 0.8), alpha = 0.3, trim = FALSE) +
+    # Boxplots for summary
+    geom_boxplot(position = position_dodge(width = 0.8), width = 0.2, alpha = 0.2, outlier.shape = NA) +
+    # Jittered points
+    geom_jitter(aes(color = group), 
+                # position = position_dodge(width = 0.8), 
+                position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.8),
+                shape = 21, #color = 'black',
+                size = 2, alpha = 0.4) +
+    # Labels and customization
+    labs(title = ind_sdg,
+         x = "SDGs",
+         y = "Impact on SDG score",
+         color = "Group",
+         fill = "Group") +
+    coord_flip()+
+    # theme_minimal() +
+    theme(
+      legend.position = c(0.86, 0.16))
  
-  return(p) 
+  p <- ggarrange(p1, p2, ncol = 1)
+  
+  if (bar_or_violin == 'bar') {
+    return(p1)
+  } else if (bar_or_violin == 'violin') {
+    return(p2)
+  } else if (bar_or_violin == 'both') {
+    return(p)
+  } else {
+    print('Please specify plot type!')
+  }
+   
 }
 ```
 
@@ -2853,6 +2905,171 @@ co2_rel_not <- rel %>%
 
 
 
+####  - 9.5.2a Researchers per million - Inventor migration
+
+  9.5.2 Researchers (in full-time equivalent) per million inhabitants 
+  
+  - Inventor migration
+  - Global talent flows (High-skilled immigrants)
+
+```{r}
+ind_sdg  <- 'Researchers per million people - Inventor'  ## person per 10^6 people
+ind_ft     <- 'Inventor migration_matrix'                ## person
+unit_check <- 10^6
+direction_sdg <- 1
+
+### Check the Unit!!!
+### rel -->          ## Researchers in R&D (per million people)
+### oft --> person
+### pop --> person
+
+
+###
+###' Resource consumption or emissions under the current trading world situation ----------
+###' --> get needed data via `10_country_profileData_prepare.Rmd`
+xls <- list.files(path = dir.input1, pattern = '^Researchers in', full.names = T); xls 
+rel_w <- readxl::read_excel(path = xls) %>% as.data.frame()  ## the status data
+rel <- rel_w %>%
+  dplyr::select(-ctr) %>%
+  gather(key = 'year', value = 'value', `2000`:ncol(.)) %>%
+  dplyr::mutate(value = value) %>%  
+  as.data.frame()
+
+
+### Outsourced footprints (oft) flow --------------------------------------------------------------------
+oft <- net_imports_bind  %>%
+  dplyr::filter(ind == ind_ft) %>%
+  dplyr::select(ind, year, iso3, net_in, scenario) %>%
+  spread(key = scenario, value = net_in)
+
+
+
+### w/o trade, and with trade together  -----------------------------------------------------------------
+rel_not_merge <- rel %>%
+  merge(x = ., y = oft,         by = c('iso3', 'year'), all.x = T) %>% 
+  merge(x = ., y = pop_l,       by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
+  dplyr::mutate(
+    ind       = unique(oft$ind),
+    value_rel = (value - 0),
+    value_not = (value - fromAll/(pop/10^6)),
+    value_dst = (value - fromNer/(pop/10^6)),
+    value_ner = (value - fromDst/(pop/10^6))
+    ) %>%  
+  ### for easy-checking the numbers
+  dplyr::select(ind, iso3, year, value, everything())
+
+rel_not <- rel_not_merge %>%
+  dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
+
+rel_not_check <- rel_not %>%
+  dplyr::mutate(dif_rel_not = value_rel - value_not) %>%
+  dplyr::select(ind, iso3, year, dif_rel_not, value_rel, value_not, everything())
+func_plot_netImports_vs_rel(df = rel_not_merge)
+
+
+###' normalization  ----------------------------------------------------------------------
+###' Be careful with **Data Direction!**   <-- `direction_sdg`
+
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, lower_bound = lower_probs, upper_bound = upper_probs, direction = direction_sdg) %>%
+  # spread(key = 'scenario', value = c('value_norm')) %>%
+  dplyr::mutate(ind_sdg = ind_sdg) %>%
+  as.data.frame()
+
+par(mfrow = c(1, 2))  # 1 row, 2 columns
+hist(df_score$val, nclass = 100)
+hist(df_score$value_norm, nclass = 100)
+
+score_9_5_2a <- df_score
+func_plot_sdg_ScoreChange_byGroup(df_score = df_score, bar_or_violin = 'both')
+```
+
+
+
+####  - 9.5.2b Researchers per million - High-skilled immigrants
+
+  9.5.2 Researchers (in full-time equivalent) per million inhabitants 
+  
+  - Inventor migration
+  - Global talent flows (High-skilled immigrants)
+
+```{r}
+ind_sdg  <- 'Researchers per million people - High-skilled'  ## person per 10^6 people
+ind_ft     <- 'High-skilled immigrants_matrix'               ## person
+unit_check <- 1
+direction_sdg <- 1
+
+### Check the Unit!!!
+### rel -->          ## Enrolment in tertiary education, all programmes, both sexes (number)
+### oft --> person   ## number
+### pop --> person
+
+
+###
+###' Resource consumption or emissions under the current trading world situation ----------
+###' --> get needed data via `10_country_profileData_prepare.Rmd`
+xls <- list.files(path = dir.input1, pattern = '^Enrolment in tertiary education', full.names = T); xls 
+rel_w <- readxl::read_excel(path = xls) %>% as.data.frame()  ## the status data
+rel <- rel_w %>%
+  dplyr::select(-ctr) %>%
+  gather(key = 'year', value = 'value', `2000`:ncol(.)) %>%
+  dplyr::mutate(value = value) %>%  
+  as.data.frame()
+
+
+
+### Outsourced footprints (oft) flow --------------------------------------------------------------------
+oft <- net_imports_bind  %>%
+  dplyr::filter(ind == ind_ft) %>%
+  dplyr::select(ind, year, iso3, net_in, scenario) %>%
+  spread(key = scenario, value = net_in)
+
+
+
+### w/o trade, and with trade together  -----------------------------------------------------------------
+rel_not_merge <- rel %>%
+  merge(x = ., y = oft,         by = c('iso3', 'year'), all.y = T) %>% 
+  merge(x = ., y = pop_l,       by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
+  dplyr::mutate(
+    ind       = unique(oft$ind),
+    value_rel = (value)/(pop/10^6),
+    value_not = (value_rel - fromAll/(pop/10^6)),
+    value_dst = (value_rel - fromNer/(pop/10^6)),
+    value_ner = (value_rel - fromDst/(pop/10^6))
+    ) %>%  
+  ### for easy-checking the numbers
+  dplyr::select(ind, iso3, year, value, everything())
+
+rel_not <- rel_not_merge %>%
+  dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
+
+rel_not_check <- rel_not %>%
+  dplyr::mutate(dif_rel_not = value_rel - value_not) %>%
+  dplyr::select(ind, iso3, year, dif_rel_not, value_rel, value_not, everything())
+func_plot_netImports_vs_rel(df = rel_not_merge)
+
+
+###' normalization  ----------------------------------------------------------------------
+###' Be careful with **Data Direction!**   <-- `direction_sdg`
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, lower_bound = lower_probs, upper_bound = upper_probs, direction = direction_sdg) %>%
+  # spread(key = 'scenario', value = c('value_norm')) %>%
+  dplyr::mutate(ind_sdg = ind_sdg) %>%
+  as.data.frame()
+
+par(mfrow = c(1, 2))  # 1 row, 2 columns
+hist(df_score$val, nclass = 100)
+hist(df_score$value_norm, nclass = 100)
+
+score_9_5_2b <- df_score
+func_plot_sdg_ScoreChange_byGroup(df_score = df_score, bar_or_violin = 'violin')
+```
+
+
+
+
 #### - 9.a.1 ODA to infrastructure
 
 *SDG*
@@ -3158,6 +3375,67 @@ func_plot_sdg_ScoreChange_byGroup(df_score = df_score)
 
 
 
+#### - 10.7.4 Refugees proportionby country of origin
+
+  10.7.4 Proportion of the population who are refugees, by country of origin
+
+```{r}
+
+ind_sdg    <- 'Refugees proportion' ## % population
+ind_ft     <- 'Refugee_matrix'
+unit_check <- 1
+direction_sdg <- -1
+
+### Check the Unit!!!
+### rel --> person
+### oft --> person
+
+### Outsourced footprints (oft) flow --------------------------------------------------------------------
+oft <- net_imports_bind  %>%
+  dplyr::filter(ind == ind_ft) %>%
+  dplyr::select(ind, year, iso3, net_in, scenario) %>%
+  spread(key = scenario, value = net_in)
+
+
+### w/o trade, and with trade together  -----------------------------------------------------------------
+rel_not_merge <- oft %>%
+  merge(x = ., y = pop_l, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
+  dplyr::mutate(
+    ind       = ind_ft,
+    ## the evaluation here is the same approach used in 16.2.2
+    victims   = 0 - fromAll, ## the number of victims from the country of origin
+    value_rel = (victims)             /pop*10^6,  ## victims per 100,000 population
+    value_not = (victims - (-fromAll))/pop*10^6,  ## 0 transfer under no-trade
+    value_dst = (victims - (-fromNer))/pop*10^6,
+    value_ner = (victims - (-fromDst))/pop*10^6
+    ) %>%   
+  dplyr::select(-victims) %>%
+  ### for easy-checking the numbers
+  dplyr::select(ind, iso3, year, everything())
+
+rel_not <- rel_not_merge %>%
+  dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
+
+
+### normalization  --------------------------------------------------------------------------------------
+### Be careful with **Data Direction!**
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, #trim.to.na = T,
+  lower_bound = lower_probs, upper_bound = upper_probs, 
+  direction = direction_sdg) %>%
+  # spread(key = 'scenario', value = c('value_norm')) %>%
+  dplyr::mutate(ind_sdg = ind_sdg) %>%
+  as.data.frame()
+
+score_10_7_4 <- df_score
+
+func_plot_netImports_vs_rel(df = rel_not_merge, x = 'pop')
+func_plot_sdg_ScoreChange_byGroup(df_score = df_score)
+```
+
+
+
 
 #### - 10.b.1x FDI for development
 
@@ -3317,6 +3595,99 @@ func_plot_netImports_vs_rel(df = rel_not_merge)
 func_plot_sdg_ScoreChange_byGroup(df_score = df_score)
 ```
 
+
+
+#### - 10.b.1z PI for development
+
+  10.b.1 Total resource flows for development, by recipient and donor countries and type of flow (e.g. official development assistance, foreign direct investment and other flows) 
+
+```{r}
+
+ind_sdg  <- 'PI for development' ## 
+ind_ft   <- 'CPIS_matrix'
+
+direction_sdg <- 1
+
+### Check the Unit!!!
+### rel --> USD
+### oft --> USD
+### gdp --> USD
+
+
+### Outsourced footprints (oft) flow --------------------------------------------------------------------
+#' net inflow of FDI
+oft <- net_imports_bind  %>%
+  dplyr::filter(ind == ind_ft) %>%
+  dplyr::select(ind, year, iso3, net_in, scenario) %>%
+  spread(key = scenario, value = net_in) %>%
+  as.data.frame()
+yrs <- unique(oft$year)
+
+
+### w/o trade, and with trade together  -----------------------------------------------------------------
+rel_not_merge <- oft %>%
+  merge(x = ., y = gdp_rel_not, by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
+  dplyr::mutate(
+    ind       = unique(oft$ind),
+    
+    ##' option 1
+    ##'    if a country's net outflow < 0, we assume it does not have FDI, 
+    ##'    and assign 0 as its net outflow
+    # value     = fromAll,
+    # value_rel = ifelse(value > 0, value, 0+1)/gdp_rel,  ##
+    # value_not = (0+1)/gdp_rel,                          ## under no-trade ## add $1 to avoid zero values
+    # value_dst = ifelse( (value-(-fromNer)) >0, (value-(-fromNer)), 0+1)/gdp_rel, ## (total outflow) - (nearby outflow)
+    # value_ner = ifelse( (value-(-fromDst)) >0, (value-(-fromDst)), 0+1)/gdp_rel  ## (total outflow) - (distant outflow)
+    
+    ##' option 2
+    ##'   it would be better to keep using the data to indicate that if outflow > 0, a country 
+    ##'   positively contribute to SDG, while outflow < 0 means a country negatively contribute to SDGs
+    ##'   In this way can avoid extreme values like 0 or 1, which are substantially smaller than other data values
+    value     = fromAll,
+    value_rel = value,  ##
+    value_not = value-(-fromAll),
+    value_dst = (value-(-fromNer)), ## (total outflow) - (nearby outflow)
+    value_ner = (value-(-fromDst)), ## (total outflow) - (distant outflow)
+    
+    ) %>%
+  ### for easy-checking the numbers
+  dplyr::select(ind, iso3, year, value, everything())
+
+rel_not <- rel_not_merge %>%
+  dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
+
+hist(rel_not$value_rel)
+
+### plot
+rel_not_merge %>%
+  ggplot(aes(x = value, y = -fromAll)) +
+  geom_point() +
+  geom_abline(slope = 1, color = 'red') +
+  scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+  scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+  theme_bw()
+
+
+### normalization  -------------------------------------------------------
+### Be careful with **Data Direction!**
+### big - better? --> func_norm_sdg_score_good
+### big - bad?    --> func_norm_sdg_score_bad
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, trim.to.na = T,
+  lower_bound = lower_probs, upper_bound = upper_probs, 
+  direction = direction_sdg) %>%
+  # spread(key = 'scenario', value = c('value_norm')) %>%
+  dplyr::mutate(ind_sdg = ind_sdg) %>%
+  as.data.frame()
+
+score_10_b_1z <- df_score
+
+func_plot_netImports_vs_rel(df = rel_not_merge)
+func_plot_sdg_ScoreChange_byGroup(df_score = df_score, bar_or_violin = 'both')
+```
 
 
 
@@ -5035,6 +5406,151 @@ score_17_3_1y <- df_score
 func_plot_netImports_vs_rel(df = rel_not_merge)
 func_plot_sdg_ScoreChange_byGroup(df_score = df_score)
 ```
+
+
+#### - 17.3.2 Remittances per GDP
+
+  17.3.2 Volume of remittances (in United States dollars) as a proportion of total GDP
+  
+  Definition: Personal remittances received as proportion of GDP is the *inflow* of personal remittances expressed as a
+percentage of Gross Domestic Product (GDP). [See UNSD Metadata](https://unstats.un.org/sdgs/metadata/files/Metadata-17-03-02.pdf)
+
+  Bilateral Remittance Estimates for 2017 using Migrant Stocks, Host Country Incomes, and Origin Country Incomes (millions of US$) (April 2018 Version)
+
+```{r}
+ind_sdg  <- 'Remittances per GDP' ## 
+ind_ft   <- 'Remittance_matrix'
+
+direction_sdg <- 1
+unit_check    <- 10^6
+
+### Check the Unit!!!
+### rel --> USD
+### oft --> Millions of USD
+### gdp --> USD
+
+### Outsourced footprints (oft) flow --------------------------------------------------------------------
+oft <- net_imports_bind  %>%
+  dplyr::filter(ind == ind_ft) %>%
+  ## change M USD -> USD
+  dplyr::mutate(net_in = net_in * unit_check) %>%
+  dplyr::select(ind, year, iso3, net_in, scenario) %>%
+  spread(key = scenario, value = net_in) %>%
+  as.data.frame()
+yrs <- unique(oft$year)
+
+### Resource consumption or emissions under the current trading world situation -------------------------
+
+
+### w/o trade, and with trade together  -----------------------------------------------------------------
+rel_not_merge <- oft %>%
+  merge(x = ., y = gdp_rel_not,  by = c('iso3', 'year'), all.x = T) %>% 
+  dplyr::filter(year %in% yrs) %>%
+  dplyr::mutate(
+    ind       = unique(oft$ind),
+    value     = fromAll,            ## received more, the better
+    value_rel = value,              ##
+    value_not = (value - fromAll)/gdp_rel, 
+    value_dst = (value - fromNer)/gdp_rel,  
+    value_ner = (value - fromDst)/gdp_rel
+    ) %>%
+  ### for easy-checking the numbers
+  dplyr::select(ind, iso3, year, value, everything())
+
+rel_not <- rel_not_merge %>%
+  dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
+
+hist(rel_not$value_rel)
+
+
+### normalization  -------------------------------------------------------
+### Be careful with **Data Direction!**
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, 
+  lower_bound = lower_probs, upper_bound = upper_probs, 
+  direction = direction_sdg) %>%
+  # spread(key = 'scenario', value = c('value_norm')) %>%
+  dplyr::mutate(ind_sdg = ind_sdg) %>%
+  as.data.frame()
+
+score_17_3_2 <- df_score
+
+func_plot_netImports_vs_rel(df = rel_not_merge)
+func_plot_sdg_ScoreChange_byGroup(df_score = df_score)
+```
+
+
+
+
+#### - 17.6 Access to innovation - Inventor flow
+
+  17.6 Enhance North-South, South-South and triangular regional and international cooperation on and access to science, technology and innovation and enhance knowledge-sharing on mutually agreed terms
+
+```{r}
+ind_sdg    <- 'Access to innovation - Inventor flow'  ## more Inventor inflow the better for SDG
+ind_ft     <- 'Inventor migration_matrix'   ## person
+unit_check <- ""
+direction_sdg <- 1
+
+### Check the Unit!!!
+### rel -->          
+### oft --> person
+### pop --> person
+
+
+
+###' Resource consumption or emissions under the current trading world situation ---------
+
+
+
+### Outsourced footprints (oft) flow -----------------------------------------------------
+oft <- net_imports_bind  %>%
+  dplyr::filter(ind == ind_ft) %>%
+  dplyr::select(ind, year, iso3, net_in, scenario) %>%
+  spread(key = scenario, value = net_in)
+
+
+
+### w/o trade, and with trade together  --------------------------------------------------
+rel_not_merge <- oft %>%
+  merge(x = ., y = pop_l,       by = c('iso3', 'year'), all.x = T) %>%
+  dplyr::filter(year %in% yrs) %>%
+  dplyr::mutate(
+    ind       = unique(oft$ind),
+    ##' The more inventor inflow, the better for innovation in the receiving country 
+    ##' The more inventor outflow, the worse for innovation in the sending country (`brain drain`)    
+    value     = fromAll,  
+    value_rel = (value -        0)/(pop/10^6),
+    value_not = (value - (fromAll)/(pop/10^6)),
+    value_dst = (value - (fromNer)/(pop/10^6)),
+    value_ner = (value - (fromDst)/(pop/10^6))
+    ) %>%  
+  ### for easy-checking the numbers
+  dplyr::select(ind, iso3, year, value, everything())
+
+rel_not <- rel_not_merge %>%
+  dplyr::select(ind, iso3, year, value_rel, value_not, value_dst, value_ner)
+
+
+###' normalization  ----------------------------------------------------------------------
+###' Be careful with **Data Direction!**   <-- `direction_sdg`
+
+df_score <- func_norm_sdg_score_auto(
+  df = rel_not, trim = 0.025, 
+  lower_bound = lower_probs, upper_bound = upper_probs, 
+  direction = direction_sdg) %>%
+  # spread(key = 'scenario', value = c('value_norm')) %>%
+  dplyr::mutate(ind_sdg = ind_sdg) %>%
+  as.data.frame()
+
+par(mfrow = c(1, 2))  # 1 row, 2 columns
+hist(df_score$val, nclass = 100)
+hist(df_score$value_norm, nclass = 100)
+
+score_17_6 <- df_score
+func_plot_sdg_ScoreChange_byGroup(df_score = df_score, bar_or_violin = 'both')
+```
+
 
 
 
