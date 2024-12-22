@@ -20,6 +20,7 @@ source('./Code/_path of data.R')
 
 ### packages
 source('./Code/_package list.R')
+library(data.table)
 
 gc()
 ```
@@ -48,7 +49,7 @@ gc()
   
 
 
-  Unit	US Dollar, Millions
+  * *Unit*:	US Dollar, Millions
 
 ```{r - input data- which ? }
 
@@ -103,7 +104,7 @@ cols_to_remove <- c("RECIPIENT", "DONOR",
                     "SECTOR", 
                     "PART", 'AMOUNTTYPE', 'TIME', 'Flags')
 
-library(data.table)
+
 data <- data.table::fread(file = f, sep = ',')
 
 names(data)
@@ -111,7 +112,7 @@ names(data)
 # unique(data$Donor)
 unique(data$`Aid type`)
 unique(data$Series)
-
+unique(data$Sector)
 
 unique(data$Part)          ## "1 : Part I - Developing Countries"     "2 : Part II - Countries in Transition"
 unique(data$`Amount type`) ## "Current Prices (USD millions)"       "Constant Prices (2021 USD millions)"
