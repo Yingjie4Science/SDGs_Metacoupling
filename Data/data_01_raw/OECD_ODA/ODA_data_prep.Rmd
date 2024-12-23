@@ -26,7 +26,9 @@ library(data.table)
 gc()
 ```
 
-```{r Helper data}
+## Help data
+
+```{r}
 
 yrs <- c(2000, 2005, 2010, 2015)
 
@@ -35,6 +37,84 @@ f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'template_eora.RData')
 load(f) # `temp_eora`
 
 ```
+
+
+
+### Country names and code
+
+```{r}
+### clean the country names and add iso3 code --------------------------------------------
+f <- paste0(dir.raw, 'OECD_ODA/', "Recipient_13_266.xlsx")
+
+# List all the sheets in the Excel file
+sheet_names <- readxl::excel_sheets(f)
+sheet_names
+
+
+### test code using one sheet ------------------------------------
+# c.d <- readxl::read_excel(f, sheet = 'ODA_OOF_Donor') %>% as.data.frame()
+#   
+# c.d_cleaned <- as.data.frame(lapply(c.d, str_squish)) %>%
+#   # dplyr::filter(str_detect(c3,'Information')) %>%
+#   dplyr::mutate(across(where(is.character), ~ str_replace_all(., "Information", ""))) %>%
+#   dplyr::mutate(across(where(is.character), str_squish))
+
+
+### loop all sheets and clean the country names -------------------
+c_all <- data.frame()
+for (sheet in sheet_names) {
+  c <- readxl::read_excel(f, sheet = sheet) %>% as.data.frame()
+
+  # Remove extra spaces from all character columns using str_squish()
+  c_cleaned <- as.data.frame(lapply(c, str_squish)) %>%
+    # dplyr::filter(str_detect(c3,'Information')) %>%
+    dplyr::mutate(across(where(is.character), ~ str_replace_all(., "Information", ""))) %>%
+    dplyr::mutate(across(where(is.character), str_squish))
+  
+  ## 
+  c_all <- rbind(c_all, c_cleaned) %>%
+    dplyr::distinct_all(.keep_all = T) %>%
+    arrange(c3, c2, c1)
+}
+
+
+### a list of institutes that are not countries
+c.exlcude <- c(c_all$c1, c_all$c2) %>% 
+  unique() %>% 
+  sort()
+
+
+
+### extended country-iso3 pair list for matching
+load('./Data/Ancillary_Data_iso_eora_ex.RData')  ## ## iso_eora_ex
+iso3_code <- iso_eora_ex %>% 
+  dplyr::select(-IMF) %>%
+  dplyr::distinct_all() %>%
+  as.data.frame()
+
+c.ctr <- c_all %>% 
+  dplyr::distinct(c3) %>%
+  dplyr::filter(str_detect(
+    c3, 
+    paste('region', 'Unspecified', 'unspecified', 'Community', 'Multilateral', 'Project', 
+          'Other donor', 'Indus Basin', 'EU Institutions', sep = '|'), 
+    negate = T)) %>%
+  # dplyr::rename('name' = 'c3') %>%
+  dplyr::mutate(
+    name_clean = str_replace(c3, " \\s*\\([^\\)]+\\)", "")
+  ) %>%
+  left_join(
+    x = .,
+    y = iso3_code,
+    by = c('name_clean' = 'Row')
+  ) %>%
+  arrange(!is.na(iso3_eora)) %>%
+  dplyr::select(-name_clean) %>%
+  as.data.frame()
+
+rm(c, c_cleaned, c_all)
+```
+
 
 
 
@@ -176,6 +256,8 @@ d4 <- d
 
 
 
+####  - input data 5 - CRS 
+
 *CRS: Creditor Reporting System (flows)*
   The objective of the CRS Aid Activity database is to provide a set of readily available granular data that enables analysis on where aid goes, what purposes it serves and what policies it aims to implement, on a comparable basis for all providers who report their activity-level statistics to the OECD. Data are collected on individual projects and programmes, with a range of attributes for each activity. Further information on the definition and possible values of each attribute can be found in the Converged Statistical Reporting Directives.
 
@@ -183,7 +265,7 @@ d4 <- d
 
 *Last updated*:   November 15, 2024 at 6:29:10 AM
 
-```{r - input data 5 - CRS }
+```{r}
 
 ### name the indicator
 ind <- 'ODA_CRS'
@@ -257,7 +339,7 @@ unique(d5$SectorName)
 ```
 
 
-```{r - input data 5 - CRS - Biodiversity}
+```{r - ODA_Biodiversity}
 d5_bio <- d5_ %>%
   filter(Biodiversity > 0) %>%
   group_by(o_iso3, d_iso3, Recipient, Donor, Year) %>%
@@ -284,91 +366,27 @@ d5_Biodiversity <- d5_bio %>%
 func_format_oda_data(data = d5_Biodiversity, sector_i = 'Biodiversity')
 ```
 
-```{r  - input data 5 - CRS - Health}
+
+
+```{r  - ODA_Health}
 
 d5_Health <- d5_ %>% 
   filter(str_detect(string = SectorName, pattern = 'Health')) %>%
   select(-USD_Commitment) %>%
   rename('Value' = 'USD_Disbursement')
 
+unique(d5_Health$SectorName)
+
+## test --> it is fine as only one row has "I.2. Health"
+# d5_check <- d5_Health %>% 
+#   filter(#o_iso3 == 'USA',
+#          # Year == 2015, 
+#          str_detect(string = SectorName, pattern = "I.2. Health"))
+
 ## format data and save as xlsx
 func_format_oda_data(data = d5_Biodiversity, sector_i = 'Health')
 ```
 
-### Country names and code
-
-```{r - tidy names}
-### clean the country names and add iso3 code --------------------------------------------
-f <- paste0(dir.raw, 'OECD_ODA/', "Recipient_13_266.xlsx")
-
-# List all the sheets in the Excel file
-sheet_names <- readxl::excel_sheets(f)
-sheet_names
-
-
-### test code using one sheet ------------------------------------
-# c.d <- readxl::read_excel(f, sheet = 'ODA_OOF_Donor') %>% as.data.frame()
-#   
-# c.d_cleaned <- as.data.frame(lapply(c.d, str_squish)) %>%
-#   # dplyr::filter(str_detect(c3,'Information')) %>%
-#   dplyr::mutate(across(where(is.character), ~ str_replace_all(., "Information", ""))) %>%
-#   dplyr::mutate(across(where(is.character), str_squish))
-
-
-### loop all sheets and clean the country names -------------------
-c_all <- data.frame()
-for (sheet in sheet_names) {
-  c <- readxl::read_excel(f, sheet = sheet) %>% as.data.frame()
-
-  # Remove extra spaces from all character columns using str_squish()
-  c_cleaned <- as.data.frame(lapply(c, str_squish)) %>%
-    # dplyr::filter(str_detect(c3,'Information')) %>%
-    dplyr::mutate(across(where(is.character), ~ str_replace_all(., "Information", ""))) %>%
-    dplyr::mutate(across(where(is.character), str_squish))
-  
-  ## 
-  c_all <- rbind(c_all, c_cleaned) %>%
-    dplyr::distinct_all(.keep_all = T) %>%
-    arrange(c3, c2, c1)
-}
-
-
-### a list of institutes that are not countries
-c.exlcude <- c(c_all$c1, c_all$c2) %>% 
-  unique() %>% 
-  sort()
-
-
-
-### extended country-iso3 pair list for matching
-load('./Data/Ancillary_Data_iso_eora_ex.RData')  ## ## iso_eora_ex
-iso3_code <- iso_eora_ex %>% 
-  dplyr::select(-IMF) %>%
-  dplyr::distinct_all() %>%
-  as.data.frame()
-
-c.ctr <- c_all %>% 
-  dplyr::distinct(c3) %>%
-  dplyr::filter(str_detect(
-    c3, 
-    paste('region', 'Unspecified', 'unspecified', 'Community', 'Multilateral', 'Project', 
-          'Other donor', 'Indus Basin', 'EU Institutions', sep = '|'), 
-    negate = T)) %>%
-  # dplyr::rename('name' = 'c3') %>%
-  dplyr::mutate(
-    name_clean = str_replace(c3, " \\s*\\([^\\)]+\\)", "")
-  ) %>%
-  left_join(
-    x = .,
-    y = iso3_code,
-    by = c('name_clean' = 'Row')
-  ) %>%
-  arrange(!is.na(iso3_eora)) %>%
-  dplyr::select(-name_clean) %>%
-  as.data.frame()
-
-rm(c, c_cleaned, c_all)
-```
 
 
 
