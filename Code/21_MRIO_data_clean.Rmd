@@ -669,11 +669,20 @@ df_formatted <- readxl::read_excel(fname)
 
 ### - ODA OECD
 
-  See `FDI_data_prep.Rmd` in "./Data/data_01_raw/OECD_ODA/"
+  See `ODA_data_prep.Rmd` in "./Data/data_01_raw/OECD_ODA/"
 
 ```{r}
-ind <- 'ODA_OOF_oecd_matrix'
-ind <- 'ODA_DACSECTOR_oecd_Infrastructure_matrix'
+ind <- 'ODA_OOF_total_matrix'
+ind <- 'ODA_Infrastructure_matrix'
+ind <- 'ODA_Agriculture_matrix'
+ind <- 'ODA_Education_matrix'
+ind <- 'ODA_Energy_matrix'
+ind <- 'ODA_Food_matrix'
+ind <- 'ODA_Water_matrix'
+ind <- 'ODA_Biodiversity_matrix'
+ind <- 'ODA_total_disbursements_matrix'
+ind <- 'ODA_Health_matrix'
+
 yrs <- c(2000, 2005, 2010, 2015)
 dir.i <- './Data/data_01_raw/OECD_ODA/'
 

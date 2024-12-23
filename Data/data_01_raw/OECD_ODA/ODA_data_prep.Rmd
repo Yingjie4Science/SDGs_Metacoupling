@@ -265,6 +265,8 @@ d4 <- d
 
 *Last updated*:   November 15, 2024 at 6:29:10 AM
 
+See data description at `./Data/data_01_raw/OECD_ODA/_readme_ODA_biodiversity.docx`
+
 ```{r}
 
 ### name the indicator
