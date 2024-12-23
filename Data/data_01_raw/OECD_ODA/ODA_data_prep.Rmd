@@ -222,9 +222,10 @@ cols_remove <- c("AgencyName", "Bi_Multi", "CrsID", "ProjectNumber", "InitialRep
                  "IncomegroupName", "TypeRepayment", "NumberRepayment", "CommitmentDate" )
 d5_ <- d5 %>%
   select(-matches("^PSI|^Project|^Interest|^Repay", ignore.case = F)) %>%
-  select(-c(ShortDescription:SDGfocus, 
-            USD_Commitment_Defl:USD_Export_Credit,
-            USD_Received:Keywords,
+  select(-c(ShortDescription:PurposeName, 
+            ChannelCode:SDGfocus, 
+            USD_Commitment_Defl:USD_GrantEquiv,
+            LDCflag:Keywords,
             USD_Interest:CapitalExpend)) %>%
   select(-any_of(cols_remove)) %>%
   filter(str_detect(string = RecipientName, pattern = "unspecified", negate = T),
@@ -240,9 +241,10 @@ d5_ <- d5 %>%
          ) %>%
   select(o_iso3, d_iso3, Recipient, Donor, Year, everything())
 
+names(d5)
 names(d5_)
 unique(d5_$FlowName)
-
+unique(d5$SectorName)
 
 # 28. Biodiversity
 # 29. Climate change – mitigation
@@ -282,6 +284,16 @@ d5_Biodiversity <- d5_bio %>%
 func_format_oda_data(data = d5_Biodiversity, sector_i = 'Biodiversity')
 ```
 
+```{r  - input data 5 - CRS - Health}
+
+d5_Health <- d5_ %>% 
+  filter(str_detect(string = SectorName, pattern = 'Health')) %>%
+  select(-USD_Commitment) %>%
+  rename('Value' = 'USD_Disbursement')
+
+## format data and save as xlsx
+func_format_oda_data(data = d5_Biodiversity, sector_i = 'Health')
+```
 
 ### Country names and code
 
