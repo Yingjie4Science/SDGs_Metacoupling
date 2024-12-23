@@ -4,11 +4,12 @@ author: "Yingjie"
 date: "`r Sys.Date()`"
 output: html_document
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 
-# Set up
+## Set up
+
 ```{r Paths and packages}
 knitr::opts_chunk$set(echo = TRUE)
 
@@ -25,11 +26,62 @@ library(data.table)
 gc()
 ```
 
+```{r Helper data}
+
+yrs <- c(2000, 2005, 2010, 2015)
+
+### use the Eora data as the template 
+f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'template_eora.RData')
+load(f) # `temp_eora`
+
+```
+
+
+
+### Functions
+
+```{r func_format_oda_data}
+## format as the same as EORA data
+func_format_oda_data <- function(data, sector_i) {
+  dfs_flow_f <- data %>%
+    dplyr::mutate(value = Value * 10^6) %>%   ## change the unit to USD
+    rename('year' = 'Year') %>%
+    # dplyr::select(year, iso3, everything()) %>%
+    dplyr::filter(year %in% yrs) %>%
+    dplyr::select(-c(Recipient, Donor, Value)) %>%
+    ## the template can limit the years included
+    merge(x = temp_eora,
+          y = .,
+          by.x = c('year', 'iso3', 'to'),
+          by.y = c('year', 'o_iso3', 'd_iso3'), 
+          all.x = T) %>%
+    as.data.frame()
+  
+  
+  ### To generate the same format as Eora in Matrix
+  df_formatted <- dfs_flow_f %>%
+    ungroup() %>%
+    arrange(year, iso3, to) %>%
+    dplyr::select(year, ctr, everything()) %>%
+    spread(key = to, value = value) %>%
+    arrange(year, iso3)
+  
+  
+  ### Count NA values in the data frame ----------------------------------------------------
+  cat('\n Total NA in', ind, ':\t\t', sum(is.na(df_formatted)), '\n')
+  
+  ### save to the `eora_cleaned` folder ----------------------------------------------------
+  df_formatted %>% group_by(year) %>% tally()
+  fname <- paste0(dir.eora_cleaned, 'ODA_', sector_i, '_matrix.xlsx'); print(fname)
+  writexl::write_xlsx(x = df_formatted, path = fname)
+}
+
+```
 
 
 ## Data
 
-### - ODA OECD
+### Load ODA data
 
   OECD offers several data sources for ODA data. 
   
@@ -50,214 +102,189 @@ gc()
 
 
   * *Unit*:	US Dollar, Millions
+  
+  
+  `Official Flows`: the sum of Official Development Assistance (`ODA`) and Other Official Flows (`OOF`) represents the total (gross or net) disbursements by the official sector at large to the recipient country shown.
 
-```{r - input data- which ? }
-
-###' - 1
+```{r - input data 1 - ODA_OOF}
+###' - 1: bilateral, Total ODA, USD millions
+###'      "Total Official, Gross"
+###'      "Total Official,  Net"
 ###' TotalOFFICIAL_Data_Total official flows by country and region (ODA+OOF).zip ----------
 f <- paste0(dir.raw, 'OECD_ODA/', 
             'TotalOFFICIAL_ODA_OOF/', 
             'TotalOfficial_Data_utf8.csv')
 ### name the indicator
 ind <- 'ODA_OOF_oecd'
+d <- data.table::fread(file = f, sep = ',')
+unique(d$`Aid type`) ## "Total Official, Gross", "Total Official,  Net"
+nrow(d) # 1,989,206
+
+d1 <- d
+```
 
 
-
-###' - 2
+```{r - input data 2 - ODA_disbursements}
+###' - 2: bilateral, by `Aid type`, USD millions
 ###' Table2a_Data_Aid (ODA) disbursements to countries and regions [DAC2a].zip ------------
-# f <- paste0(dir.raw, 'OECD_ODA/',
-#             'Table2a_DAC2a/',
-#             'Table2a_Data_utf8.csv')
-# ### name the indicator
-# ind <- 'ODA_disbursements_oecd'
+f <- paste0(dir.raw, 'OECD_ODA/',
+            'Table2a_DAC2a/',
+            'Table2a_Data_utf8.csv')
+### name the indicator
+ind <- 'ODA_disbursements_oecd'
+d <- data.table::fread(file = f, sep = ',')
+names(d)
+unique(d$`Aid type`)
+nrow(d) # 9,255,500
+
+d2 <- d
+```
 
 
-
-###' - 3
+```{r - input data 3 - ODA_DACGEO}
+###' - 3: bilateral, by `Series (Aid type)`, USD millions
 ###' DACGEO_Data_GeoBook-Geographical flows to developing countries.zip -------------------
-# f <- paste0(dir.raw, 'OECD_ODA/', 
-#             'DACGEO_Data_GeoBook-Geographical flows to developing countries/', 
-#             'DACGEO_Data_utf8.csv')
-# ### name the indicator
-# ind <- 'ODA_DACGEO_oecd'
+f <- paste0(dir.raw, 'OECD_ODA/',
+            'DACGEO_Data_GeoBook-Geographical flows to developing countries/',
+            'DACGEO_Data_utf8.csv')
+### name the indicator
+ind <- 'ODA_DACGEO_oecd'
+d <- data.table::fread(file = f, sep = ',')
+names(d)
+unique(d$`Series`)
+nrow(d) # 3,615,548
+
+d3 <- d
+```
 
 
-
-###' - 4
+```{r - input data 4 - ODA_DACSECTOR}
+###' - 4: bilateral, by `Sector (Aid type)`, USD millions
 ###' DACSECTOR_Data_GeoBook ODA by sector - bilateral commitments by donor and recipient.zip
 f <- paste0(dir.raw, 'OECD_ODA/',
             'DACSECTOR_Data_GeoBook ODA by sector - bilateral commitments by donor and recipient/',
             'DACSECTOR_Data_utf8.csv')
 ### name the indicator
 ind <- 'ODA_DACSECTOR_oecd'
+d <- data.table::fread(file = f, sep = ',')
+names(d)
+unique(d$`Sector`)
+nrow(d) # 569,833
+
+d4 <- d
 ```
 
 
 
-#### * Tidy data
+*CRS: Creditor Reporting System (flows)*
+  The objective of the CRS Aid Activity database is to provide a set of readily available granular data that enables analysis on where aid goes, what purposes it serves and what policies it aims to implement, on a comparable basis for all providers who report their activity-level statistics to the OECD. Data are collected on individual projects and programmes, with a range of attributes for each activity. Further information on the definition and possible values of each attribute can be found in the Converged Statistical Reporting Directives.
 
-```{r}
-# The 'fread' function automatically detects the delimiter (comma in this case)
+*Dimensions*: Donor, Recipient, Sector, Measure, Channel, Modality, Flow type, Price base, Drilldown dimension, Time period
 
-cols_to_remove <- c("RECIPIENT", "DONOR", 
-                    "AIDTYPE", "SERIES",
-                    "SECTOR", 
-                    "PART", 'AMOUNTTYPE', 'TIME', 'Flags')
+*Last updated*:   November 15, 2024 at 6:29:10 AM
 
+```{r - input data 5 - CRS }
 
-data <- data.table::fread(file = f, sep = ',')
+### name the indicator
+ind <- 'ODA_CRS'
 
-names(data)
-# unique(data$Recipient)
-# unique(data$Donor)
-unique(data$`Aid type`)
-unique(data$Series)
-unique(data$Sector)
+fs <- list.files(path = paste0(dir.raw, 'OECD_ODA/CRS data/'), pattern = 'CRS.*txt', full.names = T)
 
-unique(data$Part)          ## "1 : Part I - Developing Countries"     "2 : Part II - Countries in Transition"
-unique(data$`Amount type`) ## "Current Prices (USD millions)"       "Constant Prices (2021 USD millions)"
-unique(data$Sector) %>% str_to_title()
-```
+d5 <- data.frame()
 
-
-
-```{r - data 1, eval=FALSE, include=FALSE}
-if (ind == 'ODA_DACGEO_oecd'){
-  dat_ <- data %>%
-    ### rename a column to keep consistent 
-    setNames(gsub("Series", "Aid type", names(.))) %>%
-    ### Adding column if it does not exist (because `DACGEO_oecd`does not have this column)
-    rowwise() %>%
-    dplyr::mutate(
-      `Amount type` = ifelse("Amount type" %in% names(.), 
-                             `Amount type`, 
-                             "Constant Prices (2021 USD millions)")) %>%
-    as.data.frame() 
-} else if (ind != 'ODA_DACSECTOR_oecd') {
-  dat_ <- data
-} else {
-  cat('\n', 'please load the `by sector` data', '\n\n')
+for (f in fs) {
+  d <- readr::read_delim(file = f, delim ="|", show_col_types = FALSE)
+  d5 <- rbind(d5, d)
 }
 
 
-data_ <- dat_ %>%
-  dplyr::select(-any_of(cols_to_remove)) %>%
-  dplyr::filter(
-    `Aid type` %in% c("Total Official, Gross", 
-                      "ODA Gross Loans", 
-                      "ODA: Total Net",
-                      "Total ODA Net"),
-    `Amount type` == "Constant Prices (2021 USD millions)",
-    Year >= 2010
-  )
+names(d5)
+# unique(d$`Sector`)
+nrow(d5) # 569,833
 
-unique(data_$`Aid type`)
+d5 %>% distinct(FlowCode, FlowName) %>% arrange(FlowCode)
+# FlowCode    FlowName
+# 11	ODA Grants			
+# 13	ODA Loans	
+# 14	Other Official Flows (non Export Credit)
+# 19	Equity Investment
+# 30	Private Development Finance			
+		
+##' 17. Grants, loans and other flows entering the calculation of the grant equivalent ODA measure are referred to as ODA flows. 
+##' 18. Other official flows (excluding officially supported export credits – see paragraph 19) are defined as transactions by the official sector which do not meet the conditions for eligibility as ODA
+##' --> 11 + 13 + 14 => ODA
 
-### if there are > 1 `Aid type` in the data, we need to further decide which one to keep
-if( length(unique(data_$`Aid type`)) > 1) {
-  data_check <- data_ %>%
-    spread(key = 'Aid type', value = 'Value')
-  
-  data_check %>%
-    ggplot(aes(x = `ODA Gross Loans`, y = `ODA: Total Net`)) +
-    geom_point() +
-    geom_abline(slope = 1) +
-    theme_bw()
-  
-  ## check number of NA
-  sum(is.na(data_check$`ODA Gross Loans`))
-  sum(is.na(data_check$`ODA: Total Net`))  ## less NA, large values
-  
-  ## keep one of the 'Aid type' for further analysis
-  data_aidtype <- data_ %>%
-    dplyr::filter(`Aid type` == "ODA: Total Net")
-  unique(data_aidtype$`Aid type`)  
-} else {
-  data_aidtype <- data_
-}
-
-
-### aggregate data after filtering -------------------------------------------------------
-cols_to_remove2 <- c("Aid type", "Amount type", "Part")
-
-data_agg <- data_aidtype %>%
-  dplyr::select(-any_of(cols_to_remove2)) %>%
-  group_by(Recipient, Donor, Year) %>%
-  dplyr::summarise_at(c("Value"), sum, na.rm = TRUE) %>%
-  ungroup() %>%
-  as.data.frame()
-
-data_wide <- data_agg %>%
-  spread(key = 'Recipient', value = 'Value')
-
-
-names(data_agg)
-rm(data)
-gc()
-```
-
-
-
-
-```{r - data 2 - by sector, eval=FALSE, include=FALSE}
-
-data_sec <- data %>%
-    ### rename a column to keep consistent 
-    # setNames(gsub("Series", "Aid type", names(.))) %>%
-  dplyr::select(-any_of(cols_to_remove)) %>%
-  dplyr::filter(
-    Year >= 2010
+# Remove columns where names contain "apple"
+cols_remove <- c("AgencyName", "Bi_Multi", "CrsID", "ProjectNumber", "InitialReport", "RegionName", 
+                 "DonorCode", "AgencyCode", "DEIncomegroupCode",
+                 "RecipientCode", 'RegionCode', 'IncomegroupCode', 'CurrencyCode',
+                 "Finance_T", "Aid_T", "DERegioncode",
+                 "IncomegroupName", "TypeRepayment", "NumberRepayment", "CommitmentDate" )
+d5_ <- d5 %>%
+  select(-matches("^PSI|^Project|^Interest|^Repay", ignore.case = F)) %>%
+  select(-c(ShortDescription:SDGfocus, 
+            USD_Commitment_Defl:USD_Export_Credit,
+            USD_Received:Keywords,
+            USD_Interest:CapitalExpend)) %>%
+  select(-any_of(cols_remove)) %>%
+  filter(str_detect(string = RecipientName, pattern = "unspecified", negate = T),
+         str_detect(string = DERecipientcode, pattern = "_X", negate = T),
+         nchar(DEDonorcode) == 3,
+         nchar(DERecipientcode) == 3,
+         FlowCode < 15
   ) %>%
-  as.data.frame() 
+  rename('o_iso3' = 'DEDonorcode', 
+         'd_iso3' = 'DERecipientcode',
+         'Donor' = 'DonorName',
+         'Recipient' = 'RecipientName'
+         ) %>%
+  select(o_iso3, d_iso3, Recipient, Donor, Year, everything())
+
+names(d5_)
+unique(d5_$FlowName)
 
 
-data_sec_agg <- data_sec %>%
-  group_by(Recipient, Donor, Sector, Year) %>%
-  dplyr::summarise_at(c("Value"), sum, na.rm = TRUE) %>%
+# 28. Biodiversity
+# 29. Climate change – mitigation
+# 30. Climate change – adaptation
+# 31. Desertification
+# # 2=principal objective
+# # 1=significant objective
+# # 0=not targeted
+# # Blank=not screened
+```
+
+
+```{r - input data 5 - CRS - Biodiversity}
+d5_bio <- d5_ %>%
+  filter(Biodiversity > 0) %>%
+  group_by(o_iso3, d_iso3, Recipient, Donor, Year) %>%
+  summarise_at(c("USD_Commitment", "USD_Disbursement"), sum, na.rm = TRUE) %>%
   ungroup() %>%
   as.data.frame()
 
 
-sector_i <- 'Infrastructure'
-data_sec_agg_infr <- data_sec_agg %>%
-  dplyr::filter(stringr::str_detect(Sector, regex('Infrastructure|Multisector|Transport', ignore_case=TRUE))) %>%
-  group_by(Recipient, Donor, Year) %>%
-  dplyr::summarise_at(c("Value"), sum, na.rm = TRUE) %>%
-  ungroup() %>%
-  # dplyr::filter(Year == 2015) %>%
-  as.data.frame()
+d5_bio %>%
+  ggplot() +
+  geom_point(aes(x=USD_Commitment, y=USD_Disbursement)) +
+  geom_abline(slope = 1, color = 'red') +
+  scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+  scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x)))
 
-# unique(data_sec_agg_infr$Sector)
+
+d5_Biodiversity <- d5_bio %>%
+  select(-USD_Commitment) %>%
+  rename('Value' = 'USD_Disbursement')
+
+## format data and save as xlsx
+func_format_oda_data(data = d5_Biodiversity, sector_i = 'Biodiversity')
 ```
 
 
+### Country names and code
 
-```{r - compare data}
-if (ind == 'ODA_DACSECTOR_oecd'){
-  data_agg <- data_sec_agg_infr %>%
-    dplyr::mutate(
-      Donor = ifelse(str_detect(Donor, "Ivoire"), "Côte d'Ivoire", Donor),
-      Donor = ifelse(str_detect(Donor, "rkiye"), "Türkiye", Donor),
-      Recipient = ifelse(str_detect(Recipient, "Ivoire"), "Côte d'Ivoire", Recipient),
-      Recipient = ifelse(str_detect(Recipient, "rkiye"), "Türkiye", Recipient),
-      ) %>%
-    as.data.frame()
-} else{
-  data_agg = data_agg
-}
-
-
-### 
-cat('\n Total rows of data in', ind, ': \t\t', nrow(data_agg), '\n')
-
-##' Total rows of data in ODA_OOF_oecd : 		         151609
-##' Total rows of data in ODA_disbursements_oecd : 	 164060 -- best?
-##' Total rows of data in DACGEO_oecd : 		         126893 
-##' Total rows of data in ODA_DACSECTOR_oecd : 		    46758
-```
-
-
-#### * Country names
 ```{r - tidy names}
 ### clean the country names and add iso3 code --------------------------------------------
 f <- paste0(dir.raw, 'OECD_ODA/', "Recipient_13_266.xlsx")
@@ -333,130 +360,445 @@ rm(c, c_cleaned, c_all)
 
 
 
-#### * Final data
+### Tidy data
 
-```{r - filter and tidy data}
-data_ctr <- data_agg %>%
-  dplyr::filter(!Recipient %in% c.exlcude,
-                !Donor %in% c.exlcude) %>%
-  left_join(x = .,
-            y = c.ctr, 
-            by = c('Recipient' = 'c3')) %>%
-  dplyr::rename('iso3_reci' = 'iso3_eora') %>%
-  left_join(x = .,
-            y = c.ctr, 
-            by = c('Donor' = 'c3')) %>%
-  dplyr::rename('iso3_send' = 'iso3_eora') %>%
-  arrange(!is.na(iso3_send), !is.na(iso3_reci)) %>%
+```{r function}
+
+func_join_country_code <- function(data) {
+  d <- data %>%
+    ## remove non-country names
+    dplyr::filter(!Recipient %in% c(
+      c.exlcude, 'CABEI', 'EC', 'EDF', 'EBRD', 'EIB', 'CEC FOR CEEC/NIS',
+      'IBRD', 'IDB', 'MIGA', 'IFC', 'IDA-MDRI', 'IDA', 'IMF',
+      'IDB Special Oper. Fund', 'Caribbean Dev. Bank', 'Af. D B', 'African Dev. Fund',
+      'Other EU institutions', 'Other UN',
+      'Asian Dev. Bank'),
+                  !Donor %in% c.exlcude) %>%
+    dplyr::filter(str_detect(Donor, 'Agricole Foundation', negate = T)) %>%
+    dplyr::filter(str_detect(Recipient, 'Unspecified|Multilateral|Other Regional Banks|Part II|Other World Bank|Special Funds', negate = T)) %>%
+    dplyr::mutate(
+        Donor = ifelse(str_detect(Donor, "Ivoire"), "Côte d'Ivoire", Donor),
+        Donor = ifelse(str_detect(Donor, "kiye"), "Türkiye", Donor),
+        Recipient = ifelse(str_detect(Recipient, "Ivoire"), "Côte d'Ivoire", Recipient),
+        Recipient = ifelse(str_detect(Recipient, "kiye"), "Türkiye", Recipient),
+        ) %>%
+    
+    ## add country code
+    left_join(x = .,
+              y = c.ctr, 
+              by = c('Recipient' = 'c3')) %>%
+    dplyr::rename('d_iso3' = 'iso3_eora') %>%
+    left_join(x = .,
+              y = c.ctr, 
+              by = c('Donor' = 'c3')) %>%
+    dplyr::rename('o_iso3' = 'iso3_eora') %>%
+    arrange(!is.na(o_iso3), !is.na(d_iso3)) %>%
+    as.data.frame()
+  
+  return(d)
+}
+
+
+```
+
+
+```{r}
+# The 'fread' function automatically detects the delimiter (comma in this case)
+
+cols_to_remove <- c("RECIPIENT", "DONOR", "DATATYPE",
+                    "AIDTYPE", "SERIES",
+                    "SECTOR", 
+                    "PART", 'AMOUNTTYPE', 'TIME', 'Flags')
+
+
+data <- d3
+
+names(data)
+# unique(data$Recipient)
+# unique(data$Donor)
+unique(data$`Aid type`)
+unique(data$Series)
+unique(data$Sector)
+
+unique(data$Part)          ## "1 : Part I - Developing Countries"     "2 : Part II - Countries in Transition"
+unique(data$`Amount type`) ## "Current Prices (USD millions)"       "Constant Prices (2021 USD millions)"
+unique(data$Sector) %>% str_to_title()
+```
+
+#### data 1 - Total Official, Gross
+```{r}
+d1_total_o_gross <- d1 %>%
+  filter(`Aid type` == "Total Official, Gross",
+         `Amount type` == "Constant Prices (2021 USD millions)") %>%
+  dplyr::filter(Year >= 2000) %>%
+  ## these columns represent but repeat the text columns 
+  dplyr::select(-any_of(cols_to_remove)) %>%
+  func_join_country_code(data = .) %>%
+  as.data.frame() 
+
+
+unique(d1_total_o_gross$Part)
+names(d1_total_o_gross)
+
+d1_total_o_gross %>%
+  distinct(o_iso3, d_iso3, Year) %>%
+  nrow()
+
+
+d1_total_o_gross <- d1_total_o_gross %>%
+  group_by(o_iso3, d_iso3, Recipient, Donor, Year) %>%
+  dplyr::summarise_at(c("Value"), sum, na.rm = TRUE) %>%
+  ungroup() %>%
   as.data.frame()
 
 
-
-# c.check <- data_ctr %>%
-#   dplyr::distinct(Recipient, Donor) %>%
-#   # dplyr::distinct_all() %>%
-#   # dplyr::distinct_at(vars(Recipient, Donor)) %>%
-#   as.data.frame()
-# 
-# c.check.r <- c.check %>%
-#   dplyr::distinct(Recipient)
-# 
-# c.check.d <- c.check %>%
-#   dplyr::distinct(Donor)
+## format data and save as xlsx
+func_format_oda_data(data = d1_total_o_gross, sector_i = 'OOF_total') ## Total Official = ODA + OOF
 ```
 
 
 
+
+#### data 2 - `ODA Total, Gross disbursements`; `ODA: Total Net`
+
+```{r}
+
+d2_ <- d2 %>%
+  dplyr::filter(Year >= 2000) %>%
+  ## these columns represent but repeat the text columns 
+  dplyr::select(-any_of(cols_to_remove)) %>%
+  func_join_country_code(data = .) %>%
+  filter(`Amount type` == "Constant Prices (2021 USD millions)") %>%
+  as.data.frame() 
+
+names(d2_)
+unique(d2_$`Aid type`) %>% sort()
+
+
+d2_total_oda_gross <- d2_ %>%
+  filter(`Aid type` == "Memo: ODA Total, Gross disbursements") %>%
+  group_by(o_iso3, d_iso3, Recipient, Donor, Year) %>%
+  dplyr::summarise_at(c("Value"), sum, na.rm = TRUE) %>%
+  ungroup() %>%
+  as.data.frame()
+## format data and save as xlsx
+func_format_oda_data(data = d2_total_oda_gross, sector_i = 'total_disbursements')
+```
+
+
+
+
+
+#### data 3 - Total Official Gross, Total ODA Gross, Food Aid
+
+```{r}
+d3_ <- d3 %>%
+  ### rename a column to keep consistent 
+  setNames(gsub("Series", "Aid type", names(.))) %>%
+  ### Adding column if it does not exist (because `DACGEO_oecd`does not have this column)
+  rowwise() %>%
+  dplyr::mutate(
+    `Amount type` = ifelse("Amount type" %in% names(.), 
+                           `Amount type`, 
+                           "Constant Prices (2021 USD millions)")) %>%
+  dplyr::filter(Year >= 2000) %>%
+  ## these columns represent but repeat the text columns 
+  dplyr::select(-any_of(cols_to_remove)) %>%
+  as.data.frame() 
+
+
+d3_sec <- d3_ %>%
+  dplyr::filter(
+    `Aid type` %in% c("Food Aid",             # d3
+                      "Total OOF Gross",      # d3
+                      "Total Official Gross", # d3
+                      "Total ODA Gross",      # d3
+                      "Total ODA Net"),       # d3
+    `Amount type` == "Constant Prices (2021 USD millions)",
+    Year >= 2000
+  ) %>%
+  func_join_country_code(data = .) %>%
+  as.data.frame()
+
+unique(d3_sec$`Aid type`)
+
+
+
+### if there are > 1 `Aid type` in the data, we need to further decide which one to keep
+d3_sec_check <- d3_sec %>%
+  spread(key = 'Aid type', value = 'Value')
+
+d3_sec_check %>%
+  # ggplot(aes(x = `ODA Gross Loans`, y = `ODA: Total Net`)) + ## `d2`
+  ggplot(aes(x = `Total ODA Gross`, y = `Total Official Gross`)) +  ## `d3`
+  geom_point(alpha = 0.5) +
+  geom_abline(slope = 1, color = 'red') +
+  labs(x = 'Total ODA Gross', y = 'Total Official Gross') +
+  theme_bw()
+
+# ## check number of NA
+# ##' for `d3`
+# sum(is.na(d3_sec_check$`Total ODA Gross`)) ## larger values
+# sum(is.na(d3_sec_check$`Total Official Gross`))   ## less NA
+```
+
+
+```{r - Total Official Gross}
+
+### aggregate data after filtering -------------------------------------------------------
+d3_total_o_gross <- d3_sec %>%
+  dplyr::filter(`Aid type` == "Total Official Gross") %>%
+  group_by(o_iso3, d_iso3, Recipient, Donor, `Aid type`, Year) %>%
+  dplyr::summarise_at(c("Value"), sum, na.rm = TRUE) %>%
+  ungroup() %>%
+  as.data.frame()
+
+
+d3_total_oda_gross <- d3_sec %>%
+  dplyr::filter(`Aid type` == "Total ODA Gross") %>%
+  group_by(o_iso3, d_iso3, Recipient, Donor, Year) %>%
+  dplyr::summarise_at(c("Value"), sum, na.rm = TRUE) %>%
+  ungroup() %>%
+  as.data.frame()
+# ## format data and save as xlsx
+# func_format_oda_data(data = d3_total_oda_gross, sector_i = 'total')
+# ##' ! `d2_total_oda_gross` is better with fewer NA
+
+
+## ! no country specific data for this indicator
+d3_total_oof_gross <- d3_sec %>%
+  dplyr::filter(`Aid type` == "Total OOF Gross") %>%
+  group_by(o_iso3, d_iso3, Recipient, Donor, `Aid type`, Year) %>%
+  dplyr::summarise_at(c("Value"), sum, na.rm = TRUE) %>%
+  ungroup() %>%
+  as.data.frame()
+
+```
+
+
+
+```{r - Food aid}
+sector_i <- 'Food' 
+d3_sec_food <- d3_sec %>%
+  dplyr::filter(stringr::str_detect(`Aid type`, regex(sector_i, ignore_case=TRUE))) %>%
+  group_by(o_iso3, d_iso3, Recipient, Donor, `Aid type`, Year) %>%
+  dplyr::summarise_at(c("Value"), sum, na.rm = TRUE) %>%
+  ungroup() %>%
+  as.data.frame()
+```
+
+
+
+####  data 4 - by sector
+
+  Refer to `./Data/data_01_raw/OECD_ODA/ODA_data_compare.xlsx`, which is derived from [OECD](https://data-explorer.oecd.org/). 
+
+```{r}
+d4_sec <- d4 %>%
+    ### rename a column to keep consistent 
+    # setNames(gsub("Series", "Aid type", names(.))) %>%
+  dplyr::select(-any_of(cols_to_remove)) %>%
+  dplyr::filter(
+    Year >= 2000
+  ) %>%
+  as.data.frame() 
+names(d4_sec)
+
+d4_sec_agg <- d4_sec %>%
+  group_by(Recipient, Donor, Sector, Year) %>%
+  dplyr::summarise_at(c("Value"), sum, na.rm = TRUE) %>%
+  ungroup() %>%
+  func_join_country_code(data = .) %>%
+  as.data.frame()
+```
+
+
+```{r - data by sector}
+sector_i <- 'Agriculture'
+d4_sec_agriculture <- d4_sec_agg %>%
+  dplyr::filter(stringr::str_detect(Sector, regex(sector_i, ignore_case=TRUE))) %>%
+  group_by(o_iso3, d_iso3, Recipient, Donor, Sector, Year) %>%
+  dplyr::summarise_at(c("Value"), sum, na.rm = TRUE) %>%
+  ungroup() %>%
+  # dplyr::filter(Year == 2015) %>%
+  select(-Sector) %>%
+  as.data.frame()
+
+## format data and save as xlsx
+func_format_oda_data(data = d4_sec_agriculture, sector_i = sector_i)
+
+
+
+sector_i <- 'Energy'
+d4_sec_energy <- d4_sec_agg %>%
+  dplyr::filter(stringr::str_detect(Sector, regex(sector_i, ignore_case=TRUE))) %>%
+  group_by(o_iso3, d_iso3, Recipient, Donor, Sector, Year) %>%
+  dplyr::summarise_at(c("Value"), sum, na.rm = TRUE) %>%
+  ungroup() %>%
+  # dplyr::filter(Year == 2015) %>%
+  select(-Sector) %>%
+  as.data.frame()
+## format data and save as xlsx
+func_format_oda_data(data = d4_sec_agriculture, sector_i = sector_i)
+
+
+
+
+sector_i <- 'Education'
+d4_sec_education <- d4_sec_agg %>%
+  dplyr::filter(stringr::str_detect(Sector, regex(sector_i, ignore_case=TRUE))) %>%
+  group_by(o_iso3, d_iso3, Recipient, Donor, Sector, Year) %>%
+  dplyr::summarise_at(c("Value"), sum, na.rm = TRUE) %>%
+  ungroup() %>%
+  # dplyr::filter(Year == 2015) %>%
+  select(-Sector) %>%
+  as.data.frame()
+## format data and save as xlsx
+func_format_oda_data(data = d4_sec_agriculture, sector_i = sector_i)
+
+
+
+
+
+sector_i <- 'Food'
+d4_sec_food <- d4_sec_agg %>%
+  dplyr::filter(stringr::str_detect(Sector, regex(sector_i, ignore_case=TRUE))) %>%
+  group_by(o_iso3, d_iso3, Recipient, Donor, Sector, Year) %>%
+  dplyr::summarise_at(c("Value"), sum, na.rm = TRUE) %>%
+  ungroup() %>%
+  # dplyr::filter(Year == 2015) %>%
+  select(-Sector) %>%
+  as.data.frame()
+## format data and save as xlsx
+func_format_oda_data(data = d4_sec_agriculture, sector_i = sector_i)
+
+
+
+sector_i <- 'Infrastructure'
+d4_sec_infr <- d4_sec_agg %>%
+  dplyr::filter(stringr::str_detect(Sector, regex('Infrastructure|Transport', ignore_case=TRUE))) %>%
+  group_by(o_iso3, d_iso3, Recipient, Donor, Year) %>%
+  dplyr::summarise_at(c("Value"), sum, na.rm = TRUE) %>%
+  ungroup() %>%
+  # dplyr::filter(Year == 2015) %>%
+  as.data.frame()
+# unique(d4_sec_agg_infr$Sector)
+## format data and save as xlsx
+func_format_oda_data(data = d4_sec_agriculture, sector_i = sector_i)
+
+
+
+sector_i <- 'Water'
+d4_sec_water <- d4_sec_agg %>%
+  dplyr::filter(stringr::str_detect(Sector, regex(sector_i, ignore_case=TRUE))) %>%
+  group_by(o_iso3, d_iso3, Recipient, Donor, Sector, Year) %>%
+  dplyr::summarise_at(c("Value"), sum, na.rm = TRUE) %>%
+  ungroup() %>%
+  # dplyr::filter(Year == 2015) %>%
+  select(-Sector) %>%
+  as.data.frame()
+## format data and save as xlsx
+func_format_oda_data(data = d4_sec_agriculture, sector_i = sector_i)
+```
+
+
+
+#### compare data
+
+```{r - o_gross}
+
+##' `d1_total_o_gross` VS `d3_total_o_gross` 
+names(d1_total_o_gross)
+names(d3_total_o_gross)
+
+dd <- d1_total_o_gross %>%
+  merge(x = ., 
+        y = d3_total_o_gross, 
+        all = T, 
+        by = c("o_iso3", "d_iso3", "Donor", "Recipient", "Year" ))
+  
+dd %>%
+  ggplot() +
+  geom_point(aes(x = Value.x, y = Value.y)) +
+  geom_abline(slope = 1, color = 'red')
+```
+
+
+
+```{r - oda_gross}
+
+## `d2_total_oda_gross` VS `d3_total_oda_gross`
+names(d2_total_oda_gross)
+names(d3_total_oda_gross)
+
+dd <- d2_total_oda_gross %>%
+  merge(x = ., 
+        y = d3_total_oda_gross, 
+        all = T, 
+        by = c("o_iso3", "d_iso3", "Donor", "Recipient", "Year" ))
+  
+dd %>%
+  ggplot() +
+  geom_point(aes(x = Value.x, y = Value.y)) +
+  geom_abline(slope = 1, color = 'red')
+```
+
+
+```{r - food}
+## compare sector data -- food -----------------------------------------------------------
+names(d3_sec_food)
+names(d4_sec_food)
+
+dd <- d3_sec_food %>%
+  merge(x = ., 
+        y = d4_sec_food, 
+        all = T, 
+        by = c("o_iso3", "d_iso3", "Donor", "Recipient" , "Year" ))
+  
+dd %>%
+  ggplot() +
+  geom_point(aes(x = Value.x, y = Value.y)) +
+  geom_abline(slope = 1, color = 'red')
+
+```
+
+
+
+
+
+
+### Final data
 
 ```{r - format the same as EORA}
 
-yrs <- c(2000, 2005, 2010, 2015)
+##' Load function `func_format_oda_data`
 
-### use the Eora data as the template 
-f <- paste0('./Data/data_02_intermediate/dt02_flows/', 'template_eora.RData')
-load(f) # `temp_eora`
-
-
-## format as the same as EORA data
-dfs_flow_f <- data_ctr %>%
-  dplyr::mutate(value = Value * 10^6) %>%   ## change the unit to USD
-  rename('year' = 'Year') %>%
-  # dplyr::select(year, iso3, everything()) %>%
-  dplyr::filter(year %in% yrs) %>%
-  dplyr::select(-c(Recipient, Donor, Value)) %>%
-  ## the template can limit the years included
-  merge(x = temp_eora,
-        y = .,
-        by.x = c('year', 'iso3', 'to'),
-        by.y = c('year', 'iso3_send', 'iso3_reci'), all.x = T) %>%
-  as.data.frame()
-
-
-
-### To generate the same format as Eora in Matrix
-df_formatted <- dfs_flow_f %>%
-  ungroup() %>%
-  arrange(year, iso3, to) %>%
-  dplyr::select(year, ctr, everything()) %>%
-  spread(key = to, value = value) %>%
-  arrange(year, iso3)
-
-
-### Count NA values in the data frame ----------------------------------------------------
-cat('\n Total NA in', ind, ':\t\t', sum(is.na(df_formatted)), '\n')
-
-##' Total NA in ODA_OOF_oecd :		           136306 -- best
-##' Total NA in ODA_disbursements_oecd :		 136332
-##' Total NA in DACGEO_oecd :		             136594
-##' 
-df_formatted.check <- df_formatted %>%
-  dplyr::filter(year == 2015) %>%
-  gather(key = 'Recipient', value = 'value', 4:ncol(.)) 
-
-df_formatted.check2 <- df_formatted.check %>%
-  dplyr::filter(year == 2015, 
-                ctr == 'Australia') %>%
-  dplyr::mutate(value_million = value/10^6)
-cat('\n Total NA in', ind, 'in 2015:\t\t', sum(is.na(df_formatted.check$value)), '\n')
-
-##' Total NA in ODA_OOF_oecd in 2015:		           32351 -- best
-##' Total NA in ODA_disbursements_oecd in 2015:		 32368
-##' Total NA in DACGEO_oecd in 2015:		           32469 
-##' 
-##' It seems that *ODA_OOF_oecd* is a better data source!
-##' 
-
-
-### save to the `eora_cleaned` folder ----------------------------------------------------
-df_formatted %>%
-  group_by(year) %>% tally()
-fname <- paste0(dir.eora_cleaned, ind, '_', sector_i, '_matrix.xlsx'); fname
-writexl::write_xlsx(x = df_formatted, path = fname)
-gc()
 ```
 
 
-```{r - compare, eval=FALSE, include=FALSE}
-f <- paste0(dir.eora_cleaned, 'ODA_OOF_oecd_matrix', '.xlsx')
-d1 <- readxl::read_excel(f) %>%
-  dplyr::filter(year == 2015) %>%
-  gather(key = 'to', value = 'value', 4:ncol(.))
-f <- paste0(dir.eora_cleaned, 'ODA_DACSECTOR_oecd_Infrastructure_matrix', '.xlsx')
-d2 <- readxl::read_excel(f)%>%
+```{r - compare}
+f <- paste0(dir.eora_cleaned, 'ODA_OOF_total_matrix', '.xlsx')
+df1 <- readxl::read_excel(f) %>%
   dplyr::filter(year == 2015) %>%
   gather(key = 'to', value = 'value', 4:ncol(.))
 
-d3 <- d1 %>%
-  left_join(., d2, by=c("year","ctr","iso3", "to"))
+f <- paste0(dir.eora_cleaned, 'ODA_Infrastructure_matrix', '.xlsx')
+df4 <- readxl::read_excel(f)%>%
+  dplyr::filter(year == 2015) %>%
+  gather(key = 'to', value = 'value', 4:ncol(.))
 
-d3 %>%
+df14 <- df1 %>%
+  left_join(., df4, by=c("year","ctr","iso3", "to"))
+
+df14 %>%
   ggplot(aes(x = value.x, y = value.y)) +
   geom_point() +
+  labs(x = 'df1', y = 'df4') +
   geom_abline(slope = 1, color = 'red') +
-  scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
-                labels = trans_format("log10", math_format(10^.x))) +
-  scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
-                labels = trans_format("log10", math_format(10^.x))) +
+  # scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+  #               labels = trans_format("log10", math_format(10^.x))) +
+  # scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+  #               labels = trans_format("log10", math_format(10^.x))) +
   theme_bw()
 ```
 
